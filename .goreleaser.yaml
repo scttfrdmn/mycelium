@@ -160,6 +160,7 @@ brews:
       owner: scttfrdmn
       name: homebrew-tap
       branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     directory: Formula
     homepage: https://github.com/scttfrdmn/mycelium
     description: "Find and discover AWS EC2 instance types"
@@ -176,6 +177,7 @@ brews:
       owner: scttfrdmn
       name: homebrew-tap
       branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     directory: Formula
     homepage: https://github.com/scttfrdmn/mycelium
     description: "Launch ephemeral AWS EC2 instances effortlessly"
@@ -194,6 +196,7 @@ scoops:
       owner: scttfrdmn
       name: scoop-bucket
       branch: main
+      token: "{{ .Env.SCOOP_BUCKET_GITHUB_TOKEN }}"
     directory: bucket
     homepage: https://github.com/scttfrdmn/mycelium
     description: "Find and discover AWS EC2 instance types"
@@ -206,6 +209,7 @@ scoops:
       owner: scttfrdmn
       name: scoop-bucket
       branch: main
+      token: "{{ .Env.SCOOP_BUCKET_GITHUB_TOKEN }}"
     directory: bucket
     homepage: https://github.com/scttfrdmn/mycelium
     description: "Launch ephemeral AWS EC2 instances effortlessly"
