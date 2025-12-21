@@ -1,6 +1,8 @@
 # Goreleaser configuration for mycelium (truffle + spawn)
 # https://goreleaser.com
 
+version: 2
+
 before:
   hooks:
     - go mod download
@@ -10,7 +12,8 @@ before:
 builds:
   # truffle - EC2 instance search tool
   - id: truffle
-    main: ./truffle
+    dir: truffle
+    main: .
     binary: truffle
     env:
       - CGO_ENABLED=0
@@ -30,7 +33,8 @@ builds:
 
   # spawn - EC2 instance launcher
   - id: spawn
-    main: ./spawn
+    dir: spawn
+    main: .
     binary: spawn
     env:
       - CGO_ENABLED=0
@@ -50,7 +54,8 @@ builds:
 
   # spawnd - Daemon (Linux only)
   - id: spawnd
-    main: ./spawn/cmd/spawnd
+    dir: spawn
+    main: ./cmd/spawnd
     binary: spawnd
     env:
       - CGO_ENABLED=0
@@ -85,12 +90,26 @@ archives:
   - id: spawn-archive
     builds:
       - spawn
-      - spawnd
     name_template: 'spawn_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
     format: tar.gz
     format_overrides:
       - goos: windows
         format: zip
+    files:
+      - spawn/README.md
+      - spawn/IAM_PERMISSIONS.md
+      - DEPLOYMENT_GUIDE.md
+      - SECURITY.md
+      - scripts/setup-spawnd-iam-role.sh
+      - scripts/validate-permissions.sh
+      - LICENSE*
+      - README.md
+
+  - id: spawnd-archive
+    builds:
+      - spawnd
+    name_template: 'spawnd_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+    format: tar.gz
     files:
       - spawn/README.md
       - spawn/IAM_PERMISSIONS.md
@@ -141,7 +160,7 @@ brews:
       owner: scttfrdmn
       name: homebrew-tap
       branch: main
-    folder: Formula
+    directory: Formula
     homepage: https://github.com/scttfrdmn/mycelium
     description: "Find and discover AWS EC2 instance types"
     license: MIT
@@ -157,7 +176,7 @@ brews:
       owner: scttfrdmn
       name: homebrew-tap
       branch: main
-    folder: Formula
+    directory: Formula
     homepage: https://github.com/scttfrdmn/mycelium
     description: "Launch ephemeral AWS EC2 instances effortlessly"
     license: MIT
@@ -165,17 +184,6 @@ brews:
       system "#{bin}/spawn", "version"
     install: |
       bin.install "spawn"
-      if OS.linux?
-        bin.install "spawnd"
-      end
-      # Install documentation
-      doc.install "spawn/README.md"
-      doc.install "spawn/IAM_PERMISSIONS.md"
-      doc.install "DEPLOYMENT_GUIDE.md"
-      doc.install "SECURITY.md"
-      # Install scripts
-      (prefix/"scripts").install "scripts/setup-spawnd-iam-role.sh"
-      (prefix/"scripts").install "scripts/validate-permissions.sh"
 
 # Scoop Bucket
 scoops:
@@ -186,7 +194,7 @@ scoops:
       owner: scttfrdmn
       name: scoop-bucket
       branch: main
-    folder: bucket
+    directory: bucket
     homepage: https://github.com/scttfrdmn/mycelium
     description: "Find and discover AWS EC2 instance types"
     license: MIT
@@ -198,18 +206,10 @@ scoops:
       owner: scttfrdmn
       name: scoop-bucket
       branch: main
-    folder: bucket
+    directory: bucket
     homepage: https://github.com/scttfrdmn/mycelium
     description: "Launch ephemeral AWS EC2 instances effortlessly"
     license: MIT
-    post_install:
-      - Write-Host "spawn installed successfully!"
-      - Write-Host ""
-      - Write-Host "Documentation:"
-      - Write-Host "  IAM Permissions: https://github.com/scttfrdmn/mycelium/blob/main/spawn/IAM_PERMISSIONS.md"
-      - Write-Host "  Security Guide: https://github.com/scttfrdmn/mycelium/blob/main/SECURITY.md"
-      - Write-Host ""
-      - Write-Host "Note: spawnd (daemon) is Linux-only and not included in Windows builds"
 
 # GitHub Release
 release:
