@@ -157,7 +157,7 @@ brews:
     description: "Launch ephemeral AWS EC2 instances effortlessly"
     license: MIT
     dependencies:
-      - name: truffle
+      - name: scttfrdmn/tap/truffle
         type: runtime
     test: |
       system "#{bin}/spawn", "version"
