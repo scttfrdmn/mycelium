@@ -178,7 +178,7 @@ brews:
       (prefix/"scripts").install "scripts/validate-permissions.sh"
 
 # Scoop Bucket
-scoop:
+scoops:
   - name: truffle
     ids:
       - truffle-archive
