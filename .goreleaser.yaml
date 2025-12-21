@@ -74,32 +74,23 @@ builds:
 # Archive configuration
 archives:
   - id: truffle-archive
-    builds:
-      - truffle
     name_template: 'truffle_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
-    format: tar.gz
-    format_overrides:
-      - goos: windows
-        format: zip
+    ids:
+      - truffle
     files:
       - LICENSE*
 
   - id: spawn-archive
-    builds:
+    ids:
       - spawn
     name_template: 'spawn_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
-    format: tar.gz
-    format_overrides:
-      - goos: windows
-        format: zip
     files:
       - LICENSE*
 
   - id: spawnd-archive
-    builds:
+    ids:
       - spawnd
     name_template: 'spawnd_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
-    format: tar.gz
     files:
       - LICENSE*
 
@@ -109,7 +100,7 @@ checksum:
 
 # Snapshot builds (for testing)
 snapshot:
-  name_template: "{{ incpatch .Version }}-next"
+  version_template: "{{ incpatch .Version }}-next"
 
 # Changelog
 changelog:
