@@ -1,0 +1,265 @@
+# Goreleaser configuration for mycelium (truffle + spawn)
+# https://goreleaser.com
+
+version: 2
+
+before:
+  hooks:
+    - go mod download
+    - go mod tidy
+
+# Build configurations for both truffle and spawn
+builds:
+  # truffle - EC2 instance search tool
+  - id: truffle
+    main: ./truffle
+    binary: truffle
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.Version={{.Version}}
+      - -X main.Commit={{.Commit}}
+      - -X main.Date={{.Date}}
+    mod_timestamp: '{{ .CommitTimestamp }}'
+
+  # spawn - EC2 instance launcher
+  - id: spawn
+    main: ./spawn
+    binary: spawn
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.Version={{.Version}}
+      - -X main.Commit={{.Commit}}
+      - -X main.Date={{.Date}}
+    mod_timestamp: '{{ .CommitTimestamp }}'
+
+  # spawnd - Daemon (Linux only)
+  - id: spawnd
+    main: ./spawn/cmd/spawnd
+    binary: spawnd
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.Version={{.Version}}
+      - -X main.Commit={{.Commit}}
+      - -X main.Date={{.Date}}
+    mod_timestamp: '{{ .CommitTimestamp }}'
+
+# Archive configuration
+archives:
+  - id: truffle-archive
+    builds:
+      - truffle
+    name_template: 'truffle_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+    format: tar.gz
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - truffle/README.md
+      - truffle/QUOTAS.md
+      - LICENSE*
+      - README.md
+
+  - id: spawn-archive
+    builds:
+      - spawn
+      - spawnd
+    name_template: 'spawn_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+    format: tar.gz
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - spawn/README.md
+      - spawn/IAM_PERMISSIONS.md
+      - DEPLOYMENT_GUIDE.md
+      - SECURITY.md
+      - scripts/setup-spawnd-iam-role.sh
+      - scripts/validate-permissions.sh
+      - LICENSE*
+      - README.md
+
+# Checksums
+checksum:
+  name_template: 'checksums.txt'
+
+# Snapshot builds (for testing)
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+
+# Changelog
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+      - 'typo'
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: 'Bug fixes'
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: 'Security updates'
+      regexp: '^.*?sec(\([[:word:]]+\))??!?:.+$'
+      order: 2
+    - title: Others
+      order: 999
+
+# Homebrew Tap
+brews:
+  - name: truffle
+    ids:
+      - truffle-archive
+    repository:
+      owner: scttfrdmn
+      name: homebrew-tap
+      branch: main
+    folder: Formula
+    homepage: https://github.com/scttfrdmn/mycelium
+    description: "Find and discover AWS EC2 instance types"
+    license: MIT
+    test: |
+      system "#{bin}/truffle", "version"
+    install: |
+      bin.install "truffle"
+
+  - name: spawn
+    ids:
+      - spawn-archive
+    repository:
+      owner: scttfrdmn
+      name: homebrew-tap
+      branch: main
+    folder: Formula
+    homepage: https://github.com/scttfrdmn/mycelium
+    description: "Launch ephemeral AWS EC2 instances effortlessly"
+    license: MIT
+    test: |
+      system "#{bin}/spawn", "version"
+    install: |
+      bin.install "spawn"
+      if OS.linux?
+        bin.install "spawnd"
+      end
+      # Install documentation
+      doc.install "spawn/README.md"
+      doc.install "spawn/IAM_PERMISSIONS.md"
+      doc.install "DEPLOYMENT_GUIDE.md"
+      doc.install "SECURITY.md"
+      # Install scripts
+      (prefix/"scripts").install "scripts/setup-spawnd-iam-role.sh"
+      (prefix/"scripts").install "scripts/validate-permissions.sh"
+
+# Scoop Bucket
+scoop:
+  - name: truffle
+    ids:
+      - truffle-archive
+    repository:
+      owner: scttfrdmn
+      name: scoop-bucket
+      branch: main
+    folder: bucket
+    homepage: https://github.com/scttfrdmn/mycelium
+    description: "Find and discover AWS EC2 instance types"
+    license: MIT
+
+  - name: spawn
+    ids:
+      - spawn-archive
+    repository:
+      owner: scttfrdmn
+      name: scoop-bucket
+      branch: main
+    folder: bucket
+    homepage: https://github.com/scttfrdmn/mycelium
+    description: "Launch ephemeral AWS EC2 instances effortlessly"
+    license: MIT
+    post_install:
+      - Write-Host "spawn installed successfully!"
+      - Write-Host ""
+      - Write-Host "Documentation:"
+      - Write-Host "  IAM Permissions: https://github.com/scttfrdmn/mycelium/blob/main/spawn/IAM_PERMISSIONS.md"
+      - Write-Host "  Security Guide: https://github.com/scttfrdmn/mycelium/blob/main/SECURITY.md"
+      - Write-Host ""
+      - Write-Host "Note: spawnd (daemon) is Linux-only and not included in Windows builds"
+
+# GitHub Release
+release:
+  github:
+    owner: scttfrdmn
+    name: mycelium
+  draft: false
+  prerelease: auto
+  mode: replace
+  header: |
+    ## mycelium {{ .Tag }}
+
+    The underground network for AWS compute.
+
+    ### What's New
+  footer: |
+    ---
+
+    **Installation:**
+
+    **Homebrew (macOS/Linux):**
+    ```bash
+    brew install scttfrdmn/tap/truffle
+    brew install scttfrdmn/tap/spawn
+    ```
+
+    **Scoop (Windows):**
+    ```powershell
+    scoop bucket add scttfrdmn https://github.com/scttfrdmn/scoop-bucket
+    scoop install truffle
+    scoop install spawn
+    ```
+
+    **Manual Download:**
+    Download the appropriate archive for your platform below.
+
+    ---
+
+    **Documentation:**
+    - [README](https://github.com/scttfrdmn/mycelium/blob/main/README.md)
+    - [Security Guide](https://github.com/scttfrdmn/mycelium/blob/main/SECURITY.md)
+    - [Deployment Guide](https://github.com/scttfrdmn/mycelium/blob/main/DEPLOYMENT_GUIDE.md)
+    - [IAM Permissions](https://github.com/scttfrdmn/mycelium/blob/main/spawn/IAM_PERMISSIONS.md)
+
+  name_template: "v{{.Version}}"
+
+# Announce (optional - uncomment to enable)
+# announce:
+#   twitter:
+#     enabled: true
+#     message_template: 'mycelium {{ .Tag }} is out! Check it out at {{ .ReleaseURL }}'

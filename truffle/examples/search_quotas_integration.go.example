@@ -1,0 +1,229 @@
+// Example integration in cmd/search.go
+// This shows how to add --check-quotas flag with graceful degradation
+
+package cmd
+
+import (
+	"context"
+	"fmt"
+	"os"
+
+	"github.com/fatih/color"
+	"github.com/spf13/cobra"
+	"github.com/yourusername/truffle/pkg/quotas"
+)
+
+var (
+	checkQuotas bool
+	showAll     bool // Show all instances even if quota exceeded
+)
+
+func init() {
+	searchCmd.Flags().BoolVar(&checkQuotas, "check-quotas", false, 
+		"Check AWS Service Quotas (requires AWS credentials)")
+	searchCmd.Flags().BoolVar(&showAll, "show-all", false,
+		"Show all instances even if quota exceeded (use with --check-quotas)")
+}
+
+func runSearchWithQuotas(ctx context.Context, results []InstanceResult) error {
+	if !checkQuotas {
+		// No quota checking, show all results
+		return displayResults(results)
+	}
+
+	// Try to create quota client
+	quotaClient, err := quotas.NewClient(ctx)
+	if err != nil {
+		// Graceful degradation: no AWS credentials
+		fmt.Fprintf(os.Stderr, "\n")
+		fmt.Fprintf(os.Stderr, "⚠️  Cannot check quotas: %v\n", err)
+		fmt.Fprintf(os.Stderr, "\n")
+		fmt.Fprintf(os.Stderr, "💡 To enable quota checking:\n")
+		fmt.Fprintf(os.Stderr, "   1. Configure AWS credentials:\n")
+		fmt.Fprintf(os.Stderr, "      export AWS_ACCESS_KEY_ID=...\n")
+		fmt.Fprintf(os.Stderr, "      export AWS_SECRET_ACCESS_KEY=...\n")
+		fmt.Fprintf(os.Stderr, "   OR\n")
+		fmt.Fprintf(os.Stderr, "   2. Run: aws configure\n")
+		fmt.Fprintf(os.Stderr, "\n")
+		fmt.Fprintf(os.Stderr, "Showing results without quota checking...\n")
+		fmt.Fprintf(os.Stderr, "\n")
+		
+		// Still show results, just without quota info
+		return displayResults(results)
+	}
+
+	// Get quotas for each region
+	quotasByRegion := make(map[string]*quotas.QuotaInfo)
+	
+	for _, result := range results {
+		if _, ok := quotasByRegion[result.Region]; !ok {
+			quotaInfo, err := quotaClient.GetQuotas(ctx, result.Region)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: Could not get quotas for %s: %v\n", 
+					result.Region, err)
+				continue
+			}
+			quotasByRegion[result.Region] = quotaInfo
+		}
+	}
+
+	// Annotate results with quota information
+	var launchable []InstanceResult
+	var blocked []InstanceResult
+
+	for _, result := range results {
+		quotaInfo, ok := quotasByRegion[result.Region]
+		if !ok {
+			// No quota info, assume can launch
+			launchable = append(launchable, result)
+			continue
+		}
+
+		canLaunch, reason := quotaClient.CanLaunch(
+			result.InstanceType,
+			int32(result.VCPUs),
+			quotaInfo,
+			result.Spot,
+		)
+
+		result.QuotaCanLaunch = canLaunch
+		result.QuotaReason = reason
+
+		if canLaunch {
+			launchable = append(launchable, result)
+		} else {
+			blocked = append(blocked, result)
+		}
+	}
+
+	// Display quota summary
+	displayQuotaSummary(quotasByRegion)
+
+	// Display results
+	if showAll {
+		// Show all, with warnings for blocked
+		fmt.Println()
+		if len(launchable) > 0 {
+			fmt.Println("✅ Instances You Can Launch:")
+			fmt.Println()
+			displayResults(launchable)
+		}
+
+		if len(blocked) > 0 {
+			fmt.Println()
+			fmt.Println("⚠️  Instances Blocked by Quota:")
+			fmt.Println()
+			displayResultsWithQuotaWarnings(blocked)
+		}
+	} else {
+		// Only show launchable
+		if len(blocked) > 0 {
+			fmt.Fprintf(os.Stderr, "\n")
+			fmt.Fprintf(os.Stderr, "⚠️  %d instance(s) filtered due to quota limits\n", len(blocked))
+			fmt.Fprintf(os.Stderr, "   Use --show-all to see blocked instances\n")
+			fmt.Fprintf(os.Stderr, "\n")
+		}
+
+		if len(launchable) == 0 {
+			fmt.Println()
+			fmt.Println("❌ No instances available within your quota limits")
+			fmt.Println()
+			
+			if len(blocked) > 0 {
+				fmt.Println("💡 Options:")
+				fmt.Println("   1. Use --show-all to see what's blocked")
+				fmt.Println("   2. Request quota increase (see suggestions above)")
+				fmt.Println("   3. Try smaller instance types")
+			}
+			
+			return nil
+		}
+
+		displayResults(launchable)
+	}
+
+	return nil
+}
+
+func displayQuotaSummary(quotasByRegion map[string]*quotas.QuotaInfo) {
+	fmt.Println()
+	fmt.Println("╔════════════════════════════════════════════════════════╗")
+	fmt.Println("║  📊 AWS Service Quotas Summary                        ║")
+	fmt.Println("╚════════════════════════════════════════════════════════╝")
+	fmt.Println()
+
+	for region, info := range quotasByRegion {
+		fmt.Printf("Region: %s\n", region)
+		fmt.Println()
+
+		// Show quota for each family
+		families := []quotas.QuotaFamily{
+			quotas.FamilyStandard,
+			quotas.FamilyG,
+			quotas.FamilyP,
+			quotas.FamilyInf,
+			quotas.FamilyTrn,
+		}
+
+		for _, family := range families {
+			quota := info.OnDemand[family]
+			usage := info.Usage[family]
+			available := quota - usage
+
+			if quota == 0 {
+				continue // Don't show zero quotas unless in use
+			}
+
+			status := "✅"
+			if available == 0 {
+				status = "🔴"
+			} else if available < quota/4 {
+				status = "🟡"
+			}
+
+			fmt.Printf("  %s %s: %d/%d vCPUs (available: %d)\n",
+				status, family, usage, quota, available)
+		}
+
+		fmt.Println()
+	}
+}
+
+func displayResultsWithQuotaWarnings(results []InstanceResult) {
+	for _, result := range results {
+		fmt.Printf("┌──────────────────────────────────────────────────┐\n")
+		fmt.Printf("│ %s\n", result.InstanceType)
+		fmt.Printf("│ vCPUs: %d, Memory: %d GiB\n", result.VCPUs, result.MemoryMiB/1024)
+		fmt.Printf("│\n")
+		
+		red := color.New(color.FgRed).SprintFunc()
+		fmt.Printf("│ %s QUOTA EXCEEDED\n", red("❌"))
+		fmt.Printf("│ %s\n", result.QuotaReason)
+		fmt.Printf("│\n")
+		
+		// Show how to fix
+		family := quotas.GetQuotaFamily(result.InstanceType)
+		fmt.Printf("│ 💡 To launch this instance:\n")
+		fmt.Printf("│    Request quota increase for %s family\n", family)
+		fmt.Printf("└──────────────────────────────────────────────────┘\n")
+		fmt.Println()
+
+		// Show increase command
+		cmd := quotas.QuotaIncreaseCommand(result.Region, family, int32(result.VCPUs*2), result.Spot)
+		fmt.Println(cmd)
+		fmt.Println()
+	}
+}
+
+// Add quota fields to InstanceResult struct
+type InstanceResult struct {
+	InstanceType string
+	Region       string
+	VCPUs        int
+	MemoryMiB    int64
+	Spot         bool
+	
+	// Quota information (populated when --check-quotas is used)
+	QuotaCanLaunch bool
+	QuotaReason    string
+}

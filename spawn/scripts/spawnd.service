@@ -1,0 +1,23 @@
+[Unit]
+Description=Spawn Agent - Instance self-monitoring and auto-termination
+Documentation=https://github.com/yourusername/spawn
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/spawnd
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+
+# Resource limits
+LimitNOFILE=8192
+
+[Install]
+WantedBy=multi-user.target
