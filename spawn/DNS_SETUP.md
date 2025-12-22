@@ -179,12 +179,72 @@ curl -X POST https://f4gm19tl70.execute-api.us-east-1.amazonaws.com/prod/update-
 - EC2: DescribeInstances (to validate instance metadata)
 - CloudWatch Logs: Write logs
 
+## DNSSEC Configuration
+
+**Status**: ✅ Enabled and Signing
+
+DNSSEC adds cryptographic signatures to DNS records to prevent DNS hijacking and cache poisoning attacks.
+
+### Configuration Details
+
+**KMS Key**: `arn:aws:kms:us-east-1:752123829273:key/b638147e-f2c0-48bd-a3a6-5f1b7d4773d0`
+- Key Type: ECC_NIST_P256
+- Purpose: SIGN_VERIFY
+- Algorithm: ECDSAP256SHA256
+
+**Key Signing Key (KSK)**: spore-host-ksk
+- Key Tag: 12735
+- Algorithm: 13 (ECDSAP256SHA256)
+- Digest Type: 2 (SHA-256)
+
+**DS Record** (added to Porkbun):
+```
+12735 13 2 0179EFB5FA92E41D46256E7C1D8628B9DD7C0529E85E400F9B48213685BBA5E4
+```
+
+### Security Benefits
+
+🔒 **Prevents DNS hijacking** - Cryptographically proves DNS records are authentic
+🔒 **Blocks cache poisoning** - Malicious DNS cache entries are rejected
+🔒 **Protects SSH connections** - Users connecting to `*.spore.host` get authentic IPs
+🔒 **Chain of trust** - DNSSEC signatures verified from root DNS down to spore.host
+
+### Verification
+
+Check DNSSEC status:
+
+```bash
+# Check for DNSSEC signatures
+dig +dnssec spore.host SOA
+
+# Validate DNSSEC chain
+delv spore.host
+
+# Online validators
+https://dnssec-debugger.verisignlabs.com/spore.host
+https://dnsviz.net/d/spore.host/dnssec/
+```
+
+### Key Rotation
+
+Route53 automatically rotates Zone Signing Keys (ZSK). The Key Signing Key (KSK) is stable and rarely needs rotation.
+
+If KSK rotation is needed:
+1. Create new KSK in Route53
+2. Get new DS record
+3. Add new DS record to Porkbun
+4. Wait 48 hours for propagation
+5. Remove old DS record from Porkbun
+6. Deactivate old KSK in Route53
+
 ## Next Steps
 
 - [x] Create Route53 hosted zone
 - [x] Create Lambda DNS updater (Go)
 - [x] Create API Gateway endpoint
-- [ ] Update nameservers at registrar
+- [x] Update nameservers at registrar
+- [x] Enable DNSSEC
+- [x] Add DS record to registrar
 - [ ] Verify DNS propagation (24-48 hours)
 - [ ] Implement `spawn launch --dns` flag
 - [ ] Implement spawnd/spored DNS update logic (call API on launch/IP change)
