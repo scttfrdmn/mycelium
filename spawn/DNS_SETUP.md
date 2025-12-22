@@ -2,11 +2,26 @@
 
 This document tracks the DNS configuration for automatic instance hostnames.
 
+## Architecture
+
+This is an **open source project**, so anyone can use spawn and get automatic DNS. The security model uses a centralized Lambda API Gateway that validates instance identity before updating DNS.
+
+**Default Account** (Infrastructure provider - Account: 752123829273):
+- Hosts spawnd/spored binaries in S3
+- Route53 hosted zone for spore.host
+- Lambda DNS updater (Go-based)
+- API Gateway public endpoint
+
+**User Accounts** (any AWS account):
+- Spawn instances with `spawn:managed` tag
+- Call public API to update DNS
+- No special IAM roles needed!
+
 ## Route53 Hosted Zone
 
 **Domain**: spore.host
-**Hosted Zone ID**: Z08811711PGNZG45042A5
-**AWS Account**: (configured with AWS_PROFILE=aws)
+**Hosted Zone ID**: Z048907324UNXKEK9KX93
+**AWS Account**: 752123829273 (default)
 **Created**: 2025-12-22
 
 ## AWS Nameservers
@@ -14,11 +29,18 @@ This document tracks the DNS configuration for automatic instance hostnames.
 Configure these nameservers at your domain registrar:
 
 ```
-ns-1770.awsdns-29.co.uk
-ns-1294.awsdns-33.org
-ns-771.awsdns-32.net
-ns-260.awsdns-32.com
+ns-1774.awsdns-29.co.uk
+ns-422.awsdns-52.com
+ns-816.awsdns-38.net
+ns-1091.awsdns-08.org
 ```
+
+## API Gateway Endpoint
+
+**Public Endpoint**: `https://f4gm19tl70.execute-api.us-east-1.amazonaws.com/prod/update-dns`
+**Method**: POST
+**Authentication**: None (validated via instance identity)
+**Region**: us-east-1
 
 ## Nameserver Update Instructions
 
@@ -74,86 +96,99 @@ AWS_PROFILE=aws aws route53 change-resource-record-sets \
 dig test.spore.host
 ```
 
-## Cross-Account IAM Role
+## Security Model (API Gateway + Lambda)
 
-**Role Name**: SpawnDNSUpdaterRole
-**ARN**: `arn:aws:iam::942542972736:role/SpawnDNSUpdaterRole`
-**AWS Account**: 942542972736
-
-### Security Model
-
-✅ **Trust Policy**: Only allows principals with `spawn:managed` tag to assume role
-✅ **Permissions**: Limited to Route53 operations on spore.host zone (Z08811711PGNZG45042A5)
-✅ **Condition**: Records must match pattern `*.spore.host`
-✅ **Temporary Credentials**: No long-lived secrets, credentials via AssumeRole
+This system is designed for **open source** use - anyone can call the API from any AWS account.
 
 ### How It Works
 
-1. Spawn instances are launched with `spawn:managed=true` tag
-2. Instance IAM role has permission to assume SpawnDNSUpdaterRole
-3. spawnd assumes the role to get temporary credentials
-4. spawnd updates DNS record (e.g., `my-instance.spore.host`)
-5. Can only update records matching the instance name
-6. Full CloudTrail audit trail of all DNS changes
+1. **Spawn instance** launches with `spawn:managed=true` tag
+2. **Instance gets identity document** from EC2 IMDS (signed by AWS)
+3. **Instance calls API Gateway** with:
+   - Instance identity document (base64-encoded)
+   - Instance identity signature (base64-encoded)
+   - Desired DNS record name
+   - IP address
+4. **Lambda validates**:
+   - ✅ Instance identity signature (cryptographically verified with AWS public key)
+   - ✅ Instance exists and has `spawn:managed` tag (via DescribeInstances)
+   - ✅ IP address matches instance public IP
+   - ✅ Record name format is valid
+5. **Lambda updates** Route53 DNS record
+6. **Full audit trail** via CloudWatch Logs
 
-### Trust Policy
+### Security Guarantees
 
-```json
+✅ **No shared secrets**: Instance identity document can't be forged without AWS private key
+✅ **Per-instance validation**: Each request verified against live AWS instance metadata
+✅ **IP verification**: DNS only updated if IP matches instance's actual public IP
+✅ **Tag enforcement**: Only instances with `spawn:managed` tag can update DNS
+✅ **No IAM roles needed**: User accounts don't need any special permissions
+✅ **Audit trail**: All requests logged in CloudWatch
+
+### API Request Format
+
+```bash
+POST https://f4gm19tl70.execute-api.us-east-1.amazonaws.com/prod/update-dns
+Content-Type: application/json
+
 {
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {"AWS": "*"},
-      "Action": "sts:AssumeRole",
-      "Condition": {
-        "StringEquals": {
-          "aws:PrincipalTag/spawn:managed": "true"
-        }
-      }
-    }
-  ]
+  "instance_identity_document": "<base64-encoded-document>",
+  "instance_identity_signature": "<base64-encoded-signature>",
+  "record_name": "my-instance",
+  "ip_address": "1.2.3.4",
+  "action": "UPSERT"  // or "DELETE"
 }
 ```
 
-### Permissions Policy
+### Getting Instance Identity
 
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": [
-        "route53:ChangeResourceRecordSets",
-        "route53:ListResourceRecordSets"
-      ],
-      "Resource": "arn:aws:route53:::hostedzone/Z08811711PGNZG45042A5",
-      "Condition": {
-        "StringLike": {
-          "route53:ChangeResourceRecordSetsNormalizedRecordNames": ["*.spore.host"]
-        }
-      }
-    },
-    {
-      "Effect": "Allow",
-      "Action": ["route53:GetChange"],
-      "Resource": "arn:aws:route53:::change/*"
-    }
-  ]
-}
+From within an EC2 instance:
+
+```bash
+# Get instance identity document
+IDENTITY_DOC=$(curl -s http://169.254.169.254/latest/dynamic/instance-identity/document | base64 -w0)
+
+# Get instance identity signature
+IDENTITY_SIG=$(curl -s http://169.254.169.254/latest/dynamic/instance-identity/signature)
+
+# Get public IP
+PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+
+# Update DNS
+curl -X POST https://f4gm19tl70.execute-api.us-east-1.amazonaws.com/prod/update-dns \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"instance_identity_document\": \"$IDENTITY_DOC\",
+    \"instance_identity_signature\": \"$IDENTITY_SIG\",
+    \"record_name\": \"my-instance\",
+    \"ip_address\": \"$PUBLIC_IP\",
+    \"action\": \"UPSERT\"
+  }"
 ```
 
-See ROADMAP.md Phase 2 item #7 for full security model.
+### Lambda Function
+
+**Name**: spawn-dns-updater
+**Runtime**: Go (provided.al2023)
+**Source**: `spawn/lambda/dns-updater/`
+**IAM Role**: SpawnDNSLambdaExecutionRole
+
+**Permissions**:
+- Route53: Update records in spore.host zone only
+- EC2: DescribeInstances (to validate instance metadata)
+- CloudWatch Logs: Write logs
 
 ## Next Steps
 
+- [x] Create Route53 hosted zone
+- [x] Create Lambda DNS updater (Go)
+- [x] Create API Gateway endpoint
 - [ ] Update nameservers at registrar
 - [ ] Verify DNS propagation (24-48 hours)
-- [ ] Create cross-account IAM role for DNS updates
 - [ ] Implement `spawn launch --dns` flag
-- [ ] Implement spawnd DNS update logic
-- [ ] Add `spawn dns` management commands
+- [ ] Implement spawnd/spored DNS update logic (call API on launch/IP change)
+- [ ] Add `spawn dns` management commands (list, update, delete)
 
 ## Useful Commands
 
