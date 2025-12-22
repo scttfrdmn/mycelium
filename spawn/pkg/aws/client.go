@@ -360,6 +360,230 @@ func (c *Client) FindKeyPairByFingerprint(ctx context.Context, region, fingerpri
 	return "", nil // Not found
 }
 
+// InstanceInfo contains metadata about a spawn-managed instance
+type InstanceInfo struct {
+	InstanceID       string
+	Name             string
+	InstanceType     string
+	State            string
+	Region           string
+	AvailabilityZone string
+	PublicIP         string
+	PrivateIP        string
+	LaunchTime       time.Time
+	TTL              string
+	IdleTimeout      string
+	KeyName          string
+	SpotInstance     bool
+	Tags             map[string]string
+}
+
+// ListInstances returns all spawn-managed instances, optionally filtered by region and state
+func (c *Client) ListInstances(ctx context.Context, region string, stateFilter string) ([]InstanceInfo, error) {
+	var allInstances []InstanceInfo
+
+	// Determine which regions to search
+	regions := []string{}
+	if region != "" {
+		regions = append(regions, region)
+	} else {
+		// Query all regions
+		var err error
+		regions, err = c.getAllRegions(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get regions: %w", err)
+		}
+	}
+
+	// Search each region for spawn-managed instances
+	for _, r := range regions {
+		instances, err := c.listInstancesInRegion(ctx, r, stateFilter)
+		if err != nil {
+			// Log error but continue with other regions
+			continue
+		}
+		allInstances = append(allInstances, instances...)
+	}
+
+	return allInstances, nil
+}
+
+func (c *Client) listInstancesInRegion(ctx context.Context, region string, stateFilter string) ([]InstanceInfo, error) {
+	cfg := c.cfg.Copy()
+	cfg.Region = region
+	ec2Client := ec2.NewFromConfig(cfg)
+
+	// Build filters
+	filters := []types.Filter{
+		{
+			Name:   aws.String("tag:spawn:managed"),
+			Values: []string{"true"},
+		},
+	}
+
+	// Add state filter if specified
+	if stateFilter != "" {
+		filters = append(filters, types.Filter{
+			Name:   aws.String("instance-state-name"),
+			Values: []string{stateFilter},
+		})
+	} else {
+		// Default: show running and stopped instances (not terminated)
+		filters = append(filters, types.Filter{
+			Name:   aws.String("instance-state-name"),
+			Values: []string{"pending", "running", "stopping", "stopped"},
+		})
+	}
+
+	input := &ec2.DescribeInstancesInput{
+		Filters: filters,
+	}
+
+	var instances []InstanceInfo
+
+	// Paginate through results
+	paginator := ec2.NewDescribeInstancesPaginator(ec2Client, input)
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to describe instances in %s: %w", region, err)
+		}
+
+		for _, reservation := range page.Reservations {
+			for _, instance := range reservation.Instances {
+				info := InstanceInfo{
+					InstanceID:       valueOrEmpty(instance.InstanceId),
+					InstanceType:     string(instance.InstanceType),
+					State:            string(instance.State.Name),
+					Region:           region,
+					AvailabilityZone: valueOrEmpty(instance.Placement.AvailabilityZone),
+					PublicIP:         valueOrEmpty(instance.PublicIpAddress),
+					PrivateIP:        valueOrEmpty(instance.PrivateIpAddress),
+					KeyName:          valueOrEmpty(instance.KeyName),
+					SpotInstance:     instance.InstanceLifecycle == types.InstanceLifecycleTypeSpot,
+					Tags:             make(map[string]string),
+				}
+
+				if instance.LaunchTime != nil {
+					info.LaunchTime = *instance.LaunchTime
+				}
+
+				// Extract tags
+				for _, tag := range instance.Tags {
+					if tag.Key != nil && tag.Value != nil {
+						key := *tag.Key
+						value := *tag.Value
+
+						switch key {
+						case "Name":
+							info.Name = value
+						case "spawn:ttl":
+							info.TTL = value
+						case "spawn:idle-timeout":
+							info.IdleTimeout = value
+						default:
+							info.Tags[key] = value
+						}
+					}
+				}
+
+				instances = append(instances, info)
+			}
+		}
+	}
+
+	return instances, nil
+}
+
+func (c *Client) getAllRegions(ctx context.Context) ([]string, error) {
+	// Use us-east-1 as the base region for the DescribeRegions call
+	cfg := c.cfg.Copy()
+	cfg.Region = "us-east-1"
+	ec2Client := ec2.NewFromConfig(cfg)
+
+	result, err := ec2Client.DescribeRegions(ctx, &ec2.DescribeRegionsInput{
+		AllRegions: aws.Bool(false), // Only enabled regions
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to describe regions: %w", err)
+	}
+
+	var regions []string
+	for _, region := range result.Regions {
+		if region.RegionName != nil {
+			regions = append(regions, *region.RegionName)
+		}
+	}
+
+	return regions, nil
+}
+
+// StopInstance stops an EC2 instance
+func (c *Client) StopInstance(ctx context.Context, region, instanceID string, hibernate bool) error {
+	cfg := c.cfg.Copy()
+	cfg.Region = region
+	ec2Client := ec2.NewFromConfig(cfg)
+
+	input := &ec2.StopInstancesInput{
+		InstanceIds: []string{instanceID},
+		Hibernate:   aws.Bool(hibernate),
+	}
+
+	_, err := ec2Client.StopInstances(ctx, input)
+	if err != nil {
+		return fmt.Errorf("failed to stop instance: %w", err)
+	}
+
+	return nil
+}
+
+// StartInstance starts a stopped EC2 instance
+func (c *Client) StartInstance(ctx context.Context, region, instanceID string) error {
+	cfg := c.cfg.Copy()
+	cfg.Region = region
+	ec2Client := ec2.NewFromConfig(cfg)
+
+	input := &ec2.StartInstancesInput{
+		InstanceIds: []string{instanceID},
+	}
+
+	_, err := ec2Client.StartInstances(ctx, input)
+	if err != nil {
+		return fmt.Errorf("failed to start instance: %w", err)
+	}
+
+	return nil
+}
+
+// UpdateInstanceTags updates tags on an EC2 instance
+func (c *Client) UpdateInstanceTags(ctx context.Context, region, instanceID string, tags map[string]string) error {
+	cfg := c.cfg.Copy()
+	cfg.Region = region
+	ec2Client := ec2.NewFromConfig(cfg)
+
+	// Convert tags to AWS format
+	awsTags := make([]types.Tag, 0, len(tags))
+	for k, v := range tags {
+		awsTags = append(awsTags, types.Tag{
+			Key:   aws.String(k),
+			Value: aws.String(v),
+		})
+	}
+
+	// Create or update tags
+	input := &ec2.CreateTagsInput{
+		Resources: []string{instanceID},
+		Tags:      awsTags,
+	}
+
+	_, err := ec2Client.CreateTags(ctx, input)
+	if err != nil {
+		return fmt.Errorf("failed to update tags: %w", err)
+	}
+
+	return nil
+}
+
 // SetupSpawndIAMRole creates or retrieves the IAM role and instance profile for spawnd
 // Returns the instance profile name
 func (c *Client) SetupSpawndIAMRole(ctx context.Context) (string, error) {
