@@ -40,8 +40,8 @@ Feature ideas and planned enhancements for the mycelium project (truffle, spawn,
    - Environment variable injection
 
 7. **Automatic DNS** - Human-readable hostnames for instances
-   - Register domain (e.g., `spawn.dev`, `mycelium.network`)
-   - Auto-create DNS records on launch: `my-instance.spawn.dev`
+   - Domain: **spore.host** (spore needs a host to grow!)
+   - Auto-create DNS records on launch: `my-instance.spore.host`
    - Auto-update on IP changes (stop/start)
    - Auto-delete on termination
    - **Security Model**: Cross-account IAM roles
