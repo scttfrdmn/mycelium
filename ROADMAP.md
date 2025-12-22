@@ -39,12 +39,31 @@ Feature ideas and planned enhancements for the mycelium project (truffle, spawn,
    - Shared team configurations
    - Environment variable injection
 
-7. **truffle spot interruption history** - Historical interruption rates
+7. **Automatic DNS** - Human-readable hostnames for instances
+   - Register domain (e.g., `spawn.dev`, `mycelium.network`)
+   - Auto-create DNS records on launch: `my-instance.spawn.dev`
+   - Auto-update on IP changes (stop/start)
+   - Auto-delete on termination
+   - **Security Model**: Cross-account IAM roles
+     - Hosted zone in centralized account (with spawnd S3)
+     - Scoped trust policy: Only spawn-managed instances
+     - Minimal permissions: Only Route53 updates for spawn.dev zone
+     - Temporary credentials via AssumeRole (no long-lived secrets)
+     - Resource name validation: Instance can only update its own record
+     - Full CloudTrail audit trail
+   - **Configuration options**:
+     - Public hosted zone (easy option): Records visible publicly
+     - Private hosted zone (secure option): Only accessible from VPC/VPN
+     - Opt-in via `--dns` flag or config file
+     - Configurable TTL (default: 60s for quick updates)
+   - `spawn dns list/update/delete` commands for management
+
+8. **truffle spot interruption history** - Historical interruption rates
    - Show interruption frequency per instance type/region
    - Recommend least-interrupted alternatives
    - Integration with AWS Data Exchange or historical data
 
-8. **VS Code extension** - Launch and connect from VS Code
+9. **VS Code extension** - Launch and connect from VS Code
    - Launch instances from command palette
    - Auto-connect via Remote-SSH
    - Show running instances in sidebar
