@@ -44,7 +44,10 @@ var (
 	ttl              string
 	idleTimeout      string
 	hibernateOnIdle  bool
-	
+	onComplete       string
+	completionFile   string
+	completionDelay  string
+
 	// Meta
 	name             string
 	userData         string
@@ -95,7 +98,10 @@ func init() {
 	launchCmd.Flags().StringVar(&ttl, "ttl", "", "Auto-terminate after duration (e.g., 8h)")
 	launchCmd.Flags().StringVar(&idleTimeout, "idle-timeout", "", "Auto-terminate if idle")
 	launchCmd.Flags().BoolVar(&hibernateOnIdle, "hibernate-on-idle", false, "Hibernate instead of terminate when idle")
-	
+	launchCmd.Flags().StringVar(&onComplete, "on-complete", "", "Action when workload signals completion: terminate, stop, hibernate")
+	launchCmd.Flags().StringVar(&completionFile, "completion-file", "/tmp/SPAWN_COMPLETE", "File to watch for completion signal")
+	launchCmd.Flags().StringVar(&completionDelay, "completion-delay", "30s", "Grace period after completion signal")
+
 	// Meta
 	launchCmd.Flags().StringVar(&name, "name", "", "Instance name tag")
 	launchCmd.Flags().StringVar(&userData, "user-data", "", "User data (@file or inline)")
@@ -361,6 +367,15 @@ func buildLaunchConfig(truffleInput *input.TruffleInput) (*aws.LaunchConfig, err
 	}
 	if hibernateOnIdle {
 		config.HibernateOnIdle = true
+	}
+	if onComplete != "" {
+		config.OnComplete = onComplete
+	}
+	if completionFile != "" {
+		config.CompletionFile = completionFile
+	}
+	if completionDelay != "" {
+		config.CompletionDelay = completionDelay
 	}
 	if name != "" {
 		config.Name = name

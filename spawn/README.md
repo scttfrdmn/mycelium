@@ -40,6 +40,7 @@ spawn --instance-type m7i.large --region us-east-1 --ttl 8h
 - **💤 Hibernation**: Save costs on intermittent workloads
 - **⏱️ TTL Support**: Auto-terminate after time limit
 - **🕐 Idle Detection**: Auto-terminate/hibernate when idle
+- **✅ Completion Signals**: Workloads signal when done, trigger auto-cleanup
 - **📊 Live Progress**: Real-time step-by-step updates
 - **💰 Cost Estimates**: Shows hourly and total costs
 - **🪣 S3 Distribution**: Fast regional downloads (~20ms)
@@ -273,6 +274,65 @@ spawn launch --idle-timeout 1h
 spawn launch --idle-timeout 1h --hibernate-on-idle
 ```
 
+### With Completion Signals
+
+Allow workloads to signal completion and trigger automatic cleanup:
+
+```bash
+# Batch job - terminate when job signals completion
+spawn launch --on-complete terminate --ttl 4h
+# Run your job, then: spored complete
+
+# CI runner - terminate on completion, max 30 minutes
+spawn launch --on-complete terminate --ttl 30m
+# Job finishes, signals completion, instance terminates
+
+# ML training - stop (preserve state) on completion
+spawn launch --on-complete stop --ttl 8h
+# Training finishes, signals completion, instance stops (can resume later)
+
+# Data pipeline - hibernate for cost savings
+spawn launch --on-complete hibernate --ttl 12h
+# Pipeline finishes, signals completion, instance hibernates
+```
+
+**Signal completion two ways:**
+
+```bash
+# 1. Using spored CLI (recommended)
+spored complete
+spored complete --status success
+spored complete --status success --message "Job completed successfully"
+
+# 2. From any language (universal)
+touch /tmp/SPAWN_COMPLETE
+
+# With optional metadata (JSON)
+echo '{"status":"success","message":"Build completed"}' > /tmp/SPAWN_COMPLETE
+```
+
+**How it works:**
+1. Launch instance with `--on-complete` flag (terminate, stop, or hibernate)
+2. spored monitors completion file (`/tmp/SPAWN_COMPLETE` by default)
+3. When file appears, spored waits grace period (30s default)
+4. Action executes automatically (terminate/stop/hibernate)
+
+**Priority order:**
+1. Spot interruption (highest priority)
+2. Completion signal
+3. TTL expiration
+4. Idle timeout
+
+**Advanced options:**
+
+```bash
+# Custom completion file
+spawn launch --on-complete terminate --completion-file /app/done
+
+# Custom grace period
+spawn launch --on-complete terminate --completion-delay 1m
+```
+
 ### Spot Instances
 
 ```bash
@@ -347,13 +407,18 @@ systemctl status spored
 journalctl -u spored -f
 
 # Configuration via tags (set by spawn)
-spawn:ttl=24h              # Auto-terminate after 24h
-spawn:idle-timeout=1h       # Terminate if idle for 1h
-spawn:hibernate-on-idle=true # Hibernate instead of terminate
-spawn:idle-cpu=5            # CPU threshold for idle (default: 5%)
+spawn:ttl=24h                 # Auto-terminate after 24h
+spawn:idle-timeout=1h         # Terminate if idle for 1h
+spawn:hibernate-on-idle=true  # Hibernate instead of terminate
+spawn:idle-cpu=5              # CPU threshold for idle (default: 5%)
+spawn:on-complete=terminate   # Action on completion signal
+spawn:completion-file=/tmp/SPAWN_COMPLETE  # File to watch
+spawn:completion-delay=30s    # Grace period before action
 ```
 
 **What spored monitors:**
+- ✅ Spot interruption warnings (highest priority)
+- ✅ Completion signals (file-based)
 - ✅ Uptime vs TTL
 - ✅ CPU usage (idle detection)
 - ✅ Network traffic (idle detection)
@@ -519,6 +584,75 @@ truffle spot "m8g.*" --max-price 0.15 --sort-by-price | \
 # • Resume quickly when needed
 ```
 
+### Batch Processing with Completion Signal
+
+```bash
+# Launch instance for batch job
+truffle search m7i.large | \
+  spawn launch \
+    --on-complete terminate \
+    --ttl 4h \
+    --name batch-processor
+
+# SSH to instance
+spawn connect batch-processor
+
+# Run your batch job (example)
+cat > process.sh <<'EOF'
+#!/bin/bash
+echo "Processing data..."
+python3 process_data.py
+echo "Uploading results..."
+aws s3 cp results.csv s3://my-bucket/
+echo "Job complete!"
+# Signal completion when done
+spored complete --status success --message "Processed 10000 records"
+EOF
+
+chmod +x process.sh
+./process.sh
+
+# Instance automatically terminates 30 seconds after spored complete
+# TTL (4h) acts as safety net if job hangs
+# All resources cleaned up automatically
+```
+
+### CI/CD Runner with Self-Cleanup
+
+```bash
+# Launch ephemeral CI runner
+spawn launch \
+  --instance-type t3.large \
+  --on-complete terminate \
+  --ttl 30m \
+  --name ci-runner \
+  --user-data @setup-ci.sh
+
+# setup-ci.sh
+cat > setup-ci.sh <<'EOF'
+#!/bin/bash
+# Pull code
+git clone https://github.com/user/repo
+cd repo
+
+# Run tests
+npm install
+npm test
+
+# Signal completion (success or failure)
+if [ $? -eq 0 ]; then
+  spored complete --status success --message "All tests passed"
+else
+  spored complete --status failed --message "Tests failed"
+fi
+# Instance terminates automatically after 30s
+EOF
+
+# Instance runs job, signals completion, terminates
+# No manual cleanup needed
+# Works even if your laptop is off
+```
+
 ## 🛠️ Development
 
 ### Building
@@ -567,6 +701,14 @@ cat /var/log/spored.log
 
 # See warnings
 cat /tmp/SPAWN_WARNING
+
+# Signal completion (workload finished)
+spored complete
+spored complete --status success --message "Job completed"
+
+# View help
+spored help
+spored complete --help
 ```
 
 ### Metrics Monitored

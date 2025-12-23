@@ -40,6 +40,11 @@ type AgentConfig struct {
 	HibernateOnIdle bool
 	CostLimit       float64
 	IdleCPUPercent  float64
+
+	// Completion signal settings
+	OnComplete      string        // Action: terminate, stop, hibernate
+	CompletionFile  string        // File path to watch
+	CompletionDelay time.Duration // Grace period before action
 }
 
 func NewAgent(ctx context.Context) (*Agent, error) {
@@ -170,7 +175,25 @@ func loadConfigFromTags(ctx context.Context, client *ec2.Client, instanceID stri
 			}
 		case "spawn:dns-name":
 			dnsName = *tag.Value
+		case "spawn:on-complete":
+			config.OnComplete = *tag.Value
+		case "spawn:completion-file":
+			config.CompletionFile = *tag.Value
+		case "spawn:completion-delay":
+			if duration, err := time.ParseDuration(*tag.Value); err == nil {
+				config.CompletionDelay = duration
+			}
 		}
+	}
+
+	// Set default completion file if on-complete is set but file isn't specified
+	if config.OnComplete != "" && config.CompletionFile == "" {
+		config.CompletionFile = "/tmp/SPAWN_COMPLETE"
+	}
+
+	// Set default completion delay if on-complete is set but delay isn't specified
+	if config.OnComplete != "" && config.CompletionDelay == 0 {
+		config.CompletionDelay = 30 * time.Second
 	}
 
 	return config, dnsName, nil
@@ -201,7 +224,15 @@ func (a *Agent) checkAndAct(ctx context.Context) {
 		return
 	}
 
-	// 1. Check TTL
+	// 1. Check for completion signal (HIGH PRIORITY)
+	if a.config.OnComplete != "" {
+		if a.checkCompletion(ctx) {
+			// Completion signal detected - handled in checkCompletion
+			return
+		}
+	}
+
+	// 2. Check TTL
 	if a.config.TTL > 0 {
 		uptime := time.Since(a.startTime)
 		remaining := a.config.TTL - uptime
@@ -218,7 +249,7 @@ func (a *Agent) checkAndAct(ctx context.Context) {
 		}
 	}
 
-	// 2. Check idle
+	// 3. Check idle
 	if a.config.IdleTimeout > 0 {
 		idle := a.isIdle()
 		if idle {
@@ -590,6 +621,65 @@ func (a *Agent) warnUsers(message string) {
 	os.WriteFile("/tmp/SPAWN_WARNING", []byte(message+"\n"), 0644)
 
 	log.Printf("Warning sent to users: %s", message)
+}
+
+func (a *Agent) checkCompletion(ctx context.Context) bool {
+	// Check if completion file exists
+	if _, err := os.Stat(a.config.CompletionFile); err == nil {
+		log.Printf("Completion signal detected: file %s exists", a.config.CompletionFile)
+
+		// Read completion file for metadata (optional)
+		content, err := os.ReadFile(a.config.CompletionFile)
+		if err == nil && len(content) > 0 {
+			log.Printf("Completion metadata: %s", strings.TrimSpace(string(content)))
+		}
+
+		// Warn users with grace period
+		delay := a.config.CompletionDelay
+		a.warnUsers(fmt.Sprintf("✓ Workload complete - %s in %v", a.config.OnComplete, delay))
+
+		log.Printf("Grace period: waiting %v before action", delay)
+		time.Sleep(delay)
+
+		// Execute action based on configuration
+		switch strings.ToLower(a.config.OnComplete) {
+		case "terminate":
+			a.terminate(ctx, "Completion signal received")
+		case "stop":
+			a.stop(ctx, "Completion signal received")
+		case "hibernate":
+			a.hibernate(ctx)
+		default:
+			log.Printf("Unknown on-complete action: %s (doing nothing)", a.config.OnComplete)
+			return false
+		}
+
+		return true
+	}
+
+	return false
+}
+
+func (a *Agent) stop(ctx context.Context, reason string) {
+	log.Printf("Stopping instance %s (reason: %s)", a.instanceID, reason)
+
+	// Clean up DNS before stopping
+	a.Cleanup(ctx)
+
+	a.warnUsers(fmt.Sprintf("🛑 STOPPING NOW - %s", reason))
+
+	// Wait a moment for users to see warning
+	time.Sleep(5 * time.Second)
+
+	_, err := a.ec2Client.StopInstances(ctx, &ec2.StopInstancesInput{
+		InstanceIds: []string{a.instanceID},
+	})
+
+	if err != nil {
+		log.Printf("Failed to stop instance: %v", err)
+	} else {
+		log.Printf("Stop request sent")
+	}
 }
 
 func (a *Agent) hibernate(ctx context.Context) {

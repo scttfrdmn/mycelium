@@ -50,6 +50,11 @@ type LaunchConfig struct {
 	CostLimit       float64
 	DNSName         string
 
+	// Completion signal settings
+	OnComplete       string // Action: terminate, stop, hibernate
+	CompletionFile   string // File path to watch (default: /tmp/SPAWN_COMPLETE)
+	CompletionDelay  string // Grace period before action (default: 30s)
+
 	// Metadata
 	Name string
 	Tags map[string]string
@@ -198,12 +203,25 @@ func buildTags(config LaunchConfig) []types.Tag {
 	if config.HibernateOnIdle {
 		tags = append(tags, types.Tag{Key: aws.String("spawn:hibernate-on-idle"), Value: aws.String("true")})
 	}
-	
+
+	// Completion signal settings
+	if config.OnComplete != "" {
+		tags = append(tags, types.Tag{Key: aws.String("spawn:on-complete"), Value: aws.String(config.OnComplete)})
+	}
+
+	if config.CompletionFile != "" {
+		tags = append(tags, types.Tag{Key: aws.String("spawn:completion-file"), Value: aws.String(config.CompletionFile)})
+	}
+
+	if config.CompletionDelay != "" {
+		tags = append(tags, types.Tag{Key: aws.String("spawn:completion-delay"), Value: aws.String(config.CompletionDelay)})
+	}
+
 	// Add custom tags
 	for k, v := range config.Tags {
 		tags = append(tags, types.Tag{Key: aws.String(k), Value: aws.String(v)})
 	}
-	
+
 	return tags
 }
 
