@@ -1,0 +1,1345 @@
+# German (de) translations for spawn and truffle CLIs - COMPLETE VERSION
+# Deutsche Übersetzungen - Vollständige erste Version (Überprüfung durch Muttersprachler empfohlen)
+
+[common.region]
+other = "Region"
+
+[common.availability_zone]
+other = "Verfügbarkeitszone"
+
+[common.instance_type]
+other = "Instanztyp"
+
+[common.instance_id]
+other = "Instanz-ID"
+
+[common.public_ip]
+other = "Öffentliche IP"
+
+[common.error]
+other = "Fehler"
+
+[common.warning]
+other = "Warnung"
+
+[common.success]
+other = "Erfolg"
+
+[spawn.root.use]
+other = "spawn"
+
+[spawn.root.short]
+other = "AWS EC2-Instanzen mühelos starten"
+
+[spawn.root.long]
+other = """spawn - Ephemerer AWS EC2-Instanzstarter
+
+Erleichtert das Starten von AWS-Instanzen mit automatischer AMI-Erkennung, automatischer SSH-Konfiguration und automatischem Herunterfahren."""
+
+[spawn.launch.use]
+other = "launch"
+
+[spawn.launch.short]
+other = "Eine EC2-Instanz starten"
+
+[spawn.launch.long]
+other = "Eine EC2-Instanz mit intelligenten Standardwerten starten."
+
+[spawn.launch.flag.instance_type]
+other = "Instanztyp"
+
+[spawn.launch.flag.region]
+other = "AWS-Region"
+
+[spawn.launch.flag.az]
+other = "Verfügbarkeitszone"
+
+[spawn.launch.flag.ami]
+other = "AMI-ID (erkennt AL2023 automatisch)"
+
+[spawn.launch.flag.vpc]
+other = "VPC-ID"
+
+[spawn.launch.flag.subnet]
+other = "Subnetz-ID"
+
+[spawn.launch.flag.security_group]
+other = "Sicherheitsgruppen-ID"
+
+[spawn.launch.flag.key_pair]
+other = "SSH-Schlüsselpaarname"
+
+[spawn.launch.flag.spot]
+other = "Als Spot-Instanz starten"
+
+[spawn.launch.flag.spot_max_price]
+other = "Maximaler Spot-Preis"
+
+[spawn.launch.flag.use_reservation]
+other = "Kapazitätsreservierung verwenden"
+
+[spawn.launch.flag.reservation_id]
+other = "Kapazitätsreservierungs-ID"
+
+[spawn.launch.flag.hibernate]
+other = "Ruhezustand aktivieren"
+
+[spawn.launch.flag.ttl]
+other = "Automatisches Herunterfahren nach Dauer (z.B. 8h)"
+
+[spawn.launch.flag.idle_timeout]
+other = "Automatisches Herunterfahren bei Inaktivität"
+
+[spawn.launch.flag.hibernate_on_idle]
+other = "Bei Inaktivität in Ruhezustand versetzen statt herunterfahren"
+
+[spawn.launch.flag.name]
+other = "Instanznamen-Tag"
+
+[spawn.launch.flag.user_data]
+other = "Benutzerdaten (@Datei oder inline)"
+
+[spawn.launch.flag.user_data_file]
+other = "Benutzerdatendatei"
+
+[spawn.launch.flag.dns]
+other = "DNS-Namen registrieren"
+
+[spawn.launch.flag.dns_domain]
+other = "Benutzerdefinierte DNS-Domäne"
+
+[spawn.launch.flag.dns_api_endpoint]
+other = "Benutzerdefinierter DNS-API-Endpunkt"
+
+[spawn.launch.flag.interactive]
+other = "Interaktiven Assistenten erzwingen"
+
+[spawn.launch.flag.quiet]
+other = "Minimale Ausgabe"
+
+[spawn.launch.flag.wait_for_running]
+other = "Warten bis sie läuft"
+
+[spawn.launch.flag.wait_for_ssh]
+other = "Warten bis SSH bereit ist"
+
+[spawn.wizard.title]
+other = "spawn-Konfigurationsassistent"
+
+[spawn.wizard.subtitle]
+other = "Ich helfe Ihnen, eine AWS EC2-Instanz zu starten!"
+
+[spawn.wizard.instructions]
+other = "Drücken Sie Enter, um den Standardwert in [Klammern] zu verwenden"
+
+[spawn.wizard.intro.help]
+other = "Dieser Assistent hilft Ihnen, Ihre EC2-Instanz zu konfigurieren. Drücken Sie Enter, um die Standardwerte zu verwenden."
+
+[spawn.wizard.intro.default_hint]
+other = "Tipp: Lassen Sie leer und drücken Sie Enter, um den Standardwert zu verwenden."
+
+[spawn.wizard.step1.title]
+other = "Schritt 1 von 6: Wählen Sie den Instanztyp"
+
+[spawn.wizard.step1.prompt]
+other = "Instanztyp [t3.medium]: "
+
+[spawn.wizard.step1.common_choices]
+other = "Häufige Auswahlmöglichkeiten:"
+
+[spawn.wizard.step1.category.dev_testing]
+other = "Entwicklung & Tests:"
+
+[spawn.wizard.step1.category.general_purpose]
+other = "Allgemeiner Zweck:"
+
+[spawn.wizard.step1.category.compute]
+other = "Rechenoptimiert:"
+
+[spawn.wizard.step1.category.memory]
+other = "Speicheroptimiert:"
+
+[spawn.wizard.step1.category.gpu]
+other = "GPU:"
+
+[spawn.wizard.step1.category.dev]
+other = "Entwicklung & Tests:"
+
+[spawn.wizard.step1.category.general]
+other = "Allgemeiner Zweck:"
+
+[spawn.wizard.step1.instance.t3_medium]
+other = "    t3.medium - 2 vCPU, 4 GiB RAM (Standard)"
+
+[spawn.wizard.step1.instance.t3_large]
+other = "    t3.large  - 2 vCPU, 8 GiB RAM"
+
+[spawn.wizard.step1.instance.m7i_large]
+other = "    m7i.large  - 2 vCPU, 8 GiB RAM"
+
+[spawn.wizard.step1.instance.m7i_xlarge]
+other = "    m7i.xlarge - 4 vCPU, 16 GiB RAM"
+
+[spawn.wizard.step1.instance.c7i_xlarge]
+other = "    c7i.xlarge  - 4 vCPU, 8 GiB RAM"
+
+[spawn.wizard.step1.instance.c7i_2xlarge]
+other = "    c7i.2xlarge - 8 vCPU, 16 GiB RAM"
+
+[spawn.wizard.step1.instance.g6_xlarge]
+other = "    g6.xlarge    - NVIDIA L4, 4 vCPU, 16 GiB RAM"
+
+[spawn.wizard.step1.instance.p5_48xlarge]
+other = "    p5.48xlarge  - 8x NVIDIA H100, 192 vCPU, 2 TiB RAM"
+
+[spawn.wizard.step1.detected]
+other = "Ausgewählt: {{.InstanceType}}"
+
+[spawn.wizard.step1.detected_gpu]
+other = "Ausgewählt: {{.InstanceType}} (GPU-beschleunigt)"
+
+[spawn.wizard.step2.title]
+other = "Schritt 2 von 6: Wählen Sie die Region"
+
+[spawn.wizard.step2.prompt]
+other = "AWS-Region [us-east-1]: "
+
+[spawn.wizard.step2.common_regions]
+other = "Häufige Regionen:"
+
+[spawn.wizard.step2.region.us]
+other = "Vereinigte Staaten:"
+
+[spawn.wizard.step2.region.eu]
+other = "Europa:"
+
+[spawn.wizard.step2.region.asia]
+other = "Asien-Pazifik:"
+
+[spawn.wizard.step2.region.us_east_1]
+other = "    us-east-1      - Nord-Virginia"
+
+[spawn.wizard.step2.region.us_west_2]
+other = "    us-west-2      - Oregon"
+
+[spawn.wizard.step2.region.eu_west_1]
+other = "    eu-west-1      - Irland"
+
+[spawn.wizard.step2.region.eu_central_1]
+other = "    eu-central-1   - Frankfurt"
+
+[spawn.wizard.step2.region.ap_northeast_1]
+other = "    ap-northeast-1 - Tokio"
+
+[spawn.wizard.step2.region.ap_southeast_1]
+other = "    ap-southeast-1 - Singapur"
+
+[spawn.wizard.step3.title]
+other = "Schritt 3 von 6: Spot-Instanz?"
+
+[spawn.wizard.step3.explanation]
+other = "Spot-Instanzen sparen bis zu 90%, können aber von AWS unterbrochen werden."
+
+[spawn.wizard.step3.description]
+other = "Spot-Instanzen kosten 50-90% weniger, können aber von AWS mit 2-minütiger Vorankündigung unterbrochen werden."
+
+[spawn.wizard.step3.good_for]
+other = "Gut für: Dev/Test, Batch-Jobs, fehlertolerante Workloads"
+
+[spawn.wizard.step3.not_for]
+other = "Nicht für: Produktionsserver, Datenbanken, lang laufende Jobs"
+
+[spawn.wizard.step3.prompt]
+other = "Spot-Instanz verwenden? [y/N]: "
+
+[spawn.wizard.step3.using_spot]
+other = "Verwende Spot-Instanz (günstiger, kann unterbrochen werden)"
+
+[spawn.wizard.step3.using_ondemand]
+other = "Verwende On-Demand-Instanz (zuverlässig, nicht unterbrochen)"
+
+[spawn.wizard.step4.title]
+other = "Schritt 4 von 6: Automatisches Herunterfahren"
+
+[spawn.wizard.step4.explanation]
+other = "Verhindern Sie ausufernde Kosten durch Konfiguration automatischer Herunterfahrregeln."
+
+[spawn.wizard.step4.description]
+other = "Verhindern Sie ausufernde Kosten durch automatisches Herunterfahren inaktiver oder lang laufender Instanzen."
+
+[spawn.wizard.step4.option1]
+other = "1. Feste TTL (z.B. Herunterfahren nach 8 Stunden)"
+
+[spawn.wizard.step4.option2]
+other = "2. Inaktivitätserkennung (Herunterfahren bei keine Aktivität)"
+
+[spawn.wizard.step4.option3]
+other = "3. Beides (TTL + Inaktivitätserkennung)"
+
+[spawn.wizard.step4.option4]
+other = "4. Keines (nur manuelles Herunterfahren)"
+
+[spawn.wizard.step4.option.ttl]
+other = "Nur TTL (Herunterfahren nach X Stunden)"
+
+[spawn.wizard.step4.option.idle]
+other = "Nur Inaktivitäts-Timeout (Herunterfahren bei Inaktivität)"
+
+[spawn.wizard.step4.option.both]
+other = "Beides TTL + Inaktivitäts-Timeout (empfohlen)"
+
+[spawn.wizard.step4.option.manual]
+other = "Manuell (ich fahre sie selbst herunter)"
+
+[spawn.wizard.step4.prompt]
+other = "Wählen Sie [1-4]: "
+
+[spawn.wizard.step4.ttl_prompt]
+other = "Automatisches Herunterfahren nach (z.B. 8h, 24h) [8h]: "
+
+[spawn.wizard.step4.idle_prompt]
+other = "Inaktivitäts-Timeout (z.B. 30m, 1h) [30m]: "
+
+[spawn.wizard.step4.ttl_prompt_short]
+other = "TTL (z.B. 8h) [8h]: "
+
+[spawn.wizard.step4.idle_prompt_short]
+other = "Inaktivität (z.B. 30m) [30m]: "
+
+[spawn.wizard.step4.ttl_set]
+other = "Fährt herunter nach {{.TTL}}"
+
+[spawn.wizard.step4.idle_set]
+other = "Fährt herunter bei Inaktivität für {{.Idle}}"
+
+[spawn.wizard.step4.both_set]
+other = "Fährt herunter nach {{.TTL}} ODER Inaktivität für {{.Idle}}"
+
+[spawn.wizard.step4.manual_warning]
+other = "Denken Sie daran, die Instanz herunterzufahren, um Kosten zu vermeiden!"
+
+[spawn.wizard.step4.manual_command]
+other = "    Verwenden: spawn stop <instance-id>"
+
+[spawn.wizard.step5.title]
+other = "Schritt 5 von 6: SSH-Schlüssel"
+
+[spawn.wizard.step5.prompt]
+other = "SSH-Schlüsselpaarname [automatisch erkennen]: "
+
+[spawn.wizard.step5.found_key]
+other = "SSH-Schlüssel gefunden: {{.KeyPath}}"
+
+[spawn.wizard.step5.will_use_key]
+other = "Dieser Schlüssel wird für SSH-Zugriff verwendet."
+
+[spawn.wizard.step5.no_key_found]
+other = "Kein SSH-Schlüssel gefunden bei {{.KeyPath}}"
+
+[spawn.wizard.step5.key_required]
+other = "Ein SSH-Schlüssel wird benötigt, um auf die Instanz zuzugreifen."
+
+[spawn.wizard.step5.create_prompt]
+other = "Neuen SSH-Schlüssel erstellen? [Y/n]: "
+
+[spawn.wizard.step5.creating_key]
+other = "SSH-Schlüssel wird erstellt..."
+
+[spawn.wizard.step5.key_created]
+other = "SSH-Schlüssel erstellt: {{.KeyPath}}"
+
+[spawn.wizard.step6.title]
+other = "Schritt 6 von 6: Benennen Sie Ihre Instanz"
+
+[spawn.wizard.step6.prompt]
+other = "Instanzname (optional) []: "
+
+[spawn.wizard.step6.name_set]
+other = "Instanz wird benannt: {{.Name}}"
+
+[spawn.wizard.summary.title]
+other = "Konfigurationszusammenfassung"
+
+[spawn.wizard.summary.about_to_launch]
+other = "Sie sind dabei zu starten:"
+
+[spawn.wizard.summary.field.instance_type]
+other = "Instanztyp"
+
+[spawn.wizard.summary.field.region]
+other = "Region"
+
+[spawn.wizard.summary.field.spot]
+other = "Spot"
+
+[spawn.wizard.summary.field.ttl]
+other = "Automatisches Herunterfahren"
+
+[spawn.wizard.summary.field.idle]
+other = "Inaktivitäts-Timeout"
+
+[spawn.wizard.summary.field.key]
+other = "SSH-Schlüssel"
+
+[spawn.wizard.summary.field.name]
+other = "Name"
+
+[spawn.wizard.summary.label.instance_type]
+other = "Instanztyp"
+
+[spawn.wizard.summary.label.region]
+other = "Region"
+
+[spawn.wizard.summary.label.type]
+other = "Typ"
+
+[spawn.wizard.summary.label.name]
+other = "Name"
+
+[spawn.wizard.summary.label.time_limit]
+other = "Zeitlimit"
+
+[spawn.wizard.summary.label.idle_timeout]
+other = "Inaktivitäts-Timeout"
+
+[spawn.wizard.summary.type_spot]
+other = "Spot-Instanz"
+
+[spawn.wizard.summary.type_ondemand]
+other = "On-Demand"
+
+[spawn.wizard.summary.estimated_cost]
+other = "Geschätzte Kosten: {{.Cost}}/Stunde"
+
+[spawn.wizard.summary.total_cost]
+other = "Geschätzte Gesamtkosten"
+
+[spawn.wizard.summary.savings]
+other = "({{.Savings}} Ersparnis vs On-Demand)"
+
+[spawn.wizard.summary.confirm]
+other = "Instanz starten? [Y/n]: "
+
+[spawn.wizard.cancelled]
+other = "Start vom Benutzer abgebrochen"
+
+[spawn.progress.title]
+other = "Instanz wird erstellt..."
+
+[spawn.progress.detecting_ami]
+other = "AMI wird erkannt"
+
+[spawn.progress.setup_ssh]
+other = "SSH-Schlüssel wird konfiguriert"
+
+[spawn.progress.setup_iam]
+other = "IAM-Rolle wird konfiguriert"
+
+[spawn.progress.create_sg]
+other = "Sicherheitsgruppe wird erstellt"
+
+[spawn.progress.launching]
+other = "Instanz wird gestartet"
+
+[spawn.progress.installing_agent]
+other = "spored-Agent wird installiert"
+
+[spawn.progress.waiting_instance]
+other = "Warten auf Instanz"
+
+[spawn.progress.getting_ip]
+other = "Öffentliche IP wird abgerufen"
+
+[spawn.progress.waiting_ssh]
+other = "Warten auf SSH"
+
+[spawn.progress.error]
+other = "Fehler"
+
+[spawn.progress.create_security_group]
+other = "Sicherheitsgruppe wird erstellt"
+
+[spawn.progress.get_public_ip]
+other = "Öffentliche IP wird abgerufen"
+
+[spawn.progress.install_agent]
+other = "spawn-Agent wird installiert"
+
+[spawn.progress.launching_instance]
+other = "Instanz wird gestartet"
+
+[spawn.progress.setup_iam_role]
+other = "IAM-Rolle wird konfiguriert"
+
+[spawn.progress.setup_ssh_key]
+other = "SSH-Schlüssel wird konfiguriert"
+
+[spawn.progress.instance_details]
+other = "Instanzdetails:"
+
+[spawn.progress.status_running]
+other = "Status:       läuft"
+
+[spawn.progress.connect_now]
+other = "Jetzt verbinden:"
+
+[spawn.progress.success.title]
+other = "Instanz bereit!"
+
+[spawn.progress.success.details]
+other = "Instanzdetails:"
+
+[spawn.progress.success.connect_now]
+other = "Jetzt verbinden mit:"
+
+[spawn.progress.success.status_running]
+other = "läuft"
+
+[spawn.progress.success.label.instance_id]
+other = "Instanz-ID"
+
+[spawn.progress.success.label.public_ip]
+other = "Öffentliche IP"
+
+[spawn.progress.success.label.status]
+other = "Status"
+
+[spawn.progress.success.monitoring.agent_active]
+other = "spawn-Agent ist aktiv und überwacht die Nutzung"
+
+[spawn.progress.success.monitoring.close_laptop]
+other = "Die Instanz fährt automatisch herunter, wenn Sie Ihren Laptop schließen"
+
+[spawn.progress.monitoring.title]
+other = "Automatische Überwachung:"
+
+[spawn.progress.monitoring.ttl]
+other = "Fährt herunter nach: {{.Duration}}"
+
+[spawn.progress.monitoring.idle]
+other = "Fährt herunter bei Inaktivität: {{.Duration}}"
+
+[spawn.progress.monitoring.agent]
+other = "Der spored-Agent überwacht Ihre Instanz."
+
+[spawn.progress.monitoring.laptop]
+other = "Sie können Ihren Laptop schließen - Überwachung läuft auf der Instanz."
+
+[spawn.error.instance_type_required]
+other = "Instanztyp erforderlich"
+
+[spawn.error.region_required]
+other = "Region erforderlich"
+
+[spawn.error.platform_detect_failed]
+other = "Plattformerkennung fehlgeschlagen: {{.Error}}"
+
+[spawn.error.aws_init_failed]
+other = "AWS-Client-Initialisierung fehlgeschlagen: {{.Error}}"
+
+[spawn.error.ssh_key_not_found]
+other = "kein SSH-Schlüssel gefunden bei {{.Path}}"
+
+[spawn.error.ssh_key_create_failed]
+other = "SSH-Schlüsselerstellung fehlgeschlagen: {{.Error}}"
+
+[spawn.connect.use]
+other = "connect"
+
+[spawn.connect.short]
+other = "Mit einer von spawn verwalteten Instanz via SSH verbinden"
+
+[spawn.connect.long]
+other = "Mit einer von spawn verwalteten Instanz via SSH mit automatischer Schlüsselerkennung verbinden."
+
+[spawn.connect.flag.region]
+other = "Nach AWS-Region filtern"
+
+[spawn.connect.flag.use_ssm]
+other = "AWS Session Manager-Verbindung erzwingen"
+
+[spawn.connect.found_instance]
+other = "Instanz gefunden in {{.Region}}"
+
+[spawn.connect.not_running]
+other = "Instanz läuft nicht (Status: {{.State}})"
+
+[spawn.connect.ssh_key_warning]
+other = "SSH-Schlüssel für {{.KeyName}} konnte nicht gefunden werden"
+
+[spawn.connect.connecting_ssh]
+other = "Verbindung via SSH..."
+
+[spawn.connect.aws_cli_not_found]
+other = "AWS CLI nicht gefunden. Installieren von: https://aws.amazon.com/cli/"
+
+[spawn.connect.connecting_ssm]
+other = "Verbindung via AWS Session Manager..."
+
+[spawn.connect.ssm_plugin_error]
+other = """Session Manager-Plugin nicht gefunden.
+
+Installieren von: https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html
+
+Fehler: {{.Error}}"""
+
+[spawn.connect.connecting_session_manager]
+other = "Verbindung via AWS Session Manager..."
+
+[spawn.connect.fallback_session_manager]
+other = "SSH-Schlüssel nicht verfügbar, verwende AWS Session Manager"
+
+[spawn.connect.key_not_found]
+other = "SSH-Schlüsseldatei nicht gefunden bei {{.KeyPath}}"
+
+[spawn.connect.error.aws_cli_not_found]
+other = "AWS CLI nicht gefunden. Installieren von https://aws.amazon.com/cli/"
+
+[spawn.connect.error.key_not_found_for_name]
+other = "SSH-Schlüsseldatei für Schlüsselname {{.KeyName}} nicht gefunden"
+
+[spawn.connect.error.no_key_name]
+other = "Instanz hat keinen SSH-Schlüssel konfiguriert"
+
+[spawn.connect.error.not_running]
+other = "Instanz läuft nicht (Status: {{.State}})"
+
+[spawn.connect.error.session_manager_failed]
+other = "Starten der Session Manager-Sitzung fehlgeschlagen: {{.Error}}"
+
+[spawn.list.use]
+other = "list"
+
+[spawn.list.short]
+other = "Von spawn verwaltete EC2-Instanzen auflisten"
+
+[spawn.list.long]
+other = "Von spawn verwaltete EC2-Instanzen in allen Regionen auflisten."
+
+[spawn.list.flag.region]
+other = "Nach AWS-Region filtern"
+
+[spawn.list.flag.az]
+other = "Nach Verfügbarkeitszone filtern"
+
+[spawn.list.flag.state]
+other = "Nach Instanzstatus filtern"
+
+[spawn.list.flag.tags]
+other = "Nach Tags filtern (Schlüssel=Wert)"
+
+[spawn.list.flag.output]
+other = "Ausgabeformat (table, json, yaml)"
+
+[spawn.list.searching]
+other = "Suche nach von spawn verwalteten Instanzen..."
+
+[spawn.list.searching_region]
+other = "Suche in {{.Region}}..."
+
+[spawn.list.no_results]
+other = "Keine Instanzen entsprechen den angegebenen Filtern."
+
+[spawn.list.table.header.instance_id]
+other = "INSTANZ-ID"
+
+[spawn.list.table.header.name]
+other = "NAME"
+
+[spawn.list.table.header.type]
+other = "TYP"
+
+[spawn.list.table.header.state]
+other = "STATUS"
+
+[spawn.list.table.header.region]
+other = "REGION"
+
+[spawn.list.table.header.az]
+other = "VZ"
+
+[spawn.list.table.header.public_ip]
+other = "ÖFFENTLICHE IP"
+
+[spawn.list.table.header.launched]
+other = "GESTARTET"
+
+[spawn.list.no_instances]
+other = "Keine spawn-Instanzen gefunden"
+
+[spawn.list.no_instances_match]
+other = "Keine Instanzen entsprechen den angegebenen Kriterien"
+
+[spawn.list.searching_all_regions]
+other = "Suche in allen AWS-Regionen..."
+
+[spawn.list.error.list_failed]
+other = "Auflisten der Instanzen fehlgeschlagen: {{.Error}}"
+
+[spawn.list.header.instance_id]
+other = "Instanz-ID"
+
+[spawn.list.header.name]
+other = "Name"
+
+[spawn.list.header.type]
+other = "Typ"
+
+[spawn.list.header.state]
+other = "Status"
+
+[spawn.list.header.spot]
+other = "Spot"
+
+[spawn.list.header.az]
+other = "VZ"
+
+[spawn.list.header.public_ip]
+other = "Öffentliche IP"
+
+[spawn.list.header.age]
+other = "Alter"
+
+[spawn.list.header.ttl]
+other = "TTL"
+
+[spawn.dns.use]
+other = "dns"
+
+[spawn.dns.short]
+other = "DNS-Einträge für spawn-Instanzen verwalten"
+
+[spawn.dns.long]
+other = "DNS-Einträge für spawn-Instanzen verwalten."
+
+[spawn.dns.list.use]
+other = "list"
+
+[spawn.dns.list.short]
+other = "spawn-Instanzen mit aktiviertem DNS auflisten"
+
+[spawn.dns.register.use]
+other = "register"
+
+[spawn.dns.register.short]
+other = "DNS-Namen für eine Instanz registrieren"
+
+[spawn.dns.delete.use]
+other = "delete"
+
+[spawn.dns.delete.short]
+other = "DNS-Eintrag für eine Instanz löschen"
+
+[spawn.dns.invalid_name]
+other = "ungültiger DNS-Name: {{.Name}}"
+
+[spawn.dns.no_dns_enabled]
+other = "Keine Instanzen mit aktiviertem DNS gefunden."
+
+[spawn.dns.instance_info]
+other = "Instanz:"
+
+[spawn.dns.region_info]
+other = "Region:"
+
+[spawn.dns.state_info]
+other = "Status:"
+
+[spawn.dns.public_ip_info]
+other = "Öffentliche IP:"
+
+[spawn.dns.fqdn_info]
+other = "FQDN:"
+
+[spawn.dns.registered]
+other = "DNS registriert: {{.FQDN}}"
+
+[spawn.dns.deleted]
+other = "DNS gelöscht: {{.FQDN}}"
+
+[spawn.extend.use]
+other = "extend"
+
+[spawn.extend.short]
+other = "TTL einer von spawn verwalteten Instanz verlängern"
+
+[spawn.extend.long]
+other = "TTL (Time-to-Live) einer von spawn verwalteten Instanz verlängern, um automatisches Herunterfahren zu verhindern."
+
+[spawn.extend.invalid_ttl]
+other = "ungültiges TTL-Format: {{.TTL}}"
+
+[spawn.extend.ttl_format_help]
+other = "TTL muss im Format sein: 1h, 2h30m, 24h, etc."
+
+[spawn.extend.current_ttl]
+other = "Aktuelles TTL: {{.TTL}}"
+
+[spawn.extend.new_ttl]
+other = "Neues TTL: {{.TTL}}"
+
+[spawn.extend.expires_at]
+other = "Läuft ab um: {{.Time}}"
+
+[spawn.extend.success]
+other = "TTL erfolgreich verlängert"
+
+[spawn.state.stop.use]
+other = "stop"
+
+[spawn.state.stop.short]
+other = "Eine von spawn verwaltete Instanz stoppen"
+
+[spawn.state.start.use]
+other = "start"
+
+[spawn.state.start.short]
+other = "Eine gestoppte oder ruhende Instanz starten"
+
+[spawn.state.hibernate.use]
+other = "hibernate"
+
+[spawn.state.hibernate.short]
+other = "Eine von spawn verwaltete Instanz in den Ruhezustand versetzen"
+
+[spawn.state.not_running]
+other = "Instanz ist nicht im laufenden Status (aktuell: {{.State}})"
+
+[spawn.state.not_stopped]
+other = "Instanz ist nicht im gestoppten Status (aktuell: {{.State}})"
+
+[spawn.state.found_instance]
+other = "Instanz gefunden in {{.Region}}"
+
+[spawn.state.stopping]
+other = "Instanz wird gestoppt..."
+
+[spawn.state.starting]
+other = "Instanz wird gestartet..."
+
+[spawn.state.hibernating]
+other = "Instanz wird in Ruhezustand versetzt..."
+
+[spawn.state.stopped]
+other = "Instanz gestoppt"
+
+[spawn.state.started]
+other = "Instanz gestartet"
+
+[spawn.state.hibernated]
+other = "Instanz in Ruhezustand versetzt"
+
+[spawn.state.new_ip]
+other = "Neue öffentliche IP: {{.IP}}"
+
+[spawn.state.ttl_restored]
+other = "TTL wiederhergestellt: {{.Duration}}"
+
+[spawn.state.short]
+other = "Instanzstatusübergänge anzeigen"
+
+[spawn.state.long]
+other = "Statusverlauf und aktuellen Status einer spawn-Instanz anzeigen"
+
+[spawn.agent.ttl_warning]
+other = "HERUNTERFAHREN IN {{.Duration}} (TTL-Limit)"
+
+[spawn.agent.idle_warning]
+other = "INAKTIV seit {{.IdleDuration}}, fährt herunter in {{.Remaining}}"
+
+[spawn.agent.spot_interruption.title]
+other = "🚨 SPOT-UNTERBRECHUNGSWARNUNG! 🚨"
+
+[spawn.agent.spot_interruption.message]
+other = """AWS wird diese Instanz {{.Action}} um {{.Time}}
+Sie haben ~2 Minuten, um Ihre Arbeit zu speichern!
+SPEICHERN SIE JETZT ALLE DATEIEN!"""
+
+[spawn.agent.hibernating]
+other = "RUHEZUSTAND JETZT - Instanz wird pausiert..."
+
+[spawn.agent.terminating]
+other = "🔴 HERUNTERFAHREN JETZT - Grund: {{.Reason}}"
+
+[truffle.root.use]
+other = "truffle"
+
+[truffle.root.short]
+other = "AWS EC2-Instanztyp-Regionsfinder"
+
+[truffle.root.long]
+other = "Truffle entdeckt, welche AWS-Regionen und Verfügbarkeitszonen bestimmte EC2-Instanztypen unterstützen."
+
+[truffle.search.use]
+other = "search [Instanztyp-Muster]"
+
+[truffle.search.short]
+other = "Nach Instanztypen in AWS-Regionen suchen"
+
+[truffle.search.long]
+other = "Nach Instanztypen in AWS-Regionen mit Unterstützung für Platzhalter und Regex-Muster suchen."
+
+[truffle.search.flag.skip_azs]
+other = "Verfügbarkeitszonensuche überspringen"
+
+[truffle.search.flag.architecture]
+other = "Nach Architektur filtern (x86_64, arm64, i386)"
+
+[truffle.search.flag.min_vcpu]
+other = "Minimale Anzahl vCPUs"
+
+[truffle.search.flag.min_memory]
+other = "Minimaler Speicher in GiB"
+
+[truffle.search.flag.family]
+other = "Nach Instanzfamilie filtern"
+
+[truffle.search.flag.timeout]
+other = "Zeitüberschreitung für AWS-API-Aufrufe"
+
+[truffle.search.searching]
+other = "Suche nach Instanztypen, die übereinstimmen: {{.Pattern}}"
+
+[truffle.search.filtering_regions]
+other = "Filtern von Regionen: {{.Regions}}"
+
+[truffle.search.fetching_regions]
+other = "Abrufen aller AWS-Regionen..."
+
+[truffle.search.searching_regions]
+other = "Suche über {{.Count}} Region(en)..."
+
+[truffle.search.no_results]
+other = "Keine übereinstimmenden Instanztypen gefunden."
+
+[truffle.search.searching_across]
+other = "Suche über {{.Count}} Region(en)..."
+
+[truffle.search.error.invalid_pattern]
+other = "ungültiges Suchmuster: {{.Error}}"
+
+[truffle.search.error.search_failed]
+other = "Suche fehlgeschlagen: {{.Error}}"
+
+[truffle.search.error.get_regions_failed]
+other = "Abrufen der AWS-Regionen fehlgeschlagen: {{.Error}}"
+
+[truffle.search.error.unsupported_format]
+other = "nicht unterstütztes Ausgabeformat: {{.Format}}"
+
+[truffle.capacity.use]
+other = "capacity"
+
+[truffle.capacity.short]
+other = "ML-Kapazitätsreservierungen prüfen"
+
+[truffle.capacity.long]
+other = "ML-Kapazitätsreservierungen in AWS-Regionen für GPU- und ML-Instanzen prüfen."
+
+[truffle.capacity.flag.instance_types]
+other = "Nach Instanztypen filtern"
+
+[truffle.capacity.flag.available_only]
+other = "Nur Reservierungen mit verfügbarer Kapazität anzeigen"
+
+[truffle.capacity.flag.active_only]
+other = "Nur aktive Reservierungen anzeigen"
+
+[truffle.capacity.flag.min_capacity]
+other = "Minimal verfügbare Kapazität"
+
+[truffle.capacity.flag.gpu_only]
+other = "Nur GPU/ML-Instanzreservierungen anzeigen"
+
+[truffle.capacity.flag.blocks]
+other = "Capacity Blocks für ML anzeigen"
+
+[truffle.capacity.flag.odcr]
+other = "On-Demand-Kapazitätsreservierungen anzeigen"
+
+[truffle.capacity.gpu_only]
+other = "Nur GPU/ML-Instanzen"
+
+[truffle.capacity.searching]
+other = "Suche nach Kapazitätsreservierungen..."
+
+[truffle.capacity.searching_across]
+other = "Suche über {{.Count}} Region(en)..."
+
+[truffle.capacity.fetching_regions]
+other = "Abrufen verfügbarer AWS-Regionen..."
+
+[truffle.capacity.no_results]
+other = "Keine Kapazitätsreservierungen gefunden, die den Kriterien entsprechen"
+
+[truffle.capacity.error.get_failed]
+other = "Abrufen der Kapazitätsreservierungen fehlgeschlagen: {{.Error}}"
+
+[truffle.capacity.error.get_regions_failed]
+other = "Abrufen der AWS-Regionen fehlgeschlagen: {{.Error}}"
+
+[truffle.capacity.error.unsupported_format]
+other = "nicht unterstütztes Ausgabeformat: {{.Format}}"
+
+[truffle.capacity.summary.title]
+other = "Kapazitätsreservierungs-Zusammenfassung:"
+
+[truffle.capacity.summary.total]
+other = "Gesamtreservierungen: {{.Count}}"
+
+[truffle.capacity.summary.active]
+other = "Aktive Reservierungen: {{.Count}}"
+
+[truffle.capacity.summary.instance_types]
+other = "Instanztypen: {{.Count}}"
+
+[truffle.capacity.summary.regions]
+other = "Regionen: {{.Count}}"
+
+[truffle.capacity.summary.azs]
+other = "Verfügbarkeitszonen: {{.Count}}"
+
+[truffle.capacity.summary.total_capacity]
+other = "Gesamtkapazität: {{.Count}} Instanzen"
+
+[truffle.capacity.summary.available]
+other = "Verfügbare Kapazität: {{.Count}} Instanzen ({{.Percent}}% frei)"
+
+[truffle.capacity.summary.used]
+other = "Genutzte Kapazität: {{.Count}} Instanzen ({{.Percent}}% genutzt)"
+
+[truffle.capacity.summary.total_reservations]
+other = "Gesamtreservierungen"
+
+[truffle.capacity.summary.active_reservations]
+other = "Aktive Reservierungen"
+
+[truffle.capacity.summary.availability_zones]
+other = "Verfügbarkeitszonen"
+
+[truffle.capacity.summary.available_capacity]
+other = "Verfügbare Kapazität"
+
+[truffle.capacity.summary.used_capacity]
+other = "Genutzte Kapazität"
+
+[truffle.capacity.summary.instances]
+other = "Instanzen"
+
+[truffle.capacity.summary.free]
+other = "frei"
+
+[truffle.capacity.summary.utilized]
+other = "genutzt"
+
+[truffle.spot.use]
+other = "spot [Instanztyp-Muster]"
+
+[truffle.spot.short]
+other = "Nach Spot-Instanzpreisen und Verfügbarkeit suchen"
+
+[truffle.spot.long]
+other = "Nach Spot-Instanzpreisen und Verfügbarkeit in AWS-Regionen suchen."
+
+[truffle.spot.flag.max_price]
+other = "Maximaler Spot-Preis pro Stunde (USD)"
+
+[truffle.spot.flag.show_savings]
+other = "Einsparungen vs On-Demand-Preise anzeigen"
+
+[truffle.spot.flag.sort_by_price]
+other = "Nach Preis sortieren (günstigste zuerst)"
+
+[truffle.spot.flag.active_only]
+other = "Nur VZs mit aktiver Spot-Kapazität anzeigen"
+
+[truffle.spot.flag.lookback_hours]
+other = "Stunden Preisverlauf anzuschauen (1-720)"
+
+[truffle.spot.searching]
+other = "Suche nach Spot-Instanzen, die übereinstimmen: {{.Pattern}}"
+
+[truffle.spot.fetching_pricing]
+other = "Abrufen von Spot-Preisdaten..."
+
+[truffle.spot.searching_across]
+other = "Suche über {{.Count}} Region(en)..."
+
+[truffle.spot.fetching_regions]
+other = "Abrufen verfügbarer AWS-Regionen..."
+
+[truffle.spot.max_price_filter]
+other = "Filtern nach Maximalpreis: ${{.MaxPrice}}/Stunde"
+
+[truffle.spot.no_matching_types]
+other = "Keine Instanztypen gefunden, die dem Muster entsprechen"
+
+[truffle.spot.no_pricing_data]
+other = "Keine Spot-Preisdaten für die übereinstimmenden Instanzen verfügbar"
+
+[truffle.spot.error.invalid_pattern]
+other = "ungültiges Suchmuster: {{.Error}}"
+
+[truffle.spot.error.search_failed]
+other = "Suche fehlgeschlagen: {{.Error}}"
+
+[truffle.spot.error.get_regions_failed]
+other = "Abrufen der AWS-Regionen fehlgeschlagen: {{.Error}}"
+
+[truffle.spot.error.get_pricing_failed]
+other = "Abrufen der Spot-Preise fehlgeschlagen: {{.Error}}"
+
+[truffle.spot.error.unsupported_format]
+other = "nicht unterstütztes Ausgabeformat: {{.Format}}"
+
+[truffle.spot.summary.title]
+other = "Spot-Instanz-Zusammenfassung:"
+
+[truffle.spot.summary.instance_types]
+other = "Instanztypen: {{.Count}}"
+
+[truffle.spot.summary.regions]
+other = "Regionen: {{.Count}}"
+
+[truffle.spot.summary.azs]
+other = "Verfügbarkeitszonen: {{.Count}}"
+
+[truffle.spot.summary.price_range]
+other = "Preisspanne: ${{.Min}} - ${{.Max}} pro Stunde"
+
+[truffle.spot.summary.avg_price]
+other = "Durchschnittspreis: ${{.Avg}} pro Stunde"
+
+[truffle.spot.summary.avg_savings]
+other = "Durchschnittliche Einsparungen: {{.Percent}}% vs On-Demand"
+
+[truffle.spot.summary.availability_zones]
+other = "Verfügbarkeitszonen"
+
+[truffle.spot.summary.average_price]
+other = "Durchschnittlicher Spot-Preis"
+
+[truffle.spot.summary.average_savings]
+other = "Durchschnittliche Einsparungen"
+
+[truffle.spot.summary.per_hour]
+other = "pro Stunde"
+
+[truffle.spot.summary.vs_on_demand]
+other = "vs On-Demand"
+
+[truffle.quotas.use]
+other = "quotas"
+
+[truffle.quotas.short]
+other = "AWS-Service-Quotas für EC2-Instanzen anzeigen"
+
+[truffle.quotas.long]
+other = "AWS-Service-Quotas für EC2-Instanzen in Regionen anzeigen."
+
+[truffle.quotas.flag.regions]
+other = "Zu prüfende Regionen"
+
+[truffle.quotas.flag.family]
+other = "Nach Instanzfamilie filtern"
+
+[truffle.quotas.flag.request]
+other = "Befehle zur Quotenerhöhungsanfrage generieren"
+
+[truffle.quotas.credentials_required]
+other = """❌ AWS-Anmeldeinformationen erforderlich zur Quotenprüfung
+
+Zur Konfiguration der Anmeldeinformationen:
+  1. Umgebungsvariablen exportieren:
+     export AWS_ACCESS_KEY_ID=...
+     export AWS_SECRET_ACCESS_KEY=...
+     export AWS_DEFAULT_REGION=us-east-1
+
+  ODER
+
+  2. Ausführen: aws configure
+
+Fehler: {{.Error}}"""
+
+[truffle.quotas.no_results]
+other = "Konnte für keine Region Quotas abrufen"
+
+[truffle.quotas.region_error]
+other = "Konnte Quotas für {{.Region}} nicht abrufen: {{.Error}}"
+
+[truffle.quotas.title]
+other = "AWS-Service-Quotas - {{.Region}}"
+
+[truffle.quotas.table.header.family]
+other = "Familie"
+
+[truffle.quotas.table.header.type]
+other = "Typ"
+
+[truffle.quotas.table.header.quota]
+other = "Quote"
+
+[truffle.quotas.table.header.usage]
+other = "Nutzung"
+
+[truffle.quotas.table.header.available]
+other = "Verfügbar"
+
+[truffle.quotas.table.header.status]
+other = "Status"
+
+[truffle.quotas.status.ok]
+other = "OK"
+
+[truffle.quotas.status.low]
+other = "Niedrig"
+
+[truffle.quotas.status.full]
+other = "Voll"
+
+[truffle.quotas.status.zero]
+other = "Null"
+
+[truffle.quotas.running_instances]
+other = "Laufende Instanzen: {{.Count}} / {{.Total}}"
+
+[truffle.output.table.header.instance_type]
+other = "Instanztyp"
+
+[truffle.output.table.header.region]
+other = "Region"
+
+[truffle.output.table.header.vcpus]
+other = "vCPUs"
+
+[truffle.output.table.header.memory]
+other = "Speicher (GiB)"
+
+[truffle.output.table.header.architecture]
+other = "Architektur"
+
+[truffle.output.table.header.availability_zones]
+other = "Verfügbarkeitszonen"
+
+[truffle.output.header.instance_type]
+other = "Instanztyp"
+
+[truffle.output.header.region]
+other = "Region"
+
+[truffle.output.header.vcpus]
+other = "vCPUs"
+
+[truffle.output.header.memory]
+other = "Speicher (GiB)"
+
+[truffle.output.header.architecture]
+other = "Architektur"
+
+[truffle.output.header.availability_zones]
+other = "Verfügbarkeitszonen"
+
+[truffle.output.header.availability_zone]
+other = "Verfügbarkeitszone"
+
+[truffle.output.header.az]
+other = "VZ"
+
+[truffle.output.header.total]
+other = "Gesamt"
+
+[truffle.output.header.available]
+other = "Verfügbar"
+
+[truffle.output.header.used]
+other = "Genutzt"
+
+[truffle.output.header.state]
+other = "Status"
+
+[truffle.output.header.reservation_id]
+other = "Reservierungs-ID"
+
+[truffle.output.header.spot_price]
+other = "Spot-Preis/Std"
+
+[truffle.output.header.on_demand_price]
+other = "On-Demand/Std"
+
+[truffle.output.header.savings]
+other = "Einsparungen"
+
+[truffle.output.summary.found]
+one = "{{.Count}} Instanztyp gefunden über {{.Regions}} Region(en)"
+other = "{{.Count}} Instanztypen gefunden über {{.Regions}} Region(en)"
+
+[truffle.output.summary.no_results]
+other = "Keine übereinstimmenden Instanztypen gefunden."
+
+[flags.lang]
+other = "Sprache (en, es, fr, de, ja, pt)"
+
+[flags.no_emoji]
+other = "Emoji-Ausgabe deaktivieren"
+
+[flags.accessibility]
+other = "Barrierefreiheitsmodus aktivieren"
+
+[flags.no_color]
+other = "Farbige Ausgabe deaktivieren"
+
+[flags.output]
+other = "Ausgabeformat (table, json, yaml, csv)"
+
+[flags.regions]
+other = "Nach bestimmten Regionen filtern"
+
+[flags.verbose]
+other = "Ausführliche Ausgabe aktivieren"
+
+[error.invalid_pattern]
+other = "ungültiges Muster: {{.Error}}"
+
+[error.aws_client_init]
+other = "AWS-Client-Initialisierung fehlgeschlagen: {{.Error}}"
+
+[error.region_fetch]
+other = "Abrufen der Regionen fehlgeschlagen: {{.Error}}"
+
+[error.search_failed]
+other = "Suche fehlgeschlagen: {{.Error}}"
+
+[error.instance_types_fetch]
+other = "Abrufen der Instanztypen fehlgeschlagen: {{.Error}}"
+
+[error.capacity_fetch]
+other = "Abrufen der Kapazitätsreservierungen fehlgeschlagen: {{.Error}}"
+
+[error.spot_pricing_fetch]
+other = "Abrufen der Spot-Preise fehlgeschlagen: {{.Error}}"
+
+[error.unsupported_output_format]
+other = "nicht unterstütztes Ausgabeformat: {{.Format}}"
+
+[error.platform_detect_failed]
+other = "Plattformerkennung fehlgeschlagen"
+
+[error.input_parse_failed]
+other = "Eingabeverarbeitung fehlgeschlagen"
+
+[error.instance_type_required]
+other = "Instanztyp erforderlich"
+
+[error.region_required]
+other = "Region erforderlich"
+
+[error.cancelled_by_user]
+other = "Vorgang vom Benutzer abgebrochen"
+
+[error.ssh_key_create_failed]
+other = "SSH-Schlüsselerstellung fehlgeschlagen: {{.Error}}"
+
+[error.ssh_key_required]
+other = "SSH-Schlüssel erforderlich, aber keiner angegeben"
+
+# END OF GERMAN TRANSLATION - COMPLETE

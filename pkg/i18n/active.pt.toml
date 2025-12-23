@@ -1,0 +1,1638 @@
+# Portuguese (pt) translations for spawn and truffle CLIs - COMPLETE VERSION
+# Traduções em Português - Versão completa
+
+# =============================================================================
+# STRINGS COMUNS (Shared between spawn and truffle)
+# =============================================================================
+
+[common.region]
+other = "Região"
+
+[common.availability_zone]
+other = "Zona de Disponibilidade"
+
+[common.instance_type]
+other = "Tipo de Instância"
+
+[common.instance_id]
+other = "ID da Instância"
+
+[common.public_ip]
+other = "IP Público"
+
+[common.error]
+other = "Erro"
+
+[common.warning]
+other = "Aviso"
+
+[common.success]
+other = "Sucesso"
+
+# =============================================================================
+# SPAWN - COMANDO RAIZ
+# =============================================================================
+
+[spawn.root.use]
+other = "spawn"
+
+[spawn.root.short]
+other = "Lance instâncias AWS EC2 sem esforço"
+
+[spawn.root.long]
+other = """spawn - Lançador de instâncias AWS EC2 efêmeras (companheiro do truffle)
+
+spawn facilita muito o lançamento de instâncias AWS:
+  • Detecta AMI automaticamente (Amazon Linux 2023, incluindo variantes GPU)
+  • Configura chaves SSH automaticamente (usa ~/.ssh/id_rsa por padrão)
+  • Cria VPC/subnet/security groups automaticamente (marcados para limpeza)
+  • Instala agente spored para auto-monitoramento
+  • Termina automaticamente quando ocioso ou por TTL
+  • Limpa automaticamente todos os recursos
+
+Perfeito para:
+  • Instâncias rápidas de dev/test
+  • Jobs de treinamento ML
+  • Instâncias Spot
+  • Não especialistas que apenas precisam de computação
+
+Exemplos:
+  # Do truffle
+  truffle search m7i.large | spawn
+
+  # Instância Spot
+  truffle spot m7i.large --max-price 0.10 | spawn --spot
+
+  # Treinamento GPU com auto-terminação
+  truffle capacity --gpu-only | spawn --ttl 24h --hibernate-on-idle
+
+  # Lançamento direto
+  spawn --instance-type m7i.large --region us-east-1
+
+Filosofia Unix:
+  truffle encontra, spawn lança
+  Pipe JSON do truffle para spawn para fluxo de trabalho contínuo"""
+
+# =============================================================================
+# SPAWN - COMANDO LAUNCH
+# =============================================================================
+
+[spawn.launch.use]
+other = "launch"
+
+[spawn.launch.short]
+other = "Lançar uma instância EC2"
+
+[spawn.launch.long]
+other = """Lança uma instância EC2 com padrões inteligentes.
+
+Três formas de usar:
+  1. Assistente interativo (padrão se não houver entrada)
+  2. Do JSON do truffle via pipe
+  3. Direto com flags
+
+Exemplos:
+  # Assistente interativo
+  spawn launch
+
+  # Do truffle
+  truffle search m7i.large | spawn launch
+
+  # Direto
+  spawn launch --instance-type m7i.large --region us-east-1"""
+
+[spawn.launch.flag.instance_type]
+other = "Tipo de instância"
+
+[spawn.launch.flag.region]
+other = "Região AWS"
+
+[spawn.launch.flag.az]
+other = "Zona de disponibilidade"
+
+[spawn.launch.flag.ami]
+other = "AMI ID (detecta AL2023 automaticamente)"
+
+[spawn.launch.flag.vpc]
+other = "VPC ID"
+
+[spawn.launch.flag.subnet]
+other = "Subnet ID"
+
+[spawn.launch.flag.security_group]
+other = "ID do security group"
+
+[spawn.launch.flag.key_pair]
+other = "Nome do par de chaves SSH"
+
+[spawn.launch.flag.spot]
+other = "Lançar como instância Spot"
+
+[spawn.launch.flag.spot_max_price]
+other = "Preço máximo Spot"
+
+[spawn.launch.flag.use_reservation]
+other = "Usar reserva de capacidade"
+
+[spawn.launch.flag.reservation_id]
+other = "ID da reserva de capacidade"
+
+[spawn.launch.flag.hibernate]
+other = "Ativar hibernação"
+
+[spawn.launch.flag.ttl]
+other = "Auto-terminar após duração (ex: 8h)"
+
+[spawn.launch.flag.idle_timeout]
+other = "Auto-terminar se ocioso"
+
+[spawn.launch.flag.hibernate_on_idle]
+other = "Hibernar em vez de terminar quando ocioso"
+
+[spawn.launch.flag.name]
+other = "Tag de nome da instância"
+
+[spawn.launch.flag.user_data]
+other = "User data (@file ou inline)"
+
+[spawn.launch.flag.user_data_file]
+other = "Arquivo de user data"
+
+[spawn.launch.flag.dns]
+other = "Registrar nome DNS (ex: my-instance para my-instance.spore.host)"
+
+[spawn.launch.flag.dns_domain]
+other = "Domínio DNS personalizado (sobrescreve padrão)"
+
+[spawn.launch.flag.dns_api_endpoint]
+other = "Endpoint API DNS personalizado (sobrescreve padrão)"
+
+[spawn.launch.flag.interactive]
+other = "Forçar assistente interativo"
+
+[spawn.launch.flag.quiet]
+other = "Saída mínima"
+
+[spawn.launch.flag.wait_for_running]
+other = "Aguardar até que esteja executando"
+
+[spawn.launch.flag.wait_for_ssh]
+other = "Aguardar até que SSH esteja pronto"
+
+# =============================================================================
+# SPAWN - ASSISTENTE
+# =============================================================================
+
+[spawn.wizard.title]
+other = "Assistente de Configuração spawn"
+
+[spawn.wizard.subtitle]
+other = "Vou ajudá-lo a lançar uma instância AWS EC2!"
+
+[spawn.wizard.instructions]
+other = "Pressione Enter para usar o padrão mostrado entre [colchetes]"
+
+[spawn.wizard.step1.title]
+other = "Passo 1 de 6: Escolha o Tipo de Instância"
+
+[spawn.wizard.step1.prompt]
+other = "Tipo de instância [t3.medium]: "
+
+[spawn.wizard.step1.common_choices]
+other = "Escolhas comuns:"
+
+[spawn.wizard.step1.category.dev_testing]
+other = "Desenvolvimento & Testes:"
+
+[spawn.wizard.step1.category.general_purpose]
+other = "Uso Geral:"
+
+[spawn.wizard.step1.category.compute]
+other = "Otimizado para Computação:"
+
+[spawn.wizard.step1.category.memory]
+other = "Otimizado para Memória:"
+
+[spawn.wizard.step1.category.gpu]
+other = "GPU:"
+
+[spawn.wizard.step2.title]
+other = "Passo 2 de 6: Escolha a Região"
+
+[spawn.wizard.step2.prompt]
+other = "Região AWS [us-east-1]: "
+
+[spawn.wizard.step3.title]
+other = "Passo 3 de 6: Instância Spot?"
+
+[spawn.wizard.step3.explanation]
+other = "Instâncias Spot economizam até 90%, mas podem ser interrompidas pela AWS."
+
+[spawn.wizard.step3.prompt]
+other = "Usar instância Spot? [y/N]: "
+
+[spawn.wizard.step3.using_spot]
+other = "Usando instâncias Spot (economiza ~70%)"
+
+[spawn.wizard.step3.using_ondemand]
+other = "Usando On-Demand (confiável, mais caro)"
+
+[spawn.wizard.step4.title]
+other = "Passo 4 de 6: Auto-Terminação"
+
+[spawn.wizard.step4.explanation]
+other = "Previna custos descontrolados definindo regras automáticas de terminação."
+
+[spawn.wizard.step4.option1]
+other = "1. TTL fixo (ex: terminar após 8 horas)"
+
+[spawn.wizard.step4.option2]
+other = "2. Detecção de ociosidade (terminar se sem atividade)"
+
+[spawn.wizard.step4.option3]
+other = "3. Ambos (TTL + detecção de ociosidade)"
+
+[spawn.wizard.step4.option4]
+other = "4. Nenhum (apenas terminação manual)"
+
+[spawn.wizard.step4.prompt]
+other = "Escolha [1-4]: "
+
+[spawn.wizard.step5.title]
+other = "Passo 5 de 6: Chave SSH"
+
+[spawn.wizard.step5.prompt]
+other = "Nome do par de chaves SSH [detectar automaticamente]: "
+
+[spawn.wizard.step6.title]
+other = "Passo 6 de 6: Nomeie Sua Instância"
+
+[spawn.wizard.step6.prompt]
+other = "Nome da instância [gerado automaticamente]: "
+
+[spawn.wizard.summary.title]
+other = "Resumo da Configuração"
+
+[spawn.wizard.summary.confirm]
+other = "Lançar instância? [Y/n]: "
+
+[spawn.wizard.cancelled]
+other = "Lançamento cancelado pelo usuário"
+
+# =============================================================================
+# SPAWN - INDICADORES DE PROGRESSO
+# =============================================================================
+
+[spawn.progress.title]
+other = "Criando Instância..."
+
+[spawn.progress.detecting_ami]
+other = "Detectando AMI"
+
+[spawn.progress.setup_ssh]
+other = "Configurando chave SSH"
+
+[spawn.progress.setup_iam]
+other = "Configurando função IAM"
+
+[spawn.progress.create_sg]
+other = "Criando security group"
+
+[spawn.progress.launching]
+other = "Lançando instância"
+
+[spawn.progress.installing_agent]
+other = "Instalando agente spored"
+
+[spawn.progress.waiting_instance]
+other = "Aguardando instância"
+
+[spawn.progress.getting_ip]
+other = "Obtendo IP público"
+
+[spawn.progress.waiting_ssh]
+other = "Aguardando SSH"
+
+[spawn.progress.instance_details]
+other = "Detalhes da Instância:"
+
+[spawn.progress.status_running]
+other = "Status:       executando"
+
+[spawn.progress.connect_now]
+other = "Conectar Agora:"
+
+[spawn.progress.monitoring.title]
+other = "Monitoramento Automático:"
+
+[spawn.progress.monitoring.ttl]
+other = "Terminará após: {{.Duration}}"
+
+[spawn.progress.monitoring.idle]
+other = "Terminará se ocioso: {{.Duration}}"
+
+[spawn.progress.monitoring.agent]
+other = "O agente spored está monitorando sua instância."
+
+[spawn.progress.monitoring.laptop]
+other = "Você pode fechar seu laptop - monitoramento roda na instância."
+
+# =============================================================================
+# SPAWN - ERROS
+# =============================================================================
+
+[spawn.error.instance_type_required]
+other = "tipo de instância obrigatório"
+
+[spawn.error.region_required]
+other = "região obrigatória"
+
+[spawn.error.platform_detect_failed]
+other = "falha ao detectar plataforma: {{.Error}}"
+
+[spawn.error.aws_init_failed]
+other = "falha ao inicializar cliente AWS: {{.Error}}"
+
+[spawn.error.ssh_key_not_found]
+other = "nenhuma chave SSH encontrada em {{.Path}}"
+
+[spawn.error.ssh_key_create_failed]
+other = "falha ao criar chave SSH: {{.Error}}"
+
+# =============================================================================
+# SPAWN - COMANDO CONNECT
+# =============================================================================
+
+[spawn.connect.use]
+other = "connect"
+
+[spawn.connect.short]
+other = "Conectar a uma instância gerenciada pelo spawn via SSH"
+
+[spawn.connect.long]
+other = """Conecta a uma instância gerenciada pelo spawn via SSH.
+
+Encontra automaticamente sua chave SSH e conecta. Usa AWS Session Manager como fallback se SSH não estiver disponível.
+
+Exemplos:
+  # Conectar por ID da instância
+  spawn connect i-1234567890abcdef0
+
+  # Conectar por nome
+  spawn connect my-instance"""
+
+[spawn.connect.flag.region]
+other = "Filtrar por região AWS"
+
+[spawn.connect.flag.use_ssm]
+other = "Forçar conexão AWS Session Manager"
+
+[spawn.connect.found_instance]
+other = "Instância encontrada em {{.Region}}"
+
+[spawn.connect.not_running]
+other = "instância não está executando (estado: {{.State}})"
+
+[spawn.connect.ssh_key_warning]
+other = "Não foi possível encontrar chave SSH para {{.KeyName}}"
+
+[spawn.connect.connecting_ssh]
+other = "Conectando via SSH..."
+
+[spawn.connect.aws_cli_not_found]
+other = "AWS CLI não encontrado. Instale de: https://aws.amazon.com/cli/"
+
+[spawn.connect.connecting_ssm]
+other = "Conectando via AWS Session Manager..."
+
+[spawn.connect.ssm_plugin_error]
+other = """Plugin Session Manager não encontrado.
+
+Instale de: https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html
+
+Erro: {{.Error}}"""
+
+# =============================================================================
+# SPAWN - COMANDO LIST
+# =============================================================================
+
+[spawn.list.use]
+other = "list"
+
+[spawn.list.short]
+other = "Listar instâncias EC2 gerenciadas pelo spawn"
+
+[spawn.list.long]
+other = """Lista instâncias EC2 gerenciadas pelo spawn em todas as regiões.
+
+Mostra todas as instâncias com a tag spawn:managed.
+
+Exemplos:
+  # Listar todas as instâncias
+  spawn list
+
+  # Filtrar por região
+  spawn list --region us-east-1
+
+  # Filtrar por estado
+  spawn list --state running
+
+  # Saída JSON
+  spawn list --output json"""
+
+[spawn.list.flag.region]
+other = "Filtrar por região AWS"
+
+[spawn.list.flag.az]
+other = "Filtrar por zona de disponibilidade"
+
+[spawn.list.flag.state]
+other = "Filtrar por estado da instância"
+
+[spawn.list.flag.tags]
+other = "Filtrar por tags (key=value)"
+
+[spawn.list.flag.output]
+other = "Formato de saída (table, json, yaml)"
+
+[spawn.list.searching]
+other = "Procurando instâncias gerenciadas pelo spawn..."
+
+[spawn.list.searching_region]
+other = "Procurando em {{.Region}}..."
+
+[spawn.list.no_results]
+other = "Nenhuma instância corresponde aos filtros especificados."
+
+[spawn.list.table.header.instance_id]
+other = "ID DA INSTÂNCIA"
+
+[spawn.list.table.header.name]
+other = "NOME"
+
+[spawn.list.table.header.type]
+other = "TIPO"
+
+[spawn.list.table.header.state]
+other = "ESTADO"
+
+[spawn.list.table.header.region]
+other = "REGIÃO"
+
+[spawn.list.table.header.az]
+other = "AZ"
+
+[spawn.list.table.header.public_ip]
+other = "IP PÚBLICO"
+
+[spawn.list.table.header.launched]
+other = "LANÇADO"
+
+# =============================================================================
+# SPAWN - COMANDO DNS
+# =============================================================================
+
+[spawn.dns.use]
+other = "dns"
+
+[spawn.dns.short]
+other = "Gerenciar registros DNS para instâncias spawn"
+
+[spawn.dns.long]
+other = """Gerencia registros DNS para instâncias spawn.
+
+Nomes DNS são automaticamente registrados ao lançar com a flag --dns.
+Formato: <nome>.<account-base36>.spore.host
+
+Exemplos:
+  # Listar instâncias com DNS habilitado
+  spawn dns list
+
+  # Registrar nome DNS
+  spawn dns register i-1234567890abcdef0 my-server
+
+  # Deletar registro DNS
+  spawn dns delete my-server"""
+
+[spawn.dns.list.use]
+other = "list"
+
+[spawn.dns.list.short]
+other = "Listar instâncias spawn com DNS habilitado"
+
+[spawn.dns.register.use]
+other = "register"
+
+[spawn.dns.register.short]
+other = "Registrar nome DNS para uma instância"
+
+[spawn.dns.delete.use]
+other = "delete"
+
+[spawn.dns.delete.short]
+other = "Deletar registro DNS para uma instância"
+
+[spawn.dns.invalid_name]
+other = "nome DNS inválido: {{.Name}} (deve ser alfanumérico minúsculo com hífens)"
+
+[spawn.dns.no_dns_enabled]
+other = "Nenhuma instância com DNS habilitado encontrada."
+
+[spawn.dns.instance_info]
+other = "Instância:"
+
+[spawn.dns.region_info]
+other = "Região:"
+
+[spawn.dns.state_info]
+other = "Estado:"
+
+[spawn.dns.public_ip_info]
+other = "IP Público:"
+
+[spawn.dns.fqdn_info]
+other = "FQDN:"
+
+[spawn.dns.registered]
+other = "DNS registrado: {{.FQDN}}"
+
+[spawn.dns.deleted]
+other = "DNS deletado: {{.FQDN}}"
+
+# =============================================================================
+# SPAWN - COMANDO EXTEND
+# =============================================================================
+
+[spawn.extend.use]
+other = "extend"
+
+[spawn.extend.short]
+other = "Estender o TTL para uma instância gerenciada pelo spawn"
+
+[spawn.extend.long]
+other = """Estende o TTL (time-to-live) para uma instância gerenciada pelo spawn.
+
+Previne terminação automática estendendo a duração do TTL.
+
+Formato de duração: 1h, 2h30m, 24h, etc.
+
+Exemplos:
+  # Estender por 2 horas
+  spawn extend i-1234567890abcdef0 2h
+
+  # Estender por nome
+  spawn extend my-instance 8h"""
+
+[spawn.extend.invalid_ttl]
+other = "formato TTL inválido: {{.TTL}}"
+
+[spawn.extend.ttl_format_help]
+other = "TTL deve estar no formato: 1h, 2h30m, 24h, etc."
+
+[spawn.extend.current_ttl]
+other = "TTL Atual: {{.TTL}}"
+
+[spawn.extend.new_ttl]
+other = "Novo TTL: {{.TTL}}"
+
+[spawn.extend.expires_at]
+other = "Expira em: {{.Time}}"
+
+[spawn.extend.success]
+other = "TTL estendido com sucesso"
+
+# =============================================================================
+# SPAWN - COMANDO STATE (Stop, Start, Hibernate)
+# =============================================================================
+
+[spawn.state.stop.use]
+other = "stop"
+
+[spawn.state.stop.short]
+other = "Parar uma instância gerenciada pelo spawn"
+
+[spawn.state.start.use]
+other = "start"
+
+[spawn.state.start.short]
+other = "Iniciar uma instância parada ou hibernada"
+
+[spawn.state.hibernate.use]
+other = "hibernate"
+
+[spawn.state.hibernate.short]
+other = "Hibernar uma instância gerenciada pelo spawn"
+
+[spawn.state.not_running]
+other = "instância não está em estado executando (atual: {{.State}})"
+
+[spawn.state.not_stopped]
+other = "instância não está em estado parado (atual: {{.State}})"
+
+[spawn.state.found_instance]
+other = "Instância encontrada em {{.Region}}"
+
+[spawn.state.stopping]
+other = "Parando instância..."
+
+[spawn.state.starting]
+other = "Iniciando instância..."
+
+[spawn.state.hibernating]
+other = "Hibernando instância..."
+
+[spawn.state.stopped]
+other = "Instância parada"
+
+[spawn.state.started]
+other = "Instância iniciada"
+
+[spawn.state.hibernated]
+other = "Instância hibernada"
+
+[spawn.state.new_ip]
+other = "Novo IP Público: {{.IP}}"
+
+[spawn.state.ttl_restored]
+other = "TTL restaurado: {{.Duration}}"
+
+# =============================================================================
+# SPAWN - AVISOS DO AGENTE
+# =============================================================================
+
+[spawn.agent.ttl_warning]
+other = "TERMINANDO EM {{.Duration}} (limite TTL)"
+
+[spawn.agent.idle_warning]
+other = "OCIOSO por {{.IdleDuration}}, terminará em {{.Remaining}}"
+
+[spawn.agent.spot_interruption.title]
+other = "🚨 AVISO DE INTERRUPÇÃO SPOT! 🚨"
+
+[spawn.agent.spot_interruption.message]
+other = """AWS irá {{.Action}} esta instância em {{.Time}}
+Você tem ~2 minutos para salvar seu trabalho!
+SALVE TODOS OS ARQUIVOS AGORA!"""
+
+[spawn.agent.hibernating]
+other = "HIBERNANDO AGORA - Instância pausará..."
+
+[spawn.agent.terminating]
+other = "🔴 TERMINANDO AGORA - Motivo: {{.Reason}}"
+
+# =============================================================================
+# TRUFFLE - COMANDO RAIZ
+# =============================================================================
+
+[truffle.root.use]
+other = "truffle"
+
+[truffle.root.short]
+other = "🍄 Truffle - Localizador de Regiões de Tipos de Instância AWS EC2"
+
+[truffle.root.long]
+other = """Truffle é uma ferramenta CLI para descobrir quais regiões AWS e zonas de disponibilidade
+suportam tipos específicos de instância EC2. Perfeito para planejar implantações multi-região!
+
+Exemplos:
+  # Encontrar todas as regiões com instâncias m7i.large
+  truffle search m7i.large
+
+  # Buscar com wildcards - instâncias Graviton4
+  truffle search "m8g.*"
+
+  # Filtrar por regiões específicas
+  truffle search m7i.large --regions us-east-1,eu-west-1"""
+
+# =============================================================================
+# TRUFFLE - COMANDO SEARCH
+# =============================================================================
+
+[truffle.search.use]
+other = "search [padrão-tipo-instância]"
+
+[truffle.search.short]
+other = "Buscar tipos de instância em regiões AWS"
+
+[truffle.search.long]
+other = """Busca tipos de instância em regiões AWS.
+
+Suporta wildcards e padrões regex para busca flexível.
+
+Exemplos:
+  # Correspondência exata
+  truffle search m7i.large
+
+  # Wildcard - todos os tamanhos m8g
+  truffle search "m8g.*"
+
+  # Filtrar por arquitetura
+  truffle search "c7.*" --architecture arm64"""
+
+[truffle.search.flag.skip_azs]
+other = "Pular busca de zona de disponibilidade (mais rápido, menos detalhado)"
+
+[truffle.search.flag.architecture]
+other = "Filtrar por arquitetura (x86_64, arm64, i386)"
+
+[truffle.search.flag.min_vcpu]
+other = "Número mínimo de vCPUs"
+
+[truffle.search.flag.min_memory]
+other = "Memória mínima em GiB"
+
+[truffle.search.flag.family]
+other = "Filtrar por família de instância (ex: m5, c5)"
+
+[truffle.search.flag.timeout]
+other = "Timeout para chamadas API AWS"
+
+[truffle.search.searching]
+other = "Buscando tipos de instância que correspondam: {{.Pattern}}"
+
+[truffle.search.filtering_regions]
+other = "Filtrando regiões: {{.Regions}}"
+
+[truffle.search.fetching_regions]
+other = "Buscando todas as regiões AWS..."
+
+[truffle.search.searching_regions]
+other = "Buscando em {{.Count}} região(ões)..."
+
+[truffle.search.no_results]
+other = "Nenhum tipo de instância correspondente encontrado."
+
+# =============================================================================
+# TRUFFLE - COMANDO CAPACITY
+# =============================================================================
+
+[truffle.capacity.use]
+other = "capacity"
+
+[truffle.capacity.short]
+other = "Verificar reservas de capacidade ML (Capacity Blocks & ODCRs)"
+
+[truffle.capacity.long]
+other = """Verifica reservas de capacidade ML em regiões AWS.
+
+Suporta tanto Capacity Blocks (cargas de trabalho de treinamento) quanto
+Reservas de Capacidade On-Demand (ODCRs) para instâncias GPU e ML.
+
+Exemplos:
+  # Verificar todas as reservas
+  truffle capacity
+
+  # Apenas instâncias GPU
+  truffle capacity --gpu-only
+
+  # Capacity Blocks para ML
+  truffle capacity --blocks
+
+  # Apenas capacidade disponível
+  truffle capacity --available-only"""
+
+[truffle.capacity.flag.instance_types]
+other = "Filtrar por tipos de instância (separados por vírgula)"
+
+[truffle.capacity.flag.available_only]
+other = "Mostrar apenas reservas com capacidade disponível"
+
+[truffle.capacity.flag.active_only]
+other = "Mostrar apenas reservas ativas (padrão: true)"
+
+[truffle.capacity.flag.min_capacity]
+other = "Capacidade disponível mínima"
+
+[truffle.capacity.flag.gpu_only]
+other = "Mostrar apenas reservas de instância GPU/ML"
+
+[truffle.capacity.flag.blocks]
+other = "Mostrar Capacity Blocks para ML (cargas de trabalho de treinamento)"
+
+[truffle.capacity.flag.odcr]
+other = "Mostrar Reservas de Capacidade On-Demand (padrão)"
+
+[truffle.capacity.gpu_only]
+other = "Apenas instâncias GPU/ML"
+
+[truffle.capacity.summary.title]
+other = "Resumo de Reserva de Capacidade:"
+
+[truffle.capacity.summary.total]
+other = "Total de Reservas: {{.Count}}"
+
+[truffle.capacity.summary.active]
+other = "Reservas Ativas: {{.Count}}"
+
+[truffle.capacity.summary.instance_types]
+other = "Tipos de Instância: {{.Count}}"
+
+[truffle.capacity.summary.regions]
+other = "Regiões: {{.Count}}"
+
+[truffle.capacity.summary.azs]
+other = "Zonas de Disponibilidade: {{.Count}}"
+
+[truffle.capacity.summary.total_capacity]
+other = "Capacidade Total: {{.Count}} instâncias"
+
+[truffle.capacity.summary.available]
+other = "Capacidade Disponível: {{.Count}} instâncias ({{.Percent}}% livre)"
+
+[truffle.capacity.summary.used]
+other = "Capacidade Usada: {{.Count}} instâncias ({{.Percent}}% utilizada)"
+
+# =============================================================================
+# TRUFFLE - COMANDO SPOT
+# =============================================================================
+
+[truffle.spot.use]
+other = "spot [padrão-tipo-instância]"
+
+[truffle.spot.short]
+other = "Buscar preços e disponibilidade de instâncias Spot"
+
+[truffle.spot.long]
+other = """Busca preços e disponibilidade de instâncias Spot em regiões AWS.
+
+Mostra preços Spot atuais, economia vs On-Demand e histórico de preços.
+
+Exemplos:
+  # Preços Spot para m7i.large
+  truffle spot m7i.large
+
+  # Filtrar por preço máximo
+  truffle spot "m7i.*" --max-price 0.10
+
+  # Ordenar por preço
+  truffle spot "c7.*" --sort-by-price"""
+
+[truffle.spot.flag.max_price]
+other = "Preço máximo Spot por hora (USD)"
+
+[truffle.spot.flag.show_savings]
+other = "Mostrar economia vs preço On-Demand"
+
+[truffle.spot.flag.sort_by_price]
+other = "Ordenar por preço (mais barato primeiro)"
+
+[truffle.spot.flag.active_only]
+other = "Mostrar apenas AZs com capacidade Spot ativa"
+
+[truffle.spot.flag.lookback_hours]
+other = "Horas para olhar para trás no histórico de preços (1-720)"
+
+[truffle.spot.searching]
+other = "Buscando instâncias Spot que correspondam: {{.Pattern}}"
+
+[truffle.spot.fetching_pricing]
+other = "Buscando dados de preços Spot..."
+
+[truffle.spot.summary.title]
+other = "Resumo de Instâncias Spot:"
+
+[truffle.spot.summary.instance_types]
+other = "Tipos de Instância: {{.Count}}"
+
+[truffle.spot.summary.regions]
+other = "Regiões: {{.Count}}"
+
+[truffle.spot.summary.azs]
+other = "Zonas de Disponibilidade: {{.Count}}"
+
+[truffle.spot.summary.price_range]
+other = "Faixa de Preço: ${{.Min}} - ${{.Max}} por hora"
+
+[truffle.spot.summary.avg_price]
+other = "Preço Médio: ${{.Avg}} por hora"
+
+[truffle.spot.summary.avg_savings]
+other = "Economia Média: {{.Percent}}% vs On-Demand"
+
+# =============================================================================
+# TRUFFLE - COMANDO QUOTAS
+# =============================================================================
+
+[truffle.quotas.use]
+other = "quotas"
+
+[truffle.quotas.short]
+other = "Mostrar Quotas de Serviço AWS para instâncias EC2"
+
+[truffle.quotas.long]
+other = """Mostra Quotas de Serviço AWS para instâncias EC2 em regiões.
+
+Exibe quotas atuais, uso e capacidade disponível para diferentes famílias de instância.
+
+Exemplos:
+  # Verificar quotas em todas as regiões
+  truffle quotas
+
+  # Apenas regiões específicas
+  truffle quotas --regions us-east-1,eu-west-1
+
+  # Filtrar por família de instância
+  truffle quotas --family P"""
+
+[truffle.quotas.flag.regions]
+other = "Regiões para verificar (separadas por vírgula)"
+
+[truffle.quotas.flag.family]
+other = "Filtrar por família de instância (Standard, G, P, Inf, Trn)"
+
+[truffle.quotas.flag.request]
+other = "Gerar comandos de solicitação de aumento de quota"
+
+[truffle.quotas.credentials_required]
+other = """❌ Credenciais AWS necessárias para verificação de quota
+
+Para configurar credenciais:
+  1. Exportar variáveis de ambiente:
+     export AWS_ACCESS_KEY_ID=...
+     export AWS_SECRET_ACCESS_KEY=...
+     export AWS_DEFAULT_REGION=us-east-1
+
+  OU
+
+  2. Executar: aws configure
+
+Erro: {{.Error}}"""
+
+[truffle.quotas.no_results]
+other = "não foi possível recuperar quotas para nenhuma região"
+
+[truffle.quotas.region_error]
+other = "Não foi possível obter quotas para {{.Region}}: {{.Error}}"
+
+[truffle.quotas.title]
+other = "Quotas de Serviço AWS - {{.Region}}"
+
+[truffle.quotas.table.header.family]
+other = "Família"
+
+[truffle.quotas.table.header.type]
+other = "Tipo"
+
+[truffle.quotas.table.header.quota]
+other = "Quota"
+
+[truffle.quotas.table.header.usage]
+other = "Uso"
+
+[truffle.quotas.table.header.available]
+other = "Disponível"
+
+[truffle.quotas.table.header.status]
+other = "Status"
+
+[truffle.quotas.status.ok]
+other = "OK"
+
+[truffle.quotas.status.low]
+other = "Baixo"
+
+[truffle.quotas.status.full]
+other = "🔴 Cheio"
+
+[truffle.quotas.status.zero]
+other = "❌ Zero"
+
+[truffle.quotas.running_instances]
+other = "Instâncias Executando: {{.Count}} / {{.Total}}"
+
+# =============================================================================
+# TRUFFLE - FORMATADORES DE SAÍDA
+# =============================================================================
+
+[truffle.output.table.header.instance_type]
+other = "Tipo de Instância"
+
+[truffle.output.table.header.region]
+other = "Região"
+
+[truffle.output.table.header.vcpus]
+other = "vCPUs"
+
+[truffle.output.table.header.memory]
+other = "Memória (GiB)"
+
+[truffle.output.table.header.architecture]
+other = "Arquitetura"
+
+[truffle.output.table.header.availability_zones]
+other = "Zonas de Disponibilidade"
+
+[truffle.output.summary.found]
+one = "🍄 Encontrado {{.Count}} tipo de instância em {{.Regions}} região(ões)"
+other = "🍄 Encontrados {{.Count}} tipos de instância em {{.Regions}} região(ões)"
+
+[truffle.output.summary.no_results]
+other = "Nenhum tipo de instância correspondente encontrado."
+
+# =============================================================================
+# FLAGS GLOBAIS (Compartilhados entre comandos)
+# =============================================================================
+
+[flags.lang]
+other = "Idioma (en, es, fr, de, ja, pt)"
+
+[flags.no_emoji]
+other = "Desativar saída de emoji"
+
+[flags.accessibility]
+other = "Ativar modo de acessibilidade (amigável para leitores de tela)"
+
+[flags.no_color]
+other = "Desativar saída colorida"
+
+[flags.output]
+other = "Formato de saída (table, json, yaml, csv)"
+
+[flags.regions]
+other = "Filtrar por regiões específicas (separadas por vírgula)"
+
+[flags.verbose]
+other = "Ativar saída detalhada"
+
+# =============================================================================
+# ERROS COMUNS
+# =============================================================================
+
+[error.invalid_pattern]
+other = "padrão inválido: {{.Error}}"
+
+[error.aws_client_init]
+other = "falha ao inicializar cliente AWS: {{.Error}}"
+
+[error.region_fetch]
+other = "falha ao obter regiões: {{.Error}}"
+
+[error.search_failed]
+other = "busca falhou: {{.Error}}"
+
+[error.instance_types_fetch]
+other = "falha ao obter tipos de instância: {{.Error}}"
+
+[error.capacity_fetch]
+other = "falha ao obter reservas de capacidade: {{.Error}}"
+
+[error.spot_pricing_fetch]
+other = "falha ao obter preços Spot: {{.Error}}"
+
+[error.unsupported_output_format]
+other = "formato de saída não suportado: {{.Format}}"
+
+[error.platform_detect_failed]
+other = "falha ao detectar plataforma"
+
+[error.input_parse_failed]
+other = "falha ao analisar entrada"
+
+[error.instance_type_required]
+other = "tipo de instância obrigatório"
+
+[error.region_required]
+other = "região obrigatória"
+
+# =============================================================================
+# TRADUÇÕES ADICIONAIS
+# =============================================================================
+
+# Introdução do assistente
+[spawn.wizard.intro.help]
+other = "Este assistente ajudará você a configurar sua instância EC2. Pressione Enter para usar os padrões (mostrados entre colchetes)."
+
+[spawn.wizard.intro.default_hint]
+other = "Dica: Deixe em branco e pressione Enter para usar o valor padrão."
+
+# Passo 1 do assistente - Categorias de instância
+[spawn.wizard.step1.category.dev]
+other = "Desenvolvimento & Testes:"
+
+[spawn.wizard.step1.category.general]
+other = "Uso Geral:"
+
+# Passo 1 do assistente - Tipos de instância
+[spawn.wizard.step1.instance.t3_medium]
+other = "    t3.medium - 2 vCPU, 4 GiB RAM (padrão)"
+
+[spawn.wizard.step1.instance.t3_large]
+other = "    t3.large  - 2 vCPU, 8 GiB RAM"
+
+[spawn.wizard.step1.instance.m7i_large]
+other = "    m7i.large  - 2 vCPU, 8 GiB RAM"
+
+[spawn.wizard.step1.instance.m7i_xlarge]
+other = "    m7i.xlarge - 4 vCPU, 16 GiB RAM"
+
+[spawn.wizard.step1.instance.c7i_xlarge]
+other = "    c7i.xlarge  - 4 vCPU, 8 GiB RAM"
+
+[spawn.wizard.step1.instance.c7i_2xlarge]
+other = "    c7i.2xlarge - 8 vCPU, 16 GiB RAM"
+
+[spawn.wizard.step1.instance.g6_xlarge]
+other = "    g6.xlarge    - NVIDIA L4, 4 vCPU, 16 GiB RAM"
+
+[spawn.wizard.step1.instance.p5_48xlarge]
+other = "    p5.48xlarge  - 8x NVIDIA H100, 192 vCPU, 2 TiB RAM"
+
+[spawn.wizard.step1.detected]
+other = "Selecionado: {{.InstanceType}}"
+
+[spawn.wizard.step1.detected_gpu]
+other = "Selecionado: {{.InstanceType}} (acelerado por GPU)"
+
+# Passo 2 do assistente - Seleção de região
+[spawn.wizard.step2.common_regions]
+other = "Regiões comuns:"
+
+[spawn.wizard.step2.region.us]
+other = "Estados Unidos:"
+
+[spawn.wizard.step2.region.eu]
+other = "Europa:"
+
+[spawn.wizard.step2.region.asia]
+other = "Ásia-Pacífico:"
+
+[spawn.wizard.step2.region.us_east_1]
+other = "    us-east-1      - Norte da Virgínia"
+
+[spawn.wizard.step2.region.us_west_2]
+other = "    us-west-2      - Oregon"
+
+[spawn.wizard.step2.region.eu_west_1]
+other = "    eu-west-1      - Irlanda"
+
+[spawn.wizard.step2.region.eu_central_1]
+other = "    eu-central-1   - Frankfurt"
+
+[spawn.wizard.step2.region.ap_northeast_1]
+other = "    ap-northeast-1 - Tóquio"
+
+[spawn.wizard.step2.region.ap_southeast_1]
+other = "    ap-southeast-1 - Singapura"
+
+[spawn.wizard.step2.prompt]
+other = "Região [{{.DefaultRegion}}]: "
+
+# Passo 3 do assistente - Instância Spot
+[spawn.wizard.step3.description]
+other = "Instâncias Spot custam 50-90% menos, mas podem ser interrompidas pela AWS com aviso de 2 minutos."
+
+[spawn.wizard.step3.good_for]
+other = "Bom para: Dev/test, trabalhos em lote, cargas de trabalho tolerantes a falhas"
+
+[spawn.wizard.step3.not_for]
+other = "Não para: Servidores de produção, bancos de dados, trabalhos de longa execução"
+
+[spawn.wizard.step3.using_spot]
+other = "Usando instância Spot (mais barata, pode ser interrompida)"
+
+[spawn.wizard.step3.using_ondemand]
+other = "Usando instância On-Demand (confiável, não interrompida)"
+
+# Passo 4 do assistente - Auto-terminação
+[spawn.wizard.step4.description]
+other = "Previna custos descontrolados terminando automaticamente instâncias ociosas ou de longa execução."
+
+[spawn.wizard.step4.option.ttl]
+other = "Apenas TTL (terminar após X horas)"
+
+[spawn.wizard.step4.option.idle]
+other = "Apenas timeout de ociosidade (terminar quando ocioso)"
+
+[spawn.wizard.step4.option.both]
+other = "Ambos TTL + timeout de ociosidade (recomendado)"
+
+[spawn.wizard.step4.option.manual]
+other = "Manual (eu terminarei)"
+
+[spawn.wizard.step4.prompt]
+other = "Escolha [1-4] ou deixe em branco para ambos [3]: "
+
+[spawn.wizard.step4.ttl_prompt]
+other = "Auto-terminar após (ex: 8h, 24h) [8h]: "
+
+[spawn.wizard.step4.idle_prompt]
+other = "Timeout de ociosidade (ex: 30m, 1h) [30m]: "
+
+[spawn.wizard.step4.ttl_prompt_short]
+other = "TTL (ex: 8h) [8h]: "
+
+[spawn.wizard.step4.idle_prompt_short]
+other = "Ocioso (ex: 30m) [30m]: "
+
+[spawn.wizard.step4.ttl_set]
+other = "Terminará após {{.TTL}}"
+
+[spawn.wizard.step4.idle_set]
+other = "Terminará se ocioso por {{.Idle}}"
+
+[spawn.wizard.step4.both_set]
+other = "Terminará após {{.TTL}} OU ocioso por {{.Idle}}"
+
+[spawn.wizard.step4.manual_warning]
+other = "Lembre-se de terminar a instância para evitar cobranças!"
+
+[spawn.wizard.step4.manual_command]
+other = "    Use: spawn stop <instance-id>"
+
+# Passo 5 do assistente - Chave SSH
+[spawn.wizard.step5.found_key]
+other = "Chave SSH encontrada: {{.KeyPath}}"
+
+[spawn.wizard.step5.will_use_key]
+other = "Usará esta chave para acesso SSH."
+
+[spawn.wizard.step5.no_key_found]
+other = "Nenhuma chave SSH encontrada em {{.KeyPath}}"
+
+[spawn.wizard.step5.key_required]
+other = "Uma chave SSH é necessária para acessar a instância."
+
+[spawn.wizard.step5.create_prompt]
+other = "Criar nova chave SSH? [Y/n]: "
+
+[spawn.wizard.step5.creating_key]
+other = "Criando chave SSH..."
+
+[spawn.wizard.step5.key_created]
+other = "Chave SSH criada: {{.KeyPath}}"
+
+# Passo 6 do assistente - Nome da instância
+[spawn.wizard.step6.prompt]
+other = "Nome da instância (opcional) []: "
+
+[spawn.wizard.step6.name_set]
+other = "Instância será nomeada: {{.Name}}"
+
+# Resumo do assistente
+[spawn.wizard.summary.field.instance_type]
+other = "Tipo de Instância"
+
+[spawn.wizard.summary.field.region]
+other = "Região"
+
+[spawn.wizard.summary.field.spot]
+other = "Spot"
+
+[spawn.wizard.summary.field.ttl]
+other = "Auto-terminar"
+
+[spawn.wizard.summary.field.idle]
+other = "Timeout de ociosidade"
+
+[spawn.wizard.summary.field.key]
+other = "Chave SSH"
+
+[spawn.wizard.summary.field.name]
+other = "Nome"
+
+[spawn.wizard.summary.estimated_cost]
+other = "Custo estimado: {{.Cost}}/hora"
+
+[spawn.wizard.summary.confirm]
+other = "Lançar instância? [Y/n]: "
+
+# Monitoramento de progresso
+[spawn.progress.success.monitoring.title]
+other = "Monitoramento Automático Ativado:"
+
+[spawn.progress.success.monitoring.ttl]
+other = "TTL: Terminará após {{.TTL}}"
+
+[spawn.progress.success.monitoring.idle]
+other = "Ociosidade: Terminará se ocioso por {{.Idle}}"
+
+# Busca Truffle
+[truffle.search.searching_across]
+other = "Buscando em {{.Count}} região(ões)..."
+
+# Resumo Spot Truffle
+[truffle.spot.summary.per_hour]
+other = "por hora"
+
+[truffle.spot.summary.vs_on_demand]
+other = "vs On-Demand"
+
+# Campos de resumo de capacidade Truffle
+[truffle.capacity.summary.instances]
+other = "instâncias"
+
+[truffle.capacity.summary.free]
+other = "livre"
+
+[truffle.capacity.summary.utilized]
+other = "utilizada"
+
+# Cabeçalhos de saída Truffle
+[truffle.output.header.availability_zone]
+other = "Zona de Disponibilidade"
+
+[truffle.output.header.az]
+other = "AZ"
+
+[truffle.output.header.total]
+other = "Total"
+
+[truffle.output.header.available]
+other = "Disponível"
+
+[truffle.output.header.used]
+other = "Usado"
+
+[truffle.output.header.state]
+other = "Estado"
+
+[truffle.output.header.reservation_id]
+other = "ID da Reserva"
+
+[truffle.output.header.spot_price]
+other = "Preço Spot/h"
+
+[truffle.output.header.on_demand_price]
+other = "On-Demand/h"
+
+[truffle.output.header.savings]
+other = "Economia"
+
+# Erros gerais
+[error.cancelled_by_user]
+other = "operação cancelada pelo usuário"
+
+[error.ssh_key_create_failed]
+other = "falha ao criar chave SSH: {{.Error}}"
+
+[error.ssh_key_required]
+other = "chave SSH é obrigatória, mas nenhuma foi especificada"
+
+# Comando Spawn Connect
+[spawn.connect.connecting_session_manager]
+other = "Conectando via AWS Session Manager..."
+
+[spawn.connect.fallback_session_manager]
+other = "Chave SSH não disponível, usando AWS Session Manager como fallback"
+
+[spawn.connect.key_not_found]
+other = "Arquivo de chave SSH não encontrado em {{.KeyPath}}"
+
+[spawn.connect.error.aws_cli_not_found]
+other = "AWS CLI não encontrado. Instale de https://aws.amazon.com/cli/"
+
+[spawn.connect.error.key_not_found_for_name]
+other = "Arquivo de chave SSH não encontrado para nome de chave {{.KeyName}}"
+
+[spawn.connect.error.no_key_name]
+other = "instância não tem chave SSH configurada"
+
+[spawn.connect.error.not_running]
+other = "instância não está executando (estado: {{.State}})"
+
+[spawn.connect.error.session_manager_failed]
+other = "falha ao iniciar sessão Session Manager: {{.Error}}"
+
+# Comando Spawn State
+[spawn.state.short]
+other = "Mostrar transições de estado da instância"
+
+[spawn.state.long]
+other = "Exibir o histórico de estado e status atual de uma instância spawn"
+
+# Comando Spawn List
+[spawn.list.no_instances]
+other = "Nenhuma instância spawn encontrada"
+
+[spawn.list.no_instances_match]
+other = "Nenhuma instância encontrada correspondendo aos critérios especificados"
+
+[spawn.list.searching_all_regions]
+other = "Buscando em todas as regiões AWS..."
+
+[spawn.list.searching_region]
+other = "Buscando região {{.Region}}..."
+
+[spawn.list.error.list_failed]
+other = "falha ao listar instâncias: {{.Error}}"
+
+[spawn.list.header.instance_id]
+other = "ID da Instância"
+
+[spawn.list.header.name]
+other = "Nome"
+
+[spawn.list.header.type]
+other = "Tipo"
+
+[spawn.list.header.state]
+other = "Estado"
+
+[spawn.list.header.spot]
+other = "Spot"
+
+[spawn.list.header.az]
+other = "AZ"
+
+[spawn.list.header.public_ip]
+other = "IP Público"
+
+[spawn.list.header.age]
+other = "Idade"
+
+[spawn.list.header.ttl]
+other = "TTL"
+
+# Indicadores de progresso Spawn
+[spawn.progress.error]
+other = "Erro"
+
+[spawn.progress.create_security_group]
+other = "Criando security group"
+
+[spawn.progress.get_public_ip]
+other = "Obtendo IP público"
+
+[spawn.progress.install_agent]
+other = "Instalando agente spawn"
+
+[spawn.progress.launching_instance]
+other = "Lançando instância"
+
+[spawn.progress.setup_iam_role]
+other = "Configurando função IAM"
+
+[spawn.progress.setup_ssh_key]
+other = "Configurando chave SSH"
+
+[spawn.progress.success.title]
+other = "Instância Pronta!"
+
+[spawn.progress.success.details]
+other = "Detalhes da instância:"
+
+[spawn.progress.success.connect_now]
+other = "Conectar agora com:"
+
+[spawn.progress.success.status_running]
+other = "executando"
+
+[spawn.progress.success.label.instance_id]
+other = "ID da Instância"
+
+[spawn.progress.success.label.public_ip]
+other = "IP Público"
+
+[spawn.progress.success.label.status]
+other = "Status"
+
+[spawn.progress.success.monitoring.agent_active]
+other = "agente spawn está ativo e monitorando uso"
+
+[spawn.progress.success.monitoring.close_laptop]
+other = "Instância parará automaticamente quando você fechar seu laptop"
+
+# Resumo do assistente Spawn
+[spawn.wizard.summary.about_to_launch]
+other = "Você está prestes a lançar:"
+
+[spawn.wizard.summary.label.instance_type]
+other = "Tipo de Instância"
+
+[spawn.wizard.summary.label.region]
+other = "Região"
+
+[spawn.wizard.summary.label.type]
+other = "Tipo"
+
+[spawn.wizard.summary.label.name]
+other = "Nome"
+
+[spawn.wizard.summary.label.time_limit]
+other = "Limite de Tempo"
+
+[spawn.wizard.summary.label.idle_timeout]
+other = "Timeout de Ociosidade"
+
+[spawn.wizard.summary.type_spot]
+other = "Instância Spot"
+
+[spawn.wizard.summary.type_ondemand]
+other = "On-Demand"
+
+[spawn.wizard.summary.total_cost]
+other = "Custo Total Estimado"
+
+[spawn.wizard.summary.savings]
+other = "({{.Savings}} economia vs On-Demand)"
+
+# Comando Truffle Search
+[truffle.search.error.invalid_pattern]
+other = "padrão de busca inválido: {{.Error}}"
+
+[truffle.search.error.search_failed]
+other = "busca falhou: {{.Error}}"
+
+[truffle.search.error.get_regions_failed]
+other = "falha ao obter regiões AWS: {{.Error}}"
+
+[truffle.search.error.unsupported_format]
+other = "formato de saída não suportado: {{.Format}}"
+
+# Comando Truffle Capacity
+[truffle.capacity.searching]
+other = "Buscando reservas de capacidade..."
+
+[truffle.capacity.searching_across]
+other = "Buscando em {{.Count}} região(ões)..."
+
+[truffle.capacity.fetching_regions]
+other = "Buscando regiões AWS disponíveis..."
+
+[truffle.capacity.no_results]
+other = "Nenhuma reserva de capacidade encontrada correspondendo aos critérios"
+
+[truffle.capacity.error.get_failed]
+other = "falha ao obter reservas de capacidade: {{.Error}}"
+
+[truffle.capacity.error.get_regions_failed]
+other = "falha ao obter regiões AWS: {{.Error}}"
+
+[truffle.capacity.error.unsupported_format]
+other = "formato de saída não suportado: {{.Format}}"
+
+[truffle.capacity.summary.total_reservations]
+other = "Total de Reservas"
+
+[truffle.capacity.summary.active_reservations]
+other = "Reservas Ativas"
+
+[truffle.capacity.summary.availability_zones]
+other = "Zonas de Disponibilidade"
+
+[truffle.capacity.summary.available_capacity]
+other = "Capacidade Disponível"
+
+[truffle.capacity.summary.used_capacity]
+other = "Capacidade Usada"
+
+# Comando Truffle Spot
+[truffle.spot.searching_across]
+other = "Buscando em {{.Count}} região(ões)..."
+
+[truffle.spot.fetching_regions]
+other = "Buscando regiões AWS disponíveis..."
+
+[truffle.spot.max_price_filter]
+other = "Filtrando por preço máximo: ${{.MaxPrice}}/hora"
+
+[truffle.spot.no_matching_types]
+other = "Nenhum tipo de instância encontrado correspondendo ao padrão"
+
+[truffle.spot.no_pricing_data]
+other = "Nenhum dado de preço Spot disponível para as instâncias correspondentes"
+
+[truffle.spot.error.invalid_pattern]
+other = "padrão de busca inválido: {{.Error}}"
+
+[truffle.spot.error.search_failed]
+other = "busca falhou: {{.Error}}"
+
+[truffle.spot.error.get_regions_failed]
+other = "falha ao obter regiões AWS: {{.Error}}"
+
+[truffle.spot.error.get_pricing_failed]
+other = "falha ao obter preços Spot: {{.Error}}"
+
+[truffle.spot.error.unsupported_format]
+other = "formato de saída não suportado: {{.Format}}"
+
+[truffle.spot.summary.availability_zones]
+other = "Zonas de Disponibilidade"
+
+[truffle.spot.summary.average_price]
+other = "Preço Médio Spot"
+
+[truffle.spot.summary.average_savings]
+other = "Economia Média"
+
+# Cabeçalhos de saída Truffle
+[truffle.output.header.instance_type]
+other = "Tipo de Instância"
+
+[truffle.output.header.region]
+other = "Região"
+
+[truffle.output.header.vcpus]
+other = "vCPUs"
+
+[truffle.output.header.memory]
+other = "Memória (GiB)"
+
+[truffle.output.header.architecture]
+other = "Arquitetura"
+
+[truffle.output.header.availability_zones]
+other = "Zonas de Disponibilidade"
+
+# FIM DA TRADUÇÃO PORTUGUESA - COMPLETA

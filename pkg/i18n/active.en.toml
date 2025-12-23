@@ -1,0 +1,2117 @@
+# English (en) translations for spawn and truffle CLIs
+# This is the source language file - all other languages are translated from this
+
+# =============================================================================
+# COMMON STRINGS (Shared between spawn and truffle)
+# =============================================================================
+
+[common.region]
+description = "AWS region label"
+other = "Region"
+
+[common.availability_zone]
+description = "AWS availability zone label"
+other = "Availability Zone"
+
+[common.instance_type]
+description = "EC2 instance type label"
+other = "Instance Type"
+
+[common.instance_id]
+description = "EC2 instance ID label"
+other = "Instance ID"
+
+[common.public_ip]
+description = "Public IP address label"
+other = "Public IP"
+
+[common.error]
+description = "Generic error prefix"
+other = "Error"
+
+[common.warning]
+description = "Generic warning prefix"
+other = "Warning"
+
+[common.success]
+description = "Generic success prefix"
+other = "Success"
+
+# =============================================================================
+# SPAWN - ROOT COMMAND
+# =============================================================================
+
+[spawn.root.use]
+description = "Command name for spawn"
+other = "spawn"
+
+[spawn.root.short]
+description = "Short description of spawn CLI"
+other = "Launch AWS EC2 instances effortlessly"
+
+[spawn.root.long]
+description = "Long description of spawn CLI with examples"
+other = """spawn - Ephemeral AWS EC2 instance launcher (companion to truffle)
+
+spawn makes it super easy to launch AWS instances:
+  • Auto-detects AMI (Amazon Linux 2023, including GPU variants)
+  • Auto-configures SSH keys (uses ~/.ssh/id_rsa by default)
+  • Auto-creates VPC/subnet/security groups (tagged for cleanup)
+  • Installs spored agent for self-monitoring
+  • Auto-terminates on idle or TTL
+  • Auto-cleans up all resources
+
+Perfect for:
+  • Quick dev/test instances
+  • ML training jobs
+  • Spot instances
+  • Non-experts who just need compute
+
+Examples:
+  # From truffle
+  truffle search m7i.large | spawn
+
+  # Spot instance
+  truffle spot m7i.large --max-price 0.10 | spawn --spot
+
+  # GPU training with auto-terminate
+  truffle capacity --gpu-only | spawn --ttl 24h --hibernate-on-idle
+
+  # Direct launch
+  spawn --instance-type m7i.large --region us-east-1
+
+Unix Philosophy:
+  truffle finds, spawn launches
+  Pipe JSON from truffle to spawn for seamless workflow"""
+
+# =============================================================================
+# SPAWN - LAUNCH COMMAND
+# =============================================================================
+
+[spawn.launch.use]
+description = "Command name for launch"
+other = "launch"
+
+[spawn.launch.short]
+description = "Short description of launch command"
+other = "Launch an EC2 instance"
+
+[spawn.launch.long]
+description = "Long description of launch command"
+other = """Launch an EC2 instance with smart defaults.
+
+Three ways to use:
+  1. Interactive wizard (default if no input)
+  2. From truffle JSON via pipe
+  3. Direct with flags
+
+Examples:
+  # Interactive wizard
+  spawn launch
+
+  # From truffle
+  truffle search m7i.large | spawn launch
+
+  # Direct
+  spawn launch --instance-type m7i.large --region us-east-1"""
+
+[spawn.launch.flag.instance_type]
+description = "Flag help for instance-type"
+other = "Instance type"
+
+[spawn.launch.flag.region]
+description = "Flag help for region"
+other = "AWS region"
+
+[spawn.launch.flag.az]
+description = "Flag help for availability zone"
+other = "Availability zone"
+
+[spawn.launch.flag.ami]
+description = "Flag help for AMI ID"
+other = "AMI ID (auto-detects AL2023)"
+
+[spawn.launch.flag.vpc]
+description = "Flag help for VPC ID"
+other = "VPC ID"
+
+[spawn.launch.flag.subnet]
+description = "Flag help for subnet ID"
+other = "Subnet ID"
+
+[spawn.launch.flag.security_group]
+description = "Flag help for security group"
+other = "Security group ID"
+
+[spawn.launch.flag.key_pair]
+description = "Flag help for SSH key pair"
+other = "SSH key pair name"
+
+[spawn.launch.flag.spot]
+description = "Flag help for spot instances"
+other = "Launch as Spot instance"
+
+[spawn.launch.flag.spot_max_price]
+description = "Flag help for spot max price"
+other = "Max Spot price"
+
+[spawn.launch.flag.use_reservation]
+description = "Flag help for capacity reservation"
+other = "Use capacity reservation"
+
+[spawn.launch.flag.reservation_id]
+description = "Flag help for reservation ID"
+other = "Capacity reservation ID"
+
+[spawn.launch.flag.hibernate]
+description = "Flag help for hibernation"
+other = "Enable hibernation"
+
+[spawn.launch.flag.ttl]
+description = "Flag help for TTL (time to live)"
+other = "Auto-terminate after duration (e.g., 8h)"
+
+[spawn.launch.flag.idle_timeout]
+description = "Flag help for idle timeout"
+other = "Auto-terminate if idle"
+
+[spawn.launch.flag.hibernate_on_idle]
+description = "Flag help for hibernate on idle"
+other = "Hibernate instead of terminate when idle"
+
+[spawn.launch.flag.name]
+description = "Flag help for instance name"
+other = "Instance name tag"
+
+[spawn.launch.flag.user_data]
+description = "Flag help for user data"
+other = "User data (@file or inline)"
+
+[spawn.launch.flag.user_data_file]
+description = "Flag help for user data file"
+other = "User data file"
+
+[spawn.launch.flag.dns]
+description = "Flag help for DNS name"
+other = "Register DNS name (e.g., my-instance for my-instance.spore.host)"
+
+[spawn.launch.flag.dns_domain]
+description = "Flag help for custom DNS domain"
+other = "Custom DNS domain (overrides default)"
+
+[spawn.launch.flag.dns_api_endpoint]
+description = "Flag help for DNS API endpoint"
+other = "Custom DNS API endpoint (overrides default)"
+
+[spawn.launch.flag.interactive]
+description = "Flag help for interactive mode"
+other = "Force interactive wizard"
+
+[spawn.launch.flag.quiet]
+description = "Flag help for quiet mode"
+other = "Minimal output"
+
+[spawn.launch.flag.wait_for_running]
+description = "Flag help for wait until running"
+other = "Wait until running"
+
+[spawn.launch.flag.wait_for_ssh]
+description = "Flag help for wait until SSH ready"
+other = "Wait until SSH is ready"
+
+# =============================================================================
+# SPAWN - WIZARD
+# =============================================================================
+
+[spawn.wizard.title]
+description = "Wizard main title with emoji"
+other = "spawn Setup Wizard"
+
+[spawn.wizard.subtitle]
+description = "Wizard welcome message"
+other = "I'll help you launch an AWS EC2 instance!"
+
+[spawn.wizard.instructions]
+description = "Wizard usage instructions"
+other = "Press Enter to use the default shown in [brackets]"
+
+[spawn.wizard.step1.title]
+description = "Step 1 title - instance type selection"
+other = "Step 1 of 6: Choose Instance Type"
+
+[spawn.wizard.step1.prompt]
+description = "Prompt for instance type input"
+other = "Instance type [t3.medium]: "
+
+[spawn.wizard.step1.common_choices]
+description = "Header for common instance type choices"
+other = "Common choices:"
+
+[spawn.wizard.step1.category.dev_testing]
+description = "Category: Development and testing"
+other = "Development & Testing:"
+
+[spawn.wizard.step1.category.general_purpose]
+description = "Category: General purpose compute"
+other = "General Purpose:"
+
+[spawn.wizard.step1.category.compute]
+description = "Category: Compute optimized"
+other = "Compute Optimized:"
+
+[spawn.wizard.step1.category.memory]
+description = "Category: Memory optimized"
+other = "🧠 Memory Optimized:"
+
+[spawn.wizard.step1.category.gpu]
+description = "Category: GPU instances"
+other = "GPU:"
+
+[spawn.wizard.step2.title]
+description = "Step 2 title - region selection"
+other = "Step 2 of 6: Choose Region"
+
+[spawn.wizard.step2.prompt]
+description = "Prompt for region input"
+other = "AWS region [us-east-1]: "
+
+[spawn.wizard.step3.title]
+description = "Step 3 title - spot vs on-demand"
+other = "Step 3 of 6: Spot Instance?"
+
+[spawn.wizard.step3.explanation]
+description = "Explanation of spot instances"
+other = "Spot instances save up to 90% but can be interrupted by AWS."
+
+[spawn.wizard.step3.prompt]
+description = "Prompt for spot decision"
+other = "Use Spot instance? [y/N]: "
+
+[spawn.wizard.step3.using_spot]
+description = "Confirmation message for using spot"
+other = "Using Spot instances (save ~70%)"
+
+[spawn.wizard.step3.using_ondemand]
+description = "Confirmation message for using on-demand"
+other = "Using On-Demand (reliable, more expensive)"
+
+[spawn.wizard.step4.title]
+description = "Step 4 title - auto-termination"
+other = "Step 4 of 6: Auto-Termination"
+
+[spawn.wizard.step4.explanation]
+description = "Explanation of auto-termination options"
+other = "Prevent runaway costs by setting automatic termination rules."
+
+[spawn.wizard.step4.option1]
+description = "Auto-termination option 1"
+other = "1. Fixed TTL (e.g., terminate after 8 hours)"
+
+[spawn.wizard.step4.option2]
+description = "Auto-termination option 2"
+other = "2. Idle detection (terminate if no activity)"
+
+[spawn.wizard.step4.option3]
+description = "Auto-termination option 3"
+other = "3. Both (TTL + idle detection)"
+
+[spawn.wizard.step4.option4]
+description = "Auto-termination option 4"
+other = "4. None (manual termination only)"
+
+[spawn.wizard.step4.prompt]
+description = "Prompt for auto-termination choice"
+other = "Choose [1-4]: "
+
+[spawn.wizard.step5.title]
+description = "Step 5 title - SSH key"
+other = "Step 5 of 6: SSH Key"
+
+[spawn.wizard.step5.prompt]
+description = "Prompt for SSH key name"
+other = "SSH key pair name [auto-detect]: "
+
+[spawn.wizard.step6.title]
+description = "Step 6 title - instance name"
+other = "Step 6 of 6: Name Your Instance"
+
+[spawn.wizard.step6.prompt]
+description = "Prompt for instance name"
+other = "Instance name [auto-generated]: "
+
+[spawn.wizard.summary.title]
+description = "Configuration summary title"
+other = "Configuration Summary"
+
+[spawn.wizard.summary.confirm]
+description = "Launch confirmation prompt"
+other = "Launch instance? [Y/n]: "
+
+[spawn.wizard.cancelled]
+description = "Message when user cancels wizard"
+other = "Launch cancelled by user"
+
+# =============================================================================
+# SPAWN - PROGRESS INDICATORS
+# =============================================================================
+
+[spawn.progress.title]
+description = "Progress display main title"
+other = "Spawning Instance..."
+
+[spawn.progress.detecting_ami]
+description = "Progress step: Detecting AMI (completed form)"
+other = "Detecting AMI"
+
+[spawn.progress.setup_ssh]
+description = "Progress step: Setting up SSH key"
+other = "Setting up SSH key"
+
+[spawn.progress.setup_iam]
+description = "Progress step: Setting up IAM role"
+other = "Setting up IAM role"
+
+[spawn.progress.create_sg]
+description = "Progress step: Creating security group"
+other = "Creating security group"
+
+[spawn.progress.launching]
+description = "Progress step: Launching instance"
+other = "Launching instance"
+
+[spawn.progress.installing_agent]
+description = "Progress step: Installing spored agent"
+other = "Installing spored agent"
+
+[spawn.progress.waiting_instance]
+description = "Progress step: Waiting for instance"
+other = "Waiting for instance"
+
+[spawn.progress.getting_ip]
+description = "Progress step: Getting public IP"
+other = "Getting public IP"
+
+[spawn.progress.waiting_ssh]
+description = "Progress step: Waiting for SSH"
+other = "Waiting for SSH"
+
+[spawn.progress.instance_details]
+description = "Section header for instance details"
+other = "Instance Details:"
+
+[spawn.progress.status_running]
+description = "Instance status: running"
+other = "Status:       running"
+
+[spawn.progress.connect_now]
+description = "Section header for connection instructions"
+other = "Connect Now:"
+
+[spawn.progress.monitoring.title]
+description = "Automatic monitoring section title"
+other = "Automatic Monitoring:"
+
+[spawn.progress.monitoring.ttl]
+description = "TTL monitoring message"
+other = "Will terminate after: {{.Duration}}"
+
+[spawn.progress.monitoring.idle]
+description = "Idle monitoring message"
+other = "Will terminate if idle: {{.Duration}}"
+
+[spawn.progress.monitoring.agent]
+description = "Agent monitoring message"
+other = "The spored agent is monitoring your instance."
+
+[spawn.progress.monitoring.laptop]
+description = "Laptop close safety message"
+other = "You can close your laptop - monitoring runs on the instance."
+
+# =============================================================================
+# SPAWN - ERRORS
+# =============================================================================
+
+[spawn.error.instance_type_required]
+description = "Error when instance type is missing"
+other = "instance type required"
+
+[spawn.error.region_required]
+description = "Error when region is missing"
+other = "region required"
+
+[spawn.error.platform_detect_failed]
+description = "Error when platform detection fails"
+other = "failed to detect platform: {{.Error}}"
+
+[spawn.error.aws_init_failed]
+description = "Error when AWS client initialization fails"
+other = "failed to initialize AWS client: {{.Error}}"
+
+[spawn.error.ssh_key_not_found]
+description = "Error when SSH key is not found"
+other = "no SSH key found at {{.Path}}"
+
+[spawn.error.ssh_key_create_failed]
+description = "Error when SSH key creation fails"
+other = "failed to create SSH key: {{.Error}}"
+
+# =============================================================================
+# SPAWN - CONNECT COMMAND
+# =============================================================================
+
+[spawn.connect.use]
+description = "Command name for connect"
+other = "connect"
+
+[spawn.connect.short]
+description = "Short description of connect command"
+other = "Connect to a spawn-managed instance via SSH"
+
+[spawn.connect.long]
+description = "Long description of connect command"
+other = """Connect to a spawn-managed instance via SSH.
+
+Automatically finds your SSH key and connects. Falls back to AWS Session Manager if SSH is unavailable.
+
+Examples:
+  # Connect by instance ID
+  spawn connect i-1234567890abcdef0
+
+  # Connect by name
+  spawn connect my-instance"""
+
+[spawn.connect.flag.region]
+description = "Flag help for region filter"
+other = "Filter by AWS region"
+
+[spawn.connect.flag.use_ssm]
+description = "Flag help for forcing Session Manager"
+other = "Force AWS Session Manager connection"
+
+[spawn.connect.found_instance]
+description = "Message when instance is found"
+other = "Found instance in {{.Region}}"
+
+[spawn.connect.not_running]
+description = "Error when instance is not running"
+other = "instance is not running (state: {{.State}})"
+
+[spawn.connect.ssh_key_warning]
+description = "Warning when SSH key is not found"
+other = "Could not find SSH key for {{.KeyName}}"
+
+[spawn.connect.connecting_ssh]
+description = "Message when connecting via SSH"
+other = "Connecting via SSH..."
+
+[spawn.connect.aws_cli_not_found]
+description = "Error when AWS CLI is not installed"
+other = "AWS CLI not found. Install from: https://aws.amazon.com/cli/"
+
+[spawn.connect.connecting_ssm]
+description = "Message when connecting via Session Manager"
+other = "Connecting via AWS Session Manager..."
+
+[spawn.connect.ssm_plugin_error]
+description = "Error when Session Manager plugin is missing"
+other = """Session Manager plugin not found.
+
+Install from: https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html
+
+Error: {{.Error}}"""
+
+# =============================================================================
+# SPAWN - LIST COMMAND
+# =============================================================================
+
+[spawn.list.use]
+description = "Command name for list"
+other = "list"
+
+[spawn.list.short]
+description = "Short description of list command"
+other = "List spawn-managed EC2 instances"
+
+[spawn.list.long]
+description = "Long description of list command"
+other = """List spawn-managed EC2 instances across regions.
+
+Shows all instances with the spawn:managed tag.
+
+Examples:
+  # List all instances
+  spawn list
+
+  # Filter by region
+  spawn list --region us-east-1
+
+  # Filter by state
+  spawn list --state running
+
+  # JSON output
+  spawn list --output json"""
+
+[spawn.list.flag.region]
+description = "Flag help for region filter"
+other = "Filter by AWS region"
+
+[spawn.list.flag.az]
+description = "Flag help for AZ filter"
+other = "Filter by availability zone"
+
+[spawn.list.flag.state]
+description = "Flag help for state filter"
+other = "Filter by instance state"
+
+[spawn.list.flag.tags]
+description = "Flag help for tag filter"
+other = "Filter by tags (key=value)"
+
+[spawn.list.flag.output]
+description = "Flag help for output format"
+other = "Output format (table, json, yaml)"
+
+[spawn.list.searching]
+description = "Message when searching for instances"
+other = "Searching for spawn-managed instances..."
+
+[spawn.list.searching_region]
+description = "Message when searching specific region"
+other = "Searching {{.Region}}..."
+
+[spawn.list.no_results]
+description = "Message when no instances found"
+other = "No instances match the specified filters."
+
+[spawn.list.table.header.instance_id]
+description = "Table column header"
+other = "INSTANCE ID"
+
+[spawn.list.table.header.name]
+description = "Table column header"
+other = "NAME"
+
+[spawn.list.table.header.type]
+description = "Table column header"
+other = "TYPE"
+
+[spawn.list.table.header.state]
+description = "Table column header"
+other = "STATE"
+
+[spawn.list.table.header.region]
+description = "Table column header"
+other = "REGION"
+
+[spawn.list.table.header.az]
+description = "Table column header"
+other = "AZ"
+
+[spawn.list.table.header.public_ip]
+description = "Table column header"
+other = "PUBLIC IP"
+
+[spawn.list.table.header.launched]
+description = "Table column header"
+other = "LAUNCHED"
+
+# =============================================================================
+# SPAWN - DNS COMMAND
+# =============================================================================
+
+[spawn.dns.use]
+description = "Command name for DNS"
+other = "dns"
+
+[spawn.dns.short]
+description = "Short description of DNS command"
+other = "Manage DNS records for spawn instances"
+
+[spawn.dns.long]
+description = "Long description of DNS command"
+other = """Manage DNS records for spawn instances.
+
+DNS names are automatically registered when launching with --dns flag.
+Format: <name>.<account-base36>.spore.host
+
+Examples:
+  # List DNS-enabled instances
+  spawn dns list
+
+  # Register DNS name
+  spawn dns register i-1234567890abcdef0 my-server
+
+  # Delete DNS record
+  spawn dns delete my-server"""
+
+[spawn.dns.list.use]
+description = "Subcommand name for list"
+other = "list"
+
+[spawn.dns.list.short]
+description = "Short description of DNS list"
+other = "List DNS-enabled spawn instances"
+
+[spawn.dns.register.use]
+description = "Subcommand name for register"
+other = "register"
+
+[spawn.dns.register.short]
+description = "Short description of DNS register"
+other = "Register DNS name for an instance"
+
+[spawn.dns.delete.use]
+description = "Subcommand name for delete"
+other = "delete"
+
+[spawn.dns.delete.short]
+description = "Short description of DNS delete"
+other = "Delete DNS record for an instance"
+
+[spawn.dns.invalid_name]
+description = "Error for invalid DNS name"
+other = "invalid DNS name: {{.Name}} (must be lowercase alphanumeric with hyphens)"
+
+[spawn.dns.no_dns_enabled]
+description = "Message when no DNS-enabled instances found"
+other = "No DNS-enabled instances found."
+
+[spawn.dns.instance_info]
+description = "Instance information label"
+other = "Instance:"
+
+[spawn.dns.region_info]
+description = "Region information label"
+other = "Region:"
+
+[spawn.dns.state_info]
+description = "State information label"
+other = "State:"
+
+[spawn.dns.public_ip_info]
+description = "Public IP information label"
+other = "Public IP:"
+
+[spawn.dns.fqdn_info]
+description = "FQDN information label"
+other = "FQDN:"
+
+[spawn.dns.registered]
+description = "Success message for DNS registration"
+other = "DNS registered: {{.FQDN}}"
+
+[spawn.dns.deleted]
+description = "Success message for DNS deletion"
+other = "DNS deleted: {{.FQDN}}"
+
+# =============================================================================
+# SPAWN - EXTEND COMMAND
+# =============================================================================
+
+[spawn.extend.use]
+description = "Command name for extend"
+other = "extend"
+
+[spawn.extend.short]
+description = "Short description of extend command"
+other = "Extend the TTL for a spawn-managed instance"
+
+[spawn.extend.long]
+description = "Long description of extend command"
+other = """Extend the TTL (time-to-live) for a spawn-managed instance.
+
+Prevents automatic termination by extending the TTL duration.
+
+Duration format: 1h, 2h30m, 24h, etc.
+
+Examples:
+  # Extend by 2 hours
+  spawn extend i-1234567890abcdef0 2h
+
+  # Extend by name
+  spawn extend my-instance 8h"""
+
+[spawn.extend.invalid_ttl]
+description = "Error for invalid TTL format"
+other = "invalid TTL format: {{.TTL}}"
+
+[spawn.extend.ttl_format_help]
+description = "Help message for TTL format"
+other = "TTL must be in format: 1h, 2h30m, 24h, etc."
+
+[spawn.extend.current_ttl]
+description = "Current TTL information"
+other = "Current TTL: {{.TTL}}"
+
+[spawn.extend.new_ttl]
+description = "New TTL information"
+other = "New TTL: {{.TTL}}"
+
+[spawn.extend.expires_at]
+description = "Expiration time information"
+other = "Expires at: {{.Time}}"
+
+[spawn.extend.success]
+description = "Success message for TTL extension"
+other = "TTL extended successfully"
+
+# =============================================================================
+# SPAWN - STATE COMMAND (Stop, Start, Hibernate)
+# =============================================================================
+
+[spawn.state.stop.use]
+description = "Command name for stop"
+other = "stop"
+
+[spawn.state.stop.short]
+description = "Short description of stop command"
+other = "Stop a spawn-managed instance"
+
+[spawn.state.start.use]
+description = "Command name for start"
+other = "start"
+
+[spawn.state.start.short]
+description = "Short description of start command"
+other = "Start a stopped or hibernated instance"
+
+[spawn.state.hibernate.use]
+description = "Command name for hibernate"
+other = "hibernate"
+
+[spawn.state.hibernate.short]
+description = "Short description of hibernate command"
+other = "Hibernate a spawn-managed instance"
+
+[spawn.state.not_running]
+description = "Error when instance is not running"
+other = "instance is not in running state (current: {{.State}})"
+
+[spawn.state.not_stopped]
+description = "Error when instance is not stopped"
+other = "instance is not in stopped state (current: {{.State}})"
+
+[spawn.state.found_instance]
+description = "Message when instance is found"
+other = "Found instance in {{.Region}}"
+
+[spawn.state.stopping]
+description = "Message when stopping instance"
+other = "Stopping instance..."
+
+[spawn.state.starting]
+description = "Message when starting instance"
+other = "Starting instance..."
+
+[spawn.state.hibernating]
+description = "Message when hibernating instance"
+other = "Hibernating instance..."
+
+[spawn.state.stopped]
+description = "Success message for stopped instance"
+other = "Instance stopped"
+
+[spawn.state.started]
+description = "Success message for started instance"
+other = "Instance started"
+
+[spawn.state.hibernated]
+description = "Success message for hibernated instance"
+other = "Instance hibernated"
+
+[spawn.state.new_ip]
+description = "New public IP information"
+other = "New Public IP: {{.IP}}"
+
+[spawn.state.ttl_restored]
+description = "TTL restoration message"
+other = "TTL restored: {{.Duration}}"
+
+# =============================================================================
+# SPAWN - AGENT WARNINGS
+# =============================================================================
+
+[spawn.agent.ttl_warning]
+description = "Warning when TTL is expiring"
+other = "TERMINATING IN {{.Duration}} (TTL limit)"
+
+[spawn.agent.idle_warning]
+description = "Warning when idle timeout approaching"
+other = "IDLE for {{.IdleDuration}}, will terminate in {{.Remaining}}"
+
+[spawn.agent.spot_interruption.title]
+description = "Spot interruption alert title"
+other = "🚨 SPOT INTERRUPTION WARNING! 🚨"
+
+[spawn.agent.spot_interruption.message]
+description = "Spot interruption alert message"
+other = """AWS will {{.Action}} this instance at {{.Time}}
+You have ~2 minutes to save your work!
+SAVE ALL FILES NOW!"""
+
+[spawn.agent.hibernating]
+description = "Hibernation announcement"
+other = "HIBERNATING NOW - Instance will pause..."
+
+[spawn.agent.terminating]
+description = "Termination announcement"
+other = "🔴 TERMINATING NOW - Reason: {{.Reason}}"
+
+# =============================================================================
+# TRUFFLE - ROOT COMMAND
+# =============================================================================
+
+[truffle.root.use]
+description = "Command name for truffle"
+other = "truffle"
+
+[truffle.root.short]
+description = "Short description of truffle CLI"
+other = "🍄 Truffle - AWS EC2 Instance Type Region Finder"
+
+[truffle.root.long]
+description = "Long description of truffle CLI"
+other = """Truffle is a CLI tool to discover which AWS regions and availability zones
+support specific EC2 instance types. Perfect for planning multi-region deployments!
+
+Examples:
+  # Find all regions with m7i.large instances
+  truffle search m7i.large
+
+  # Search with wildcards - Graviton4 instances
+  truffle search "m8g.*"
+
+  # Filter by specific regions
+  truffle search m7i.large --regions us-east-1,eu-west-1"""
+
+# =============================================================================
+# TRUFFLE - SEARCH COMMAND
+# =============================================================================
+
+[truffle.search.use]
+description = "Command name for search"
+other = "search [instance-type-pattern]"
+
+[truffle.search.short]
+description = "Short description of search command"
+other = "Search for instance types across AWS regions"
+
+[truffle.search.long]
+description = "Long description of search command"
+other = """Search for instance types across AWS regions.
+
+Supports wildcards and regex patterns for flexible searching.
+
+Examples:
+  # Exact match
+  truffle search m7i.large
+
+  # Wildcard - all m8g sizes
+  truffle search "m8g.*"
+
+  # Filter by architecture
+  truffle search "c7.*" --architecture arm64"""
+
+[truffle.search.flag.skip_azs]
+description = "Flag help for skipping AZ lookup"
+other = "Skip availability zone lookup (faster but less detailed)"
+
+[truffle.search.flag.architecture]
+description = "Flag help for architecture filter"
+other = "Filter by architecture (x86_64, arm64, i386)"
+
+[truffle.search.flag.min_vcpu]
+description = "Flag help for minimum vCPU"
+other = "Minimum number of vCPUs"
+
+[truffle.search.flag.min_memory]
+description = "Flag help for minimum memory"
+other = "Minimum memory in GiB"
+
+[truffle.search.flag.family]
+description = "Flag help for instance family filter"
+other = "Filter by instance family (e.g., m5, c5)"
+
+[truffle.search.flag.timeout]
+description = "Flag help for timeout"
+other = "Timeout for AWS API calls"
+
+[truffle.search.searching]
+description = "Verbose message when searching"
+other = "Searching for instance types matching: {{.Pattern}}"
+
+[truffle.search.filtering_regions]
+description = "Verbose message for region filtering"
+other = "Filtering regions: {{.Regions}}"
+
+[truffle.search.fetching_regions]
+description = "Verbose message when fetching regions"
+other = "Fetching all AWS regions..."
+
+[truffle.search.searching_regions]
+description = "Verbose message when searching regions"
+other = "Searching across {{.Count}} regions..."
+
+[truffle.search.no_results]
+description = "Message when no results found"
+other = "No matching instance types found."
+
+# =============================================================================
+# TRUFFLE - CAPACITY COMMAND
+# =============================================================================
+
+[truffle.capacity.use]
+description = "Command name for capacity"
+other = "capacity"
+
+[truffle.capacity.short]
+description = "Short description of capacity command"
+other = "Check ML capacity reservations (Capacity Blocks & ODCRs)"
+
+[truffle.capacity.long]
+description = "Long description of capacity command"
+other = """Check ML capacity reservations across AWS regions.
+
+Supports both Capacity Blocks (training workloads) and On-Demand Capacity
+Reservations (ODCRs) for GPU and ML instances.
+
+Examples:
+  # Check all reservations
+  truffle capacity
+
+  # GPU instances only
+  truffle capacity --gpu-only
+
+  # Capacity Blocks for ML
+  truffle capacity --blocks
+
+  # Available capacity only
+  truffle capacity --available-only"""
+
+[truffle.capacity.flag.instance_types]
+description = "Flag help for instance type filter"
+other = "Filter by instance types (comma-separated)"
+
+[truffle.capacity.flag.available_only]
+description = "Flag help for available only"
+other = "Only show reservations with available capacity"
+
+[truffle.capacity.flag.active_only]
+description = "Flag help for active only"
+other = "Only show active reservations (default: true)"
+
+[truffle.capacity.flag.min_capacity]
+description = "Flag help for minimum capacity"
+other = "Minimum available capacity"
+
+[truffle.capacity.flag.gpu_only]
+description = "Flag help for GPU only"
+other = "Only show GPU/ML instance reservations"
+
+[truffle.capacity.flag.blocks]
+description = "Flag help for Capacity Blocks"
+other = "Show Capacity Blocks for ML (training workloads)"
+
+[truffle.capacity.flag.odcr]
+description = "Flag help for ODCRs"
+other = "Show On-Demand Capacity Reservations (default)"
+
+[truffle.capacity.gpu_only]
+description = "Verbose message for GPU filter"
+other = "GPU/ML instances only"
+
+[truffle.capacity.summary.title]
+description = "Summary section title"
+other = "Capacity Reservation Summary:"
+
+[truffle.capacity.summary.total]
+description = "Total reservations count"
+other = "Total Reservations: {{.Count}}"
+
+[truffle.capacity.summary.active]
+description = "Active reservations count"
+other = "Active Reservations: {{.Count}}"
+
+[truffle.capacity.summary.instance_types]
+description = "Instance types count"
+other = "Instance Types: {{.Count}}"
+
+[truffle.capacity.summary.regions]
+description = "Regions count"
+other = "Regions: {{.Count}}"
+
+[truffle.capacity.summary.azs]
+description = "Availability zones count"
+other = "Availability Zones: {{.Count}}"
+
+[truffle.capacity.summary.total_capacity]
+description = "Total capacity"
+other = "Total Capacity: {{.Count}} instances"
+
+[truffle.capacity.summary.available]
+description = "Available capacity"
+other = "Available Capacity: {{.Count}} instances ({{.Percent}}% free)"
+
+[truffle.capacity.summary.used]
+description = "Used capacity"
+other = "Used Capacity: {{.Count}} instances ({{.Percent}}% utilized)"
+
+# =============================================================================
+# TRUFFLE - SPOT COMMAND
+# =============================================================================
+
+[truffle.spot.use]
+description = "Command name for spot"
+other = "spot [instance-type-pattern]"
+
+[truffle.spot.short]
+description = "Short description of spot command"
+other = "Search for Spot instance pricing and availability"
+
+[truffle.spot.long]
+description = "Long description of spot command"
+other = """Search for Spot instance pricing and availability across AWS regions.
+
+Shows current Spot prices, savings vs On-Demand, and price history.
+
+Examples:
+  # Spot prices for m7i.large
+  truffle spot m7i.large
+
+  # Filter by max price
+  truffle spot "m7i.*" --max-price 0.10
+
+  # Sort by price
+  truffle spot "c7.*" --sort-by-price"""
+
+[truffle.spot.flag.max_price]
+description = "Flag help for max price"
+other = "Maximum Spot price per hour (USD)"
+
+[truffle.spot.flag.show_savings]
+description = "Flag help for showing savings"
+other = "Show savings vs On-Demand pricing"
+
+[truffle.spot.flag.sort_by_price]
+description = "Flag help for price sorting"
+other = "Sort by price (cheapest first)"
+
+[truffle.spot.flag.active_only]
+description = "Flag help for active only"
+other = "Only show AZs with active Spot capacity"
+
+[truffle.spot.flag.lookback_hours]
+description = "Flag help for lookback period"
+other = "Hours to look back for price history (1-720)"
+
+[truffle.spot.searching]
+description = "Verbose message when searching"
+other = "Searching for Spot instances matching: {{.Pattern}}"
+
+[truffle.spot.fetching_pricing]
+description = "Verbose message when fetching pricing"
+other = "Fetching Spot pricing data..."
+
+[truffle.spot.summary.title]
+description = "Summary section title"
+other = "Spot Instance Summary:"
+
+[truffle.spot.summary.instance_types]
+description = "Instance types count"
+other = "Instance Types: {{.Count}}"
+
+[truffle.spot.summary.regions]
+description = "Regions count"
+other = "Regions: {{.Count}}"
+
+[truffle.spot.summary.azs]
+description = "Availability zones count"
+other = "Availability Zones: {{.Count}}"
+
+[truffle.spot.summary.price_range]
+description = "Price range"
+other = "Price Range: ${{.Min}} - ${{.Max}} per hour"
+
+[truffle.spot.summary.avg_price]
+description = "Average price"
+other = "Average Price: ${{.Avg}} per hour"
+
+[truffle.spot.summary.avg_savings]
+description = "Average savings"
+other = "Average Savings: {{.Percent}}% vs On-Demand"
+
+# =============================================================================
+# TRUFFLE - QUOTAS COMMAND
+# =============================================================================
+
+[truffle.quotas.use]
+description = "Command name for quotas"
+other = "quotas"
+
+[truffle.quotas.short]
+description = "Short description of quotas command"
+other = "Show AWS Service Quotas for EC2 instances"
+
+[truffle.quotas.long]
+description = "Long description of quotas command"
+other = """Show AWS Service Quotas for EC2 instances across regions.
+
+Displays current quotas, usage, and available capacity for different instance families.
+
+Examples:
+  # Check quotas in all regions
+  truffle quotas
+
+  # Specific regions only
+  truffle quotas --regions us-east-1,eu-west-1
+
+  # Filter by instance family
+  truffle quotas --family P"""
+
+[truffle.quotas.flag.regions]
+description = "Flag help for regions"
+other = "Regions to check (comma-separated)"
+
+[truffle.quotas.flag.family]
+description = "Flag help for family filter"
+other = "Filter by instance family (Standard, G, P, Inf, Trn)"
+
+[truffle.quotas.flag.request]
+description = "Flag help for generating requests"
+other = "Generate quota increase request commands"
+
+[truffle.quotas.credentials_required]
+description = "Error when AWS credentials missing"
+other = """❌ AWS credentials required for quota checking
+
+To configure credentials:
+  1. Export environment variables:
+     export AWS_ACCESS_KEY_ID=...
+     export AWS_SECRET_ACCESS_KEY=...
+     export AWS_DEFAULT_REGION=us-east-1
+
+  OR
+
+  2. Run: aws configure
+
+Error: {{.Error}}"""
+
+[truffle.quotas.no_results]
+description = "Error when no quotas retrieved"
+other = "could not retrieve quotas for any region"
+
+[truffle.quotas.region_error]
+description = "Warning for single region failure"
+other = "Could not get quotas for {{.Region}}: {{.Error}}"
+
+[truffle.quotas.title]
+description = "Quotas display title"
+other = "AWS Service Quotas - {{.Region}}"
+
+[truffle.quotas.table.header.family]
+description = "Table column header"
+other = "Family"
+
+[truffle.quotas.table.header.type]
+description = "Table column header"
+other = "Type"
+
+[truffle.quotas.table.header.quota]
+description = "Table column header"
+other = "Quota"
+
+[truffle.quotas.table.header.usage]
+description = "Table column header"
+other = "Usage"
+
+[truffle.quotas.table.header.available]
+description = "Table column header"
+other = "Available"
+
+[truffle.quotas.table.header.status]
+description = "Table column header"
+other = "Status"
+
+[truffle.quotas.status.ok]
+description = "Status: OK"
+other = "OK"
+
+[truffle.quotas.status.low]
+description = "Status: Low capacity"
+other = "Low"
+
+[truffle.quotas.status.full]
+description = "Status: At capacity"
+other = "🔴 Full"
+
+[truffle.quotas.status.zero]
+description = "Status: No capacity"
+other = "❌ Zero"
+
+[truffle.quotas.running_instances]
+description = "Running instances summary"
+other = "Running Instances: {{.Count}} / {{.Total}}"
+
+# =============================================================================
+# TRUFFLE - OUTPUT FORMATTERS
+# =============================================================================
+
+[truffle.output.table.header.instance_type]
+description = "Table column header"
+other = "Instance Type"
+
+[truffle.output.table.header.region]
+description = "Table column header"
+other = "Region"
+
+[truffle.output.table.header.vcpus]
+description = "Table column header"
+other = "vCPUs"
+
+[truffle.output.table.header.memory]
+description = "Table column header"
+other = "Memory (GiB)"
+
+[truffle.output.table.header.architecture]
+description = "Table column header"
+other = "Architecture"
+
+[truffle.output.table.header.availability_zones]
+description = "Table column header"
+other = "Availability Zones"
+
+[truffle.output.summary.found]
+description = "Summary of search results with pluralization"
+one = "🍄 Found {{.Count}} instance type across {{.Regions}} region(s)"
+other = "🍄 Found {{.Count}} instance types across {{.Regions}} region(s)"
+
+[truffle.output.summary.no_results]
+description = "Message when no results found"
+other = "No matching instance types found."
+
+# =============================================================================
+# GLOBAL FLAGS (Shared across commands)
+# =============================================================================
+
+[flags.lang]
+description = "Flag help for language selection"
+other = "Language (en, es, fr, de, ja)"
+
+[flags.no_emoji]
+description = "Flag help for disabling emoji"
+other = "Disable emoji output"
+
+[flags.accessibility]
+description = "Flag help for accessibility mode"
+other = "Enable accessibility mode (screen reader-friendly)"
+
+[flags.no_color]
+description = "Flag help for disabling color"
+other = "Disable colorized output"
+
+[flags.output]
+description = "Flag help for output format"
+other = "Output format (table, json, yaml, csv)"
+
+[flags.regions]
+description = "Flag help for region filter"
+other = "Filter by specific regions (comma-separated)"
+
+[flags.verbose]
+description = "Flag help for verbose output"
+other = "Enable verbose output"
+
+# =============================================================================
+# COMMON ERRORS
+# =============================================================================
+
+[error.invalid_pattern]
+description = "Error for invalid regex pattern"
+other = "invalid pattern: {{.Error}}"
+
+[error.aws_client_init]
+description = "Error for AWS client initialization"
+other = "failed to initialize AWS client: {{.Error}}"
+
+[error.region_fetch]
+description = "Error for region fetching"
+other = "failed to get regions: {{.Error}}"
+
+[error.search_failed]
+description = "Error for search failure"
+other = "search failed: {{.Error}}"
+
+[error.instance_types_fetch]
+description = "Error for fetching instance types"
+other = "failed to get instance types: {{.Error}}"
+
+[error.capacity_fetch]
+description = "Error for fetching capacity"
+other = "failed to get capacity reservations: {{.Error}}"
+
+[error.spot_pricing_fetch]
+description = "Error for fetching Spot pricing"
+other = "failed to get Spot pricing: {{.Error}}"
+
+[error.unsupported_output_format]
+description = "Error for unsupported output format"
+other = "unsupported output format: {{.Format}}"
+
+[error.platform_detect_failed]
+description = "Error when platform detection fails"
+other = "failed to detect platform"
+
+[error.input_parse_failed]
+description = "Error when parsing input fails"
+other = "failed to parse input"
+
+[error.instance_type_required]
+description = "Error when instance type is not provided"
+other = "instance type required"
+
+[error.region_required]
+description = "Error when region is not provided"
+other = "region required"
+
+# =============================================================================
+# END OF TRANSLATIONS
+# Total: 493 strings extracted
+# =============================================================================
+
+# =============================================================================
+# ADDITIONAL MISSING TRANSLATIONS
+# =============================================================================
+
+# Wizard intro
+[spawn.wizard.intro.help]
+description = "Wizard help text"
+other = "This wizard will help you configure your EC2 instance. Press Enter to use defaults (shown in brackets)."
+
+[spawn.wizard.intro.default_hint]
+description = "Default value hint"
+other = "Tip: Leave blank and press Enter to use the default value."
+
+# Wizard step 1 - Instance categories
+[spawn.wizard.step1.common_choices]
+description = "Common choices heading"
+other = "Common choices:"
+
+[spawn.wizard.step1.category.dev]
+description = "Development & Testing category"
+other = "Development & Testing:"
+
+[spawn.wizard.step1.category.general]
+description = "General Purpose category"
+other = "General Purpose:"
+
+[spawn.wizard.step1.category.compute]
+description = "Compute Optimized category"
+other = "Compute Optimized:"
+
+# Wizard step 1 - Instance types
+[spawn.wizard.step1.instance.t3_medium]
+description = "Instance type option"
+other = "    t3.medium - 2 vCPU, 4 GiB RAM (default)"
+
+[spawn.wizard.step1.instance.t3_large]
+description = "Instance type option"
+other = "    t3.large  - 2 vCPU, 8 GiB RAM"
+
+[spawn.wizard.step1.instance.m7i_large]
+description = "Instance type option"
+other = "    m7i.large  - 2 vCPU, 8 GiB RAM"
+
+[spawn.wizard.step1.instance.m7i_xlarge]
+description = "Instance type option"
+other = "    m7i.xlarge - 4 vCPU, 16 GiB RAM"
+
+[spawn.wizard.step1.instance.c7i_xlarge]
+description = "Instance type option"
+other = "    c7i.xlarge  - 4 vCPU, 8 GiB RAM"
+
+[spawn.wizard.step1.instance.c7i_2xlarge]
+description = "Instance type option"
+other = "    c7i.2xlarge - 8 vCPU, 16 GiB RAM"
+
+[spawn.wizard.step1.instance.g6_xlarge]
+description = "Instance type option"
+other = "    g6.xlarge    - NVIDIA L4, 4 vCPU, 16 GiB RAM"
+
+[spawn.wizard.step1.instance.p5_48xlarge]
+description = "Instance type option"
+other = "    p5.48xlarge  - 8x NVIDIA H100, 192 vCPU, 2 TiB RAM"
+
+[spawn.wizard.step1.prompt]
+description = "Instance type prompt"
+other = "Instance type [t3.medium]: "
+
+[spawn.wizard.step1.detected]
+description = "Instance type detected confirmation"
+other = "Selected: {{.InstanceType}}"
+
+[spawn.wizard.step1.detected_gpu]
+description = "GPU instance detected confirmation"
+other = "Selected: {{.InstanceType}} (GPU accelerated)"
+
+# Wizard step 2 - Region selection
+[spawn.wizard.step2.common_regions]
+description = "Common regions heading"
+other = "Common regions:"
+
+[spawn.wizard.step2.region.us]
+description = "US regions heading"
+other = "United States:"
+
+[spawn.wizard.step2.region.eu]
+description = "Europe regions heading"
+other = "Europe:"
+
+[spawn.wizard.step2.region.asia]
+description = "Asia regions heading"
+other = "Asia Pacific:"
+
+[spawn.wizard.step2.region.us_east_1]
+description = "US East 1 region option"
+other = "    us-east-1      - N. Virginia"
+
+[spawn.wizard.step2.region.us_west_2]
+description = "US West 2 region option"
+other = "    us-west-2      - Oregon"
+
+[spawn.wizard.step2.region.eu_west_1]
+description = "EU West 1 region option"
+other = "    eu-west-1      - Ireland"
+
+[spawn.wizard.step2.region.eu_central_1]
+description = "EU Central 1 region option"
+other = "    eu-central-1   - Frankfurt"
+
+[spawn.wizard.step2.region.ap_northeast_1]
+description = "AP Northeast 1 region option"
+other = "    ap-northeast-1 - Tokyo"
+
+[spawn.wizard.step2.region.ap_southeast_1]
+description = "AP Southeast 1 region option"
+other = "    ap-southeast-1 - Singapore"
+
+[spawn.wizard.step2.prompt]
+description = "Region selection prompt"
+other = "Region [{{.DefaultRegion}}]: "
+
+# Wizard step 3 - Spot instance
+[spawn.wizard.step3.description]
+description = "Spot instance description"
+other = "Spot instances cost 50-90% less but can be interrupted by AWS with 2-minute notice."
+
+[spawn.wizard.step3.good_for]
+description = "Good for spot"
+other = "Good for: Dev/test, batch jobs, fault-tolerant workloads"
+
+[spawn.wizard.step3.not_for]
+description = "Not good for spot"
+other = "Not for: Production servers, databases, long-running jobs"
+
+[spawn.wizard.step3.prompt]
+description = "Spot instance prompt"
+other = "Use Spot instance? [y/N]: "
+
+[spawn.wizard.step3.using_spot]
+description = "Spot instance selected"
+other = "Using Spot instance (cheaper, can be interrupted)"
+
+[spawn.wizard.step3.using_ondemand]
+description = "On-demand instance selected"
+other = "Using On-Demand instance (reliable, not interrupted)"
+
+# Wizard step 4 - Auto-termination
+[spawn.wizard.step4.description]
+description = "Auto-termination description"
+other = "Prevent runaway costs by automatically terminating idle or long-running instances."
+
+[spawn.wizard.step4.option.ttl]
+description = "TTL option"
+other = "TTL only (terminate after X hours)"
+
+[spawn.wizard.step4.option.idle]
+description = "Idle timeout option"
+other = "Idle timeout only (terminate when idle)"
+
+[spawn.wizard.step4.option.both]
+description = "Both TTL and idle option"
+other = "Both TTL + idle timeout (recommended)"
+
+[spawn.wizard.step4.option.manual]
+description = "Manual termination option"
+other = "Manual (I'll terminate it myself)"
+
+[spawn.wizard.step4.prompt]
+description = "Auto-termination prompt"
+other = "Choose [1-4] or leave blank for both [3]: "
+
+[spawn.wizard.step4.ttl_prompt]
+description = "TTL duration prompt"
+other = "Auto-terminate after (e.g., 8h, 24h) [8h]: "
+
+[spawn.wizard.step4.idle_prompt]
+description = "Idle timeout prompt"
+other = "Idle timeout (e.g., 30m, 1h) [30m]: "
+
+[spawn.wizard.step4.ttl_prompt_short]
+description = "Short TTL prompt"
+other = "TTL (e.g., 8h) [8h]: "
+
+[spawn.wizard.step4.idle_prompt_short]
+description = "Short idle prompt"
+other = "Idle (e.g., 30m) [30m]: "
+
+[spawn.wizard.step4.ttl_set]
+description = "TTL configured message"
+other = "Will terminate after {{.TTL}}"
+
+[spawn.wizard.step4.idle_set]
+description = "Idle timeout configured message"
+other = "Will terminate if idle for {{.Idle}}"
+
+[spawn.wizard.step4.both_set]
+description = "Both TTL and idle configured"
+other = "Will terminate after {{.TTL}} OR idle for {{.Idle}}"
+
+[spawn.wizard.step4.manual_warning]
+description = "Manual termination warning"
+other = "Remember to terminate the instance to avoid charges!"
+
+[spawn.wizard.step4.manual_command]
+description = "Manual termination command hint"
+other = "    Use: spawn stop <instance-id>"
+
+# Wizard step 5 - SSH key
+[spawn.wizard.step5.found_key]
+description = "SSH key found message"
+other = "Found SSH key: {{.KeyPath}}"
+
+[spawn.wizard.step5.will_use_key]
+description = "Will use found key"
+other = "Will use this key for SSH access."
+
+[spawn.wizard.step5.no_key_found]
+description = "No SSH key found"
+other = "No SSH key found at {{.KeyPath}}"
+
+[spawn.wizard.step5.key_required]
+description = "SSH key required message"
+other = "An SSH key is required to access the instance."
+
+[spawn.wizard.step5.create_prompt]
+description = "Create key prompt"
+other = "Create new SSH key? [Y/n]: "
+
+[spawn.wizard.step5.creating_key]
+description = "Creating SSH key message"
+other = "Creating SSH key..."
+
+[spawn.wizard.step5.key_created]
+description = "SSH key created message"
+other = "SSH key created: {{.KeyPath}}"
+
+# Wizard step 6 - Instance name
+[spawn.wizard.step6.prompt]
+description = "Instance name prompt"
+other = "Instance name (optional) []: "
+
+[spawn.wizard.step6.name_set]
+description = "Instance name set message"
+other = "Instance will be named: {{.Name}}"
+
+# Wizard summary
+[spawn.wizard.summary.field.instance_type]
+description = "Summary field label"
+other = "Instance Type"
+
+[spawn.wizard.summary.field.region]
+description = "Summary field label"
+other = "Region"
+
+[spawn.wizard.summary.field.spot]
+description = "Summary field label"
+other = "Spot"
+
+[spawn.wizard.summary.field.ttl]
+description = "Summary field label"
+other = "Auto-terminate"
+
+[spawn.wizard.summary.field.idle]
+description = "Summary field label"
+other = "Idle timeout"
+
+[spawn.wizard.summary.field.key]
+description = "Summary field label"
+other = "SSH Key"
+
+[spawn.wizard.summary.field.name]
+description = "Summary field label"
+other = "Name"
+
+[spawn.wizard.summary.estimated_cost]
+description = "Estimated cost message"
+other = "Estimated cost: {{.Cost}}/hour"
+
+[spawn.wizard.summary.confirm]
+description = "Confirmation prompt"
+other = "Launch instance? [Y/n]: "
+
+# Progress monitoring
+[spawn.progress.success.monitoring.title]
+description = "Monitoring section title"
+other = "Auto-Monitoring Enabled:"
+
+[spawn.progress.success.monitoring.ttl]
+description = "TTL monitoring message"
+other = "TTL: Will terminate after {{.TTL}}"
+
+[spawn.progress.success.monitoring.idle]
+description = "Idle monitoring message"
+other = "Idle: Will terminate if idle for {{.Idle}}"
+
+# Truffle search
+[truffle.search.searching_across]
+description = "Searching across regions message"
+other = "Searching across {{.Count}} region(s)..."
+
+# Truffle spot summary
+[truffle.spot.summary.per_hour]
+description = "Per hour suffix"
+other = "per hour"
+
+[truffle.spot.summary.vs_on_demand]
+description = "Vs On-Demand suffix"
+other = "vs On-Demand"
+
+# Truffle capacity summary fields
+[truffle.capacity.summary.instances]
+description = "Instances label"
+other = "instances"
+
+[truffle.capacity.summary.free]
+description = "Free percentage label"
+other = "free"
+
+[truffle.capacity.summary.utilized]
+description = "Utilized percentage label"
+other = "utilized"
+
+# Truffle output headers
+[truffle.output.header.availability_zone]
+description = "Table header"
+other = "Availability Zone"
+
+[truffle.output.header.az]
+description = "Table header (short)"
+other = "AZ"
+
+[truffle.output.header.total]
+description = "Table header"
+other = "Total"
+
+[truffle.output.header.available]
+description = "Table header"
+other = "Available"
+
+[truffle.output.header.used]
+description = "Table header"
+other = "Used"
+
+[truffle.output.header.state]
+description = "Table header"
+other = "State"
+
+[truffle.output.header.reservation_id]
+description = "Table header"
+other = "Reservation ID"
+
+[truffle.output.header.spot_price]
+description = "Table header"
+other = "Spot Price/hr"
+
+[truffle.output.header.on_demand_price]
+description = "Table header"
+other = "On-Demand/hr"
+
+[truffle.output.header.savings]
+description = "Table header"
+other = "Savings"
+
+
+# ============================================================================
+# Additional Missing Keys
+# ============================================================================
+
+# General Errors
+[error.cancelled_by_user]
+description = "Operation cancelled by user"
+other = "operation cancelled by user"
+
+[error.ssh_key_create_failed]
+description = "Failed to create SSH key"
+other = "failed to create SSH key: {{.Error}}"
+
+[error.ssh_key_required]
+description = "SSH key is required"
+other = "SSH key is required but none specified"
+
+# Spawn Connect Command
+[spawn.connect.connecting_session_manager]
+description = "Connecting via Session Manager"
+other = "Connecting via AWS Session Manager..."
+
+[spawn.connect.connecting_ssh]
+description = "Connecting via SSH"
+other = "Connecting via SSH..."
+
+[spawn.connect.fallback_session_manager]
+description = "Falling back to Session Manager"
+other = "SSH key not available, falling back to AWS Session Manager"
+
+[spawn.connect.key_not_found]
+description = "SSH key file not found"
+other = "SSH key file not found at {{.KeyPath}}"
+
+[spawn.connect.error.aws_cli_not_found]
+description = "AWS CLI not found error"
+other = "AWS CLI not found. Install from https://aws.amazon.com/cli/"
+
+[spawn.connect.error.key_not_found_for_name]
+description = "SSH key file not found for key name"
+other = "SSH key file not found for key name {{.KeyName}}"
+
+[spawn.connect.error.no_key_name]
+description = "Instance has no SSH key"
+other = "instance has no SSH key configured"
+
+[spawn.connect.error.not_running]
+description = "Instance not running"
+other = "instance is not running (state: {{.State}})"
+
+[spawn.connect.error.session_manager_failed]
+description = "Session Manager connection failed"
+other = "failed to start Session Manager session: {{.Error}}"
+
+# Spawn State Command
+[spawn.state.short]
+description = "State command short description"
+other = "Show instance state transitions"
+
+[spawn.state.long]
+description = "State command long description"
+other = "Display the state history and current status of a spawn instance"
+
+# Spawn List Command
+[spawn.list.no_instances]
+description = "No instances found"
+other = "No spawn instances found"
+
+[spawn.list.no_instances_match]
+description = "No instances match filter"
+other = "No instances found matching the specified criteria"
+
+[spawn.list.searching_all_regions]
+description = "Searching all regions"
+other = "Searching all AWS regions..."
+
+[spawn.list.searching_region]
+description = "Searching specific region"
+other = "Searching region {{.Region}}..."
+
+[spawn.list.error.list_failed]
+description = "Failed to list instances"
+other = "failed to list instances: {{.Error}}"
+
+[spawn.list.header.instance_id]
+description = "Instance ID column header"
+other = "Instance ID"
+
+[spawn.list.header.name]
+description = "Name column header"
+other = "Name"
+
+[spawn.list.header.type]
+description = "Instance type column header"
+other = "Type"
+
+[spawn.list.header.state]
+description = "State column header"
+other = "State"
+
+[spawn.list.header.spot]
+description = "Spot column header"
+other = "Spot"
+
+[spawn.list.header.az]
+description = "Availability zone column header"
+other = "AZ"
+
+[spawn.list.header.public_ip]
+description = "Public IP column header"
+other = "Public IP"
+
+[spawn.list.header.age]
+description = "Age column header"
+other = "Age"
+
+[spawn.list.header.ttl]
+description = "TTL column header"
+other = "TTL"
+
+# Spawn Progress Indicators
+[spawn.progress.error]
+description = "Progress error label"
+other = "Error"
+
+[spawn.progress.create_security_group]
+description = "Creating security group step"
+other = "Creating security group"
+
+[spawn.progress.get_public_ip]
+description = "Getting public IP step"
+other = "Getting public IP"
+
+[spawn.progress.install_agent]
+description = "Installing agent step"
+other = "Installing spawn agent"
+
+[spawn.progress.launching_instance]
+description = "Launching instance step"
+other = "Launching instance"
+
+[spawn.progress.setup_iam_role]
+description = "Setting up IAM role step"
+other = "Setting up IAM role"
+
+[spawn.progress.setup_ssh_key]
+description = "Setting up SSH key step"
+other = "Setting up SSH key"
+
+[spawn.progress.success.title]
+description = "Success title in progress display"
+other = "Instance Ready!"
+
+[spawn.progress.success.details]
+description = "Success details header"
+other = "Instance details:"
+
+[spawn.progress.success.connect_now]
+description = "Connect now message"
+other = "Connect now with:"
+
+[spawn.progress.success.status_running]
+description = "Running status"
+other = "running"
+
+[spawn.progress.success.label.instance_id]
+description = "Instance ID label"
+other = "Instance ID"
+
+[spawn.progress.success.label.public_ip]
+description = "Public IP label"
+other = "Public IP"
+
+[spawn.progress.success.label.status]
+description = "Status label"
+other = "Status"
+
+[spawn.progress.success.monitoring.agent_active]
+description = "Agent is active and monitoring"
+other = "spawn agent is active and monitoring usage"
+
+[spawn.progress.success.monitoring.close_laptop]
+description = "Laptop close detection message"
+other = "Instance will auto-stop when you close your laptop"
+
+# Spawn Wizard Summary
+[spawn.wizard.summary.about_to_launch]
+description = "About to launch message"
+other = "You're about to launch:"
+
+[spawn.wizard.summary.label.instance_type]
+description = "Instance type label"
+other = "Instance Type"
+
+[spawn.wizard.summary.label.region]
+description = "Region label"
+other = "Region"
+
+[spawn.wizard.summary.label.type]
+description = "Type label (spot/on-demand)"
+other = "Type"
+
+[spawn.wizard.summary.label.name]
+description = "Name label"
+other = "Name"
+
+[spawn.wizard.summary.label.time_limit]
+description = "Time limit label"
+other = "Time Limit"
+
+[spawn.wizard.summary.label.idle_timeout]
+description = "Idle timeout label"
+other = "Idle Timeout"
+
+[spawn.wizard.summary.type_spot]
+description = "Spot instance type"
+other = "Spot Instance"
+
+[spawn.wizard.summary.type_ondemand]
+description = "On-demand instance type"
+other = "On-Demand"
+
+[spawn.wizard.summary.total_cost]
+description = "Estimated total cost"
+other = "Estimated Total Cost"
+
+[spawn.wizard.summary.savings]
+description = "Savings message"
+other = "({{.Savings}} savings vs On-Demand)"
+
+# Truffle Search Command
+[truffle.search.error.invalid_pattern]
+description = "Invalid pattern error"
+other = "invalid search pattern: {{.Error}}"
+
+[truffle.search.error.search_failed]
+description = "Search failed error"
+other = "search failed: {{.Error}}"
+
+[truffle.search.error.get_regions_failed]
+description = "Failed to get regions"
+other = "failed to get AWS regions: {{.Error}}"
+
+[truffle.search.error.unsupported_format]
+description = "Unsupported output format"
+other = "unsupported output format: {{.Format}}"
+
+# Truffle Capacity Command
+[truffle.capacity.searching]
+description = "Searching for capacity reservations"
+other = "Searching for capacity reservations..."
+
+[truffle.capacity.searching_across]
+description = "Searching across regions"
+other = "Searching across {{.Count}} region(s)..."
+
+[truffle.capacity.fetching_regions]
+description = "Fetching regions"
+other = "Fetching available AWS regions..."
+
+[truffle.capacity.no_results]
+description = "No capacity reservations found"
+other = "No capacity reservations found matching criteria"
+
+[truffle.capacity.error.get_failed]
+description = "Failed to get capacity reservations"
+other = "failed to get capacity reservations: {{.Error}}"
+
+[truffle.capacity.error.get_regions_failed]
+description = "Failed to get regions"
+other = "failed to get AWS regions: {{.Error}}"
+
+[truffle.capacity.error.unsupported_format]
+description = "Unsupported output format"
+other = "unsupported output format: {{.Format}}"
+
+[truffle.capacity.summary.total_reservations]
+description = "Total reservations count"
+other = "Total Reservations"
+
+[truffle.capacity.summary.active_reservations]
+description = "Active reservations count"
+other = "Active Reservations"
+
+[truffle.capacity.summary.availability_zones]
+description = "Availability zones count"
+other = "Availability Zones"
+
+[truffle.capacity.summary.available_capacity]
+description = "Available capacity"
+other = "Available Capacity"
+
+[truffle.capacity.summary.used_capacity]
+description = "Used capacity"
+other = "Used Capacity"
+
+# Truffle Spot Command
+[truffle.spot.searching_across]
+description = "Searching across regions"
+other = "Searching across {{.Count}} region(s)..."
+
+[truffle.spot.fetching_regions]
+description = "Fetching regions"
+other = "Fetching available AWS regions..."
+
+[truffle.spot.max_price_filter]
+description = "Max price filter"
+other = "Filtering by max price: ${{.MaxPrice}}/hour"
+
+[truffle.spot.no_matching_types]
+description = "No matching instance types"
+other = "No instance types found matching pattern"
+
+[truffle.spot.no_pricing_data]
+description = "No spot pricing data"
+other = "No Spot pricing data available for the matching instances"
+
+[truffle.spot.error.invalid_pattern]
+description = "Invalid pattern error"
+other = "invalid search pattern: {{.Error}}"
+
+[truffle.spot.error.search_failed]
+description = "Search failed error"
+other = "search failed: {{.Error}}"
+
+[truffle.spot.error.get_regions_failed]
+description = "Failed to get regions"
+other = "failed to get AWS regions: {{.Error}}"
+
+[truffle.spot.error.get_pricing_failed]
+description = "Failed to get spot pricing"
+other = "failed to get Spot pricing: {{.Error}}"
+
+[truffle.spot.error.unsupported_format]
+description = "Unsupported output format"
+other = "unsupported output format: {{.Format}}"
+
+[truffle.spot.summary.availability_zones]
+description = "Availability zones count"
+other = "Availability Zones"
+
+[truffle.spot.summary.average_price]
+description = "Average spot price"
+other = "Average Spot Price"
+
+[truffle.spot.summary.average_savings]
+description = "Average savings"
+other = "Average Savings"
+
+# Truffle Output Headers
+[truffle.output.header.instance_type]
+description = "Instance type column header"
+other = "Instance Type"
+
+[truffle.output.header.region]
+description = "Region column header"
+other = "Region"
+
+[truffle.output.header.vcpus]
+description = "vCPUs column header"
+other = "vCPUs"
+
+[truffle.output.header.memory]
+description = "Memory column header"
+other = "Memory (GiB)"
+
+[truffle.output.header.architecture]
+description = "Architecture column header"
+other = "Architecture"
+
+[truffle.output.header.availability_zones]
+description = "Availability zones column header"
+other = "Availability Zones"
+

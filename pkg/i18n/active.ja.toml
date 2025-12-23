@@ -1,0 +1,1638 @@
+# Japanese (ja) translations for spawn and truffle CLIs - COMPLETE VERSION
+# 日本語翻訳 - 完全版
+
+# =============================================================================
+# 共通文字列 (Shared between spawn and truffle)
+# =============================================================================
+
+[common.region]
+other = "リージョン"
+
+[common.availability_zone]
+other = "アベイラビリティーゾーン"
+
+[common.instance_type]
+other = "インスタンスタイプ"
+
+[common.instance_id]
+other = "インスタンスID"
+
+[common.public_ip]
+other = "パブリックIP"
+
+[common.error]
+other = "エラー"
+
+[common.warning]
+other = "警告"
+
+[common.success]
+other = "成功"
+
+# =============================================================================
+# SPAWN - ルートコマンド
+# =============================================================================
+
+[spawn.root.use]
+other = "spawn"
+
+[spawn.root.short]
+other = "AWS EC2インスタンスを簡単に起動"
+
+[spawn.root.long]
+other = """spawn - エフェメラルAWS EC2インスタンスランチャー（truffleの補完ツール）
+
+spawnを使うとAWSインスタンスの起動が非常に簡単になります：
+  • AMIを自動検出（Amazon Linux 2023、GPUバリアント含む）
+  • SSHキーを自動設定（デフォルトで~/.ssh/id_rsaを使用）
+  • VPC/サブネット/セキュリティグループを自動作成（クリーンアップ用にタグ付け）
+  • sporedエージェントをインストールして自己監視
+  • アイドルまたはTTLで自動終了
+  • すべてのリソースを自動クリーンアップ
+
+最適な用途：
+  • 迅速な開発/テストインスタンス
+  • ML学習ジョブ
+  • スポットインスタンス
+  • 専門知識がない方のコンピュート
+
+使用例：
+  # truffleから
+  truffle search m7i.large | spawn
+
+  # スポットインスタンス
+  truffle spot m7i.large --max-price 0.10 | spawn --spot
+
+  # GPU学習と自動終了
+  truffle capacity --gpu-only | spawn --ttl 24h --hibernate-on-idle
+
+  # 直接起動
+  spawn --instance-type m7i.large --region us-east-1
+
+Unix哲学：
+  truffleが見つけ、spawnが起動
+  truffleからspawnへJSONをパイプしてシームレスなワークフロー"""
+
+# =============================================================================
+# SPAWN - LAUNCHコマンド
+# =============================================================================
+
+[spawn.launch.use]
+other = "launch"
+
+[spawn.launch.short]
+other = "EC2インスタンスを起動"
+
+[spawn.launch.long]
+other = """スマートデフォルトでEC2インスタンスを起動します。
+
+3つの使用方法：
+  1. インタラクティブウィザード（入力がない場合のデフォルト）
+  2. パイプ経由でtruffleのJSONから
+  3. フラグで直接指定
+
+使用例：
+  # インタラクティブウィザード
+  spawn launch
+
+  # truffleから
+  truffle search m7i.large | spawn launch
+
+  # 直接指定
+  spawn launch --instance-type m7i.large --region us-east-1"""
+
+[spawn.launch.flag.instance_type]
+other = "インスタンスタイプ"
+
+[spawn.launch.flag.region]
+other = "AWSリージョン"
+
+[spawn.launch.flag.az]
+other = "アベイラビリティーゾーン"
+
+[spawn.launch.flag.ami]
+other = "AMI ID（AL2023を自動検出）"
+
+[spawn.launch.flag.vpc]
+other = "VPC ID"
+
+[spawn.launch.flag.subnet]
+other = "サブネットID"
+
+[spawn.launch.flag.security_group]
+other = "セキュリティグループID"
+
+[spawn.launch.flag.key_pair]
+other = "SSHキーペア名"
+
+[spawn.launch.flag.spot]
+other = "スポットインスタンスとして起動"
+
+[spawn.launch.flag.spot_max_price]
+other = "スポット最高価格"
+
+[spawn.launch.flag.use_reservation]
+other = "キャパシティ予約を使用"
+
+[spawn.launch.flag.reservation_id]
+other = "キャパシティ予約ID"
+
+[spawn.launch.flag.hibernate]
+other = "休止状態を有効化"
+
+[spawn.launch.flag.ttl]
+other = "期間後に自動終了（例：8h）"
+
+[spawn.launch.flag.idle_timeout]
+other = "アイドル時に自動終了"
+
+[spawn.launch.flag.hibernate_on_idle]
+other = "アイドル時に終了の代わりに休止状態"
+
+[spawn.launch.flag.name]
+other = "インスタンス名タグ"
+
+[spawn.launch.flag.user_data]
+other = "ユーザーデータ（@fileまたはインライン）"
+
+[spawn.launch.flag.user_data_file]
+other = "ユーザーデータファイル"
+
+[spawn.launch.flag.dns]
+other = "DNS名を登録（例：my-instance.spore.host用のmy-instance）"
+
+[spawn.launch.flag.dns_domain]
+other = "カスタムDNSドメイン（デフォルトをオーバーライド）"
+
+[spawn.launch.flag.dns_api_endpoint]
+other = "カスタムDNS APIエンドポイント（デフォルトをオーバーライド）"
+
+[spawn.launch.flag.interactive]
+other = "インタラクティブウィザードを強制"
+
+[spawn.launch.flag.quiet]
+other = "最小限の出力"
+
+[spawn.launch.flag.wait_for_running]
+other = "実行中になるまで待機"
+
+[spawn.launch.flag.wait_for_ssh]
+other = "SSHの準備が整うまで待機"
+
+# =============================================================================
+# SPAWN - ウィザード
+# =============================================================================
+
+[spawn.wizard.title]
+other = "spawn設定ウィザード"
+
+[spawn.wizard.subtitle]
+other = "AWS EC2インスタンスの起動をお手伝いします！"
+
+[spawn.wizard.instructions]
+other = "Enterキーを押すと[角括弧]内のデフォルト値を使用します"
+
+[spawn.wizard.step1.title]
+other = "ステップ1/6：インスタンスタイプを選択"
+
+[spawn.wizard.step1.prompt]
+other = "インスタンスタイプ [t3.medium]: "
+
+[spawn.wizard.step1.common_choices]
+other = "一般的な選択肢："
+
+[spawn.wizard.step1.category.dev_testing]
+other = "開発 & テスト："
+
+[spawn.wizard.step1.category.general_purpose]
+other = "汎用："
+
+[spawn.wizard.step1.category.compute]
+other = "コンピューティング最適化："
+
+[spawn.wizard.step1.category.memory]
+other = "メモリ最適化："
+
+[spawn.wizard.step1.category.gpu]
+other = "GPU："
+
+[spawn.wizard.step2.title]
+other = "ステップ2/6：リージョンを選択"
+
+[spawn.wizard.step2.prompt]
+other = "AWSリージョン [us-east-1]: "
+
+[spawn.wizard.step3.title]
+other = "ステップ3/6：スポットインスタンス？"
+
+[spawn.wizard.step3.explanation]
+other = "スポットインスタンスは最大90%節約できますが、AWSによって中断される可能性があります。"
+
+[spawn.wizard.step3.prompt]
+other = "スポットインスタンスを使用しますか？ [y/N]: "
+
+[spawn.wizard.step3.using_spot]
+other = "スポットインスタンスを使用（約70%節約）"
+
+[spawn.wizard.step3.using_ondemand]
+other = "オンデマンドを使用（信頼性が高いが高価）"
+
+[spawn.wizard.step4.title]
+other = "ステップ4/6：自動終了"
+
+[spawn.wizard.step4.explanation]
+other = "自動終了ルールを設定して、予期しないコストを防止します。"
+
+[spawn.wizard.step4.option1]
+other = "1. 固定TTL（例：8時間後に終了）"
+
+[spawn.wizard.step4.option2]
+other = "2. アイドル検出（アクティビティがない場合終了）"
+
+[spawn.wizard.step4.option3]
+other = "3. 両方（TTL + アイドル検出）"
+
+[spawn.wizard.step4.option4]
+other = "4. なし（手動終了のみ）"
+
+[spawn.wizard.step4.prompt]
+other = "選択 [1-4]: "
+
+[spawn.wizard.step5.title]
+other = "ステップ5/6：SSHキー"
+
+[spawn.wizard.step5.prompt]
+other = "SSHキーペア名 [自動検出]: "
+
+[spawn.wizard.step6.title]
+other = "ステップ6/6：インスタンスに名前を付ける"
+
+[spawn.wizard.step6.prompt]
+other = "インスタンス名 [自動生成]: "
+
+[spawn.wizard.summary.title]
+other = "設定サマリー"
+
+[spawn.wizard.summary.confirm]
+other = "インスタンスを起動しますか？ [Y/n]: "
+
+[spawn.wizard.cancelled]
+other = "ユーザーによって起動がキャンセルされました"
+
+# =============================================================================
+# SPAWN - 進行状況インジケーター
+# =============================================================================
+
+[spawn.progress.title]
+other = "インスタンスを生成中..."
+
+[spawn.progress.detecting_ami]
+other = "AMIを検出中"
+
+[spawn.progress.setup_ssh]
+other = "SSHキーをセットアップ中"
+
+[spawn.progress.setup_iam]
+other = "IAMロールをセットアップ中"
+
+[spawn.progress.create_sg]
+other = "セキュリティグループを作成中"
+
+[spawn.progress.launching]
+other = "インスタンスを起動中"
+
+[spawn.progress.installing_agent]
+other = "sporedエージェントをインストール中"
+
+[spawn.progress.waiting_instance]
+other = "インスタンスを待機中"
+
+[spawn.progress.getting_ip]
+other = "パブリックIPを取得中"
+
+[spawn.progress.waiting_ssh]
+other = "SSHを待機中"
+
+[spawn.progress.instance_details]
+other = "インスタンス詳細："
+
+[spawn.progress.status_running]
+other = "ステータス:       実行中"
+
+[spawn.progress.connect_now]
+other = "今すぐ接続："
+
+[spawn.progress.monitoring.title]
+other = "自動監視："
+
+[spawn.progress.monitoring.ttl]
+other = "次の期間後に終了: {{.Duration}}"
+
+[spawn.progress.monitoring.idle]
+other = "アイドル時に終了: {{.Duration}}"
+
+[spawn.progress.monitoring.agent]
+other = "sporedエージェントがインスタンスを監視しています。"
+
+[spawn.progress.monitoring.laptop]
+other = "ノートパソコンを閉じても大丈夫です - 監視はインスタンス上で実行されます。"
+
+# =============================================================================
+# SPAWN - エラー
+# =============================================================================
+
+[spawn.error.instance_type_required]
+other = "インスタンスタイプが必要です"
+
+[spawn.error.region_required]
+other = "リージョンが必要です"
+
+[spawn.error.platform_detect_failed]
+other = "プラットフォームの検出に失敗しました: {{.Error}}"
+
+[spawn.error.aws_init_failed]
+other = "AWSクライアントの初期化に失敗しました: {{.Error}}"
+
+[spawn.error.ssh_key_not_found]
+other = "{{.Path}}にSSHキーが見つかりません"
+
+[spawn.error.ssh_key_create_failed]
+other = "SSHキーの作成に失敗しました: {{.Error}}"
+
+# =============================================================================
+# SPAWN - CONNECTコマンド
+# =============================================================================
+
+[spawn.connect.use]
+other = "connect"
+
+[spawn.connect.short]
+other = "SSH経由でspawn管理インスタンスに接続"
+
+[spawn.connect.long]
+other = """SSH経由でspawn管理インスタンスに接続します。
+
+SSHキーを自動的に見つけて接続します。SSHが利用できない場合はAWS Session Managerにフォールバックします。
+
+使用例：
+  # インスタンスIDで接続
+  spawn connect i-1234567890abcdef0
+
+  # 名前で接続
+  spawn connect my-instance"""
+
+[spawn.connect.flag.region]
+other = "AWSリージョンでフィルター"
+
+[spawn.connect.flag.use_ssm]
+other = "AWS Session Manager接続を強制"
+
+[spawn.connect.found_instance]
+other = "{{.Region}}でインスタンスが見つかりました"
+
+[spawn.connect.not_running]
+other = "インスタンスが実行されていません（状態: {{.State}}）"
+
+[spawn.connect.ssh_key_warning]
+other = "{{.KeyName}}のSSHキーが見つかりませんでした"
+
+[spawn.connect.connecting_ssh]
+other = "SSH経由で接続中..."
+
+[spawn.connect.aws_cli_not_found]
+other = "AWS CLIが見つかりません。こちらからインストールしてください: https://aws.amazon.com/cli/"
+
+[spawn.connect.connecting_ssm]
+other = "AWS Session Manager経由で接続中..."
+
+[spawn.connect.ssm_plugin_error]
+other = """Session Managerプラグインが見つかりません。
+
+こちらからインストールしてください: https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html
+
+エラー: {{.Error}}"""
+
+# =============================================================================
+# SPAWN - LISTコマンド
+# =============================================================================
+
+[spawn.list.use]
+other = "list"
+
+[spawn.list.short]
+other = "spawn管理EC2インスタンスをリスト表示"
+
+[spawn.list.long]
+other = """リージョン全体のspawn管理EC2インスタンスをリスト表示します。
+
+spawn:managedタグを持つすべてのインスタンスを表示します。
+
+使用例：
+  # すべてのインスタンスをリスト表示
+  spawn list
+
+  # リージョンでフィルター
+  spawn list --region us-east-1
+
+  # 状態でフィルター
+  spawn list --state running
+
+  # JSON出力
+  spawn list --output json"""
+
+[spawn.list.flag.region]
+other = "AWSリージョンでフィルター"
+
+[spawn.list.flag.az]
+other = "アベイラビリティーゾーンでフィルター"
+
+[spawn.list.flag.state]
+other = "インスタンス状態でフィルター"
+
+[spawn.list.flag.tags]
+other = "タグでフィルター（key=value）"
+
+[spawn.list.flag.output]
+other = "出力フォーマット（table、json、yaml）"
+
+[spawn.list.searching]
+other = "spawn管理インスタンスを検索中..."
+
+[spawn.list.searching_region]
+other = "{{.Region}}を検索中..."
+
+[spawn.list.no_results]
+other = "指定されたフィルターに一致するインスタンスはありません。"
+
+[spawn.list.table.header.instance_id]
+other = "インスタンスID"
+
+[spawn.list.table.header.name]
+other = "名前"
+
+[spawn.list.table.header.type]
+other = "タイプ"
+
+[spawn.list.table.header.state]
+other = "状態"
+
+[spawn.list.table.header.region]
+other = "リージョン"
+
+[spawn.list.table.header.az]
+other = "AZ"
+
+[spawn.list.table.header.public_ip]
+other = "パブリックIP"
+
+[spawn.list.table.header.launched]
+other = "起動日時"
+
+# =============================================================================
+# SPAWN - DNSコマンド
+# =============================================================================
+
+[spawn.dns.use]
+other = "dns"
+
+[spawn.dns.short]
+other = "spawnインスタンスのDNSレコードを管理"
+
+[spawn.dns.long]
+other = """spawnインスタンスのDNSレコードを管理します。
+
+--dnsフラグ付きで起動すると、DNS名が自動的に登録されます。
+フォーマット: <name>.<account-base36>.spore.host
+
+使用例：
+  # DNS有効化インスタンスをリスト表示
+  spawn dns list
+
+  # DNS名を登録
+  spawn dns register i-1234567890abcdef0 my-server
+
+  # DNSレコードを削除
+  spawn dns delete my-server"""
+
+[spawn.dns.list.use]
+other = "list"
+
+[spawn.dns.list.short]
+other = "DNS有効化spawnインスタンスをリスト表示"
+
+[spawn.dns.register.use]
+other = "register"
+
+[spawn.dns.register.short]
+other = "インスタンスのDNS名を登録"
+
+[spawn.dns.delete.use]
+other = "delete"
+
+[spawn.dns.delete.short]
+other = "インスタンスのDNSレコードを削除"
+
+[spawn.dns.invalid_name]
+other = "無効なDNS名: {{.Name}}（小文字の英数字とハイフンのみ使用可能）"
+
+[spawn.dns.no_dns_enabled]
+other = "DNS有効化インスタンスが見つかりません。"
+
+[spawn.dns.instance_info]
+other = "インスタンス:"
+
+[spawn.dns.region_info]
+other = "リージョン:"
+
+[spawn.dns.state_info]
+other = "状態:"
+
+[spawn.dns.public_ip_info]
+other = "パブリックIP:"
+
+[spawn.dns.fqdn_info]
+other = "FQDN:"
+
+[spawn.dns.registered]
+other = "DNS登録完了: {{.FQDN}}"
+
+[spawn.dns.deleted]
+other = "DNS削除完了: {{.FQDN}}"
+
+# =============================================================================
+# SPAWN - EXTENDコマンド
+# =============================================================================
+
+[spawn.extend.use]
+other = "extend"
+
+[spawn.extend.short]
+other = "spawn管理インスタンスのTTLを延長"
+
+[spawn.extend.long]
+other = """spawn管理インスタンスのTTL（生存期間）を延長します。
+
+TTL期間を延長して自動終了を防止します。
+
+期間フォーマット: 1h、2h30m、24hなど
+
+使用例：
+  # 2時間延長
+  spawn extend i-1234567890abcdef0 2h
+
+  # 名前で延長
+  spawn extend my-instance 8h"""
+
+[spawn.extend.invalid_ttl]
+other = "無効なTTLフォーマット: {{.TTL}}"
+
+[spawn.extend.ttl_format_help]
+other = "TTLは次のフォーマットで指定してください: 1h、2h30m、24hなど"
+
+[spawn.extend.current_ttl]
+other = "現在のTTL: {{.TTL}}"
+
+[spawn.extend.new_ttl]
+other = "新しいTTL: {{.TTL}}"
+
+[spawn.extend.expires_at]
+other = "期限: {{.Time}}"
+
+[spawn.extend.success]
+other = "TTL延長成功"
+
+# =============================================================================
+# SPAWN - STATEコマンド（Stop、Start、Hibernate）
+# =============================================================================
+
+[spawn.state.stop.use]
+other = "stop"
+
+[spawn.state.stop.short]
+other = "spawn管理インスタンスを停止"
+
+[spawn.state.start.use]
+other = "start"
+
+[spawn.state.start.short]
+other = "停止中または休止状態のインスタンスを開始"
+
+[spawn.state.hibernate.use]
+other = "hibernate"
+
+[spawn.state.hibernate.short]
+other = "spawn管理インスタンスを休止状態にする"
+
+[spawn.state.not_running]
+other = "インスタンスが実行状態ではありません（現在: {{.State}}）"
+
+[spawn.state.not_stopped]
+other = "インスタンスが停止状態ではありません（現在: {{.State}}）"
+
+[spawn.state.found_instance]
+other = "{{.Region}}でインスタンスが見つかりました"
+
+[spawn.state.stopping]
+other = "インスタンスを停止中..."
+
+[spawn.state.starting]
+other = "インスタンスを起動中..."
+
+[spawn.state.hibernating]
+other = "インスタンスを休止状態にしています..."
+
+[spawn.state.stopped]
+other = "インスタンス停止完了"
+
+[spawn.state.started]
+other = "インスタンス起動完了"
+
+[spawn.state.hibernated]
+other = "インスタンス休止状態完了"
+
+[spawn.state.new_ip]
+other = "新しいパブリックIP: {{.IP}}"
+
+[spawn.state.ttl_restored]
+other = "TTL復元完了: {{.Duration}}"
+
+# =============================================================================
+# SPAWN - エージェント警告
+# =============================================================================
+
+[spawn.agent.ttl_warning]
+other = "{{.Duration}}後に終了します（TTL制限）"
+
+[spawn.agent.idle_warning]
+other = "{{.IdleDuration}}アイドル状態、{{.Remaining}}後に終了します"
+
+[spawn.agent.spot_interruption.title]
+other = "🚨 スポット中断警告！ 🚨"
+
+[spawn.agent.spot_interruption.message]
+other = """AWSは{{.Time}}にこのインスタンスを{{.Action}}します
+作業を保存するまで約2分です！
+今すぐすべてのファイルを保存してください！"""
+
+[spawn.agent.hibernating]
+other = "今すぐ休止状態にします - インスタンスが一時停止します..."
+
+[spawn.agent.terminating]
+other = "🔴 今すぐ終了します - 理由: {{.Reason}}"
+
+# =============================================================================
+# TRUFFLE - ルートコマンド
+# =============================================================================
+
+[truffle.root.use]
+other = "truffle"
+
+[truffle.root.short]
+other = "🍄 Truffle - AWS EC2インスタンスタイプリージョンファインダー"
+
+[truffle.root.long]
+other = """Truffleは、特定のEC2インスタンスタイプをサポートするAWSリージョンと
+アベイラビリティーゾーンを発見するCLIツールです。マルチリージョン展開の計画に最適です！
+
+使用例：
+  # m7i.largeインスタンスを持つすべてのリージョンを検索
+  truffle search m7i.large
+
+  # ワイルドカードで検索 - Graviton4インスタンス
+  truffle search "m8g.*"
+
+  # 特定のリージョンでフィルター
+  truffle search m7i.large --regions us-east-1,eu-west-1"""
+
+# =============================================================================
+# TRUFFLE - SEARCHコマンド
+# =============================================================================
+
+[truffle.search.use]
+other = "search [instance-type-pattern]"
+
+[truffle.search.short]
+other = "AWSリージョン全体でインスタンスタイプを検索"
+
+[truffle.search.long]
+other = """AWSリージョン全体でインスタンスタイプを検索します。
+
+柔軟な検索のためにワイルドカードと正規表現パターンをサポートしています。
+
+使用例：
+  # 完全一致
+  truffle search m7i.large
+
+  # ワイルドカード - すべてのm8gサイズ
+  truffle search "m8g.*"
+
+  # アーキテクチャでフィルター
+  truffle search "c7.*" --architecture arm64"""
+
+[truffle.search.flag.skip_azs]
+other = "AZルックアップをスキップ（高速だが詳細度低）"
+
+[truffle.search.flag.architecture]
+other = "アーキテクチャでフィルター（x86_64、arm64、i386）"
+
+[truffle.search.flag.min_vcpu]
+other = "最小vCPU数"
+
+[truffle.search.flag.min_memory]
+other = "最小メモリ（GiB）"
+
+[truffle.search.flag.family]
+other = "インスタンスファミリーでフィルター（例: m5、c5）"
+
+[truffle.search.flag.timeout]
+other = "AWS API呼び出しのタイムアウト"
+
+[truffle.search.searching]
+other = "次と一致するインスタンスタイプを検索中: {{.Pattern}}"
+
+[truffle.search.filtering_regions]
+other = "リージョンをフィルター中: {{.Regions}}"
+
+[truffle.search.fetching_regions]
+other = "すべてのAWSリージョンを取得中..."
+
+[truffle.search.searching_regions]
+other = "{{.Count}}リージョンを検索中..."
+
+[truffle.search.no_results]
+other = "一致するインスタンスタイプが見つかりません。"
+
+# =============================================================================
+# TRUFFLE - CAPACITYコマンド
+# =============================================================================
+
+[truffle.capacity.use]
+other = "capacity"
+
+[truffle.capacity.short]
+other = "MLキャパシティ予約を確認（Capacity Blocks & ODCRs）"
+
+[truffle.capacity.long]
+other = """AWSリージョン全体のMLキャパシティ予約を確認します。
+
+Capacity Blocks（トレーニングワークロード）とオンデマンドキャパシティ
+予約（ODCRs）の両方をサポートしています。GPUおよびMLインスタンス用。
+
+使用例：
+  # すべての予約を確認
+  truffle capacity
+
+  # GPUインスタンスのみ
+  truffle capacity --gpu-only
+
+  # ML用Capacity Blocks
+  truffle capacity --blocks
+
+  # 利用可能なキャパシティのみ
+  truffle capacity --available-only"""
+
+[truffle.capacity.flag.instance_types]
+other = "インスタンスタイプでフィルター（カンマ区切り）"
+
+[truffle.capacity.flag.available_only]
+other = "利用可能なキャパシティを持つ予約のみ表示"
+
+[truffle.capacity.flag.active_only]
+other = "アクティブな予約のみ表示（デフォルト: true）"
+
+[truffle.capacity.flag.min_capacity]
+other = "最小利用可能キャパシティ"
+
+[truffle.capacity.flag.gpu_only]
+other = "GPU/MLインスタンス予約のみ表示"
+
+[truffle.capacity.flag.blocks]
+other = "ML用Capacity Blocksを表示（トレーニングワークロード）"
+
+[truffle.capacity.flag.odcr]
+other = "オンデマンドキャパシティ予約を表示（デフォルト）"
+
+[truffle.capacity.gpu_only]
+other = "GPU/MLインスタンスのみ"
+
+[truffle.capacity.summary.title]
+other = "キャパシティ予約サマリー:"
+
+[truffle.capacity.summary.total]
+other = "総予約数: {{.Count}}"
+
+[truffle.capacity.summary.active]
+other = "アクティブな予約: {{.Count}}"
+
+[truffle.capacity.summary.instance_types]
+other = "インスタンスタイプ: {{.Count}}"
+
+[truffle.capacity.summary.regions]
+other = "リージョン: {{.Count}}"
+
+[truffle.capacity.summary.azs]
+other = "アベイラビリティーゾーン: {{.Count}}"
+
+[truffle.capacity.summary.total_capacity]
+other = "総キャパシティ: {{.Count}}インスタンス"
+
+[truffle.capacity.summary.available]
+other = "利用可能キャパシティ: {{.Count}}インスタンス（{{.Percent}}%空き）"
+
+[truffle.capacity.summary.used]
+other = "使用中キャパシティ: {{.Count}}インスタンス（{{.Percent}}%使用率）"
+
+# =============================================================================
+# TRUFFLE - SPOTコマンド
+# =============================================================================
+
+[truffle.spot.use]
+other = "spot [instance-type-pattern]"
+
+[truffle.spot.short]
+other = "スポットインスタンス価格と可用性を検索"
+
+[truffle.spot.long]
+other = """AWSリージョン全体のスポットインスタンス価格と可用性を検索します。
+
+現在のスポット価格、オンデマンドとの節約額、価格履歴を表示します。
+
+使用例：
+  # m7i.largeのスポット価格
+  truffle spot m7i.large
+
+  # 最高価格でフィルター
+  truffle spot "m7i.*" --max-price 0.10
+
+  # 価格で並べ替え
+  truffle spot "c7.*" --sort-by-price"""
+
+[truffle.spot.flag.max_price]
+other = "最高スポット価格（USD/時間）"
+
+[truffle.spot.flag.show_savings]
+other = "オンデマンド価格との節約額を表示"
+
+[truffle.spot.flag.sort_by_price]
+other = "価格で並べ替え（最安値優先）"
+
+[truffle.spot.flag.active_only]
+other = "アクティブなスポットキャパシティを持つAZのみ表示"
+
+[truffle.spot.flag.lookback_hours]
+other = "価格履歴の振り返り時間（1-720時間）"
+
+[truffle.spot.searching]
+other = "次と一致するスポットインスタンスを検索中: {{.Pattern}}"
+
+[truffle.spot.fetching_pricing]
+other = "スポット価格データを取得中..."
+
+[truffle.spot.summary.title]
+other = "スポットインスタンスサマリー:"
+
+[truffle.spot.summary.instance_types]
+other = "インスタンスタイプ: {{.Count}}"
+
+[truffle.spot.summary.regions]
+other = "リージョン: {{.Count}}"
+
+[truffle.spot.summary.azs]
+other = "アベイラビリティーゾーン: {{.Count}}"
+
+[truffle.spot.summary.price_range]
+other = "価格範囲: ${{.Min}} - ${{.Max}}/時間"
+
+[truffle.spot.summary.avg_price]
+other = "平均価格: ${{.Avg}}/時間"
+
+[truffle.spot.summary.avg_savings]
+other = "平均節約額: オンデマンドと比較して{{.Percent}}%"
+
+# =============================================================================
+# TRUFFLE - QUOTASコマンド
+# =============================================================================
+
+[truffle.quotas.use]
+other = "quotas"
+
+[truffle.quotas.short]
+other = "EC2インスタンスのAWSサービスクォータを表示"
+
+[truffle.quotas.long]
+other = """リージョン全体のEC2インスタンスのAWSサービスクォータを表示します。
+
+異なるインスタンスファミリーの現在のクォータ、使用状況、利用可能なキャパシティを表示します。
+
+使用例：
+  # すべてのリージョンのクォータを確認
+  truffle quotas
+
+  # 特定のリージョンのみ
+  truffle quotas --regions us-east-1,eu-west-1
+
+  # インスタンスファミリーでフィルター
+  truffle quotas --family P"""
+
+[truffle.quotas.flag.regions]
+other = "確認するリージョン（カンマ区切り）"
+
+[truffle.quotas.flag.family]
+other = "インスタンスファミリーでフィルター（Standard、G、P、Inf、Trn）"
+
+[truffle.quotas.flag.request]
+other = "クォータ増加リクエストコマンドを生成"
+
+[truffle.quotas.credentials_required]
+other = """❌ クォータ確認にはAWS認証情報が必要です
+
+認証情報を設定するには：
+  1. 環境変数をエクスポート：
+     export AWS_ACCESS_KEY_ID=...
+     export AWS_SECRET_ACCESS_KEY=...
+     export AWS_DEFAULT_REGION=us-east-1
+
+  または
+
+  2. 実行: aws configure
+
+エラー: {{.Error}}"""
+
+[truffle.quotas.no_results]
+other = "どのリージョンのクォータも取得できませんでした"
+
+[truffle.quotas.region_error]
+other = "{{.Region}}のクォータを取得できませんでした: {{.Error}}"
+
+[truffle.quotas.title]
+other = "AWSサービスクォータ - {{.Region}}"
+
+[truffle.quotas.table.header.family]
+other = "ファミリー"
+
+[truffle.quotas.table.header.type]
+other = "タイプ"
+
+[truffle.quotas.table.header.quota]
+other = "クォータ"
+
+[truffle.quotas.table.header.usage]
+other = "使用状況"
+
+[truffle.quotas.table.header.available]
+other = "利用可能"
+
+[truffle.quotas.table.header.status]
+other = "ステータス"
+
+[truffle.quotas.status.ok]
+other = "OK"
+
+[truffle.quotas.status.low]
+other = "低"
+
+[truffle.quotas.status.full]
+other = "🔴 満杯"
+
+[truffle.quotas.status.zero]
+other = "❌ ゼロ"
+
+[truffle.quotas.running_instances]
+other = "実行中インスタンス: {{.Count}} / {{.Total}}"
+
+# =============================================================================
+# TRUFFLE - 出力フォーマッター
+# =============================================================================
+
+[truffle.output.table.header.instance_type]
+other = "インスタンスタイプ"
+
+[truffle.output.table.header.region]
+other = "リージョン"
+
+[truffle.output.table.header.vcpus]
+other = "vCPU"
+
+[truffle.output.table.header.memory]
+other = "メモリ（GiB）"
+
+[truffle.output.table.header.architecture]
+other = "アーキテクチャ"
+
+[truffle.output.table.header.availability_zones]
+other = "アベイラビリティーゾーン"
+
+[truffle.output.summary.found]
+one = "🍄 {{.Regions}}リージョンで{{.Count}}個のインスタンスタイプが見つかりました"
+other = "🍄 {{.Regions}}リージョンで{{.Count}}個のインスタンスタイプが見つかりました"
+
+[truffle.output.summary.no_results]
+other = "一致するインスタンスタイプが見つかりません。"
+
+# =============================================================================
+# グローバルフラグ（コマンド間で共有）
+# =============================================================================
+
+[flags.lang]
+other = "言語（en、es、fr、de、ja）"
+
+[flags.no_emoji]
+other = "絵文字出力を無効化"
+
+[flags.accessibility]
+other = "アクセシビリティモードを有効化（スクリーンリーダー対応）"
+
+[flags.no_color]
+other = "色付き出力を無効化"
+
+[flags.output]
+other = "出力フォーマット（table、json、yaml、csv）"
+
+[flags.regions]
+other = "特定のリージョンでフィルター（カンマ区切り）"
+
+[flags.verbose]
+other = "詳細出力を有効化"
+
+# =============================================================================
+# 共通エラー
+# =============================================================================
+
+[error.invalid_pattern]
+other = "無効なパターン: {{.Error}}"
+
+[error.aws_client_init]
+other = "AWSクライアントの初期化に失敗しました: {{.Error}}"
+
+[error.region_fetch]
+other = "リージョンの取得に失敗しました: {{.Error}}"
+
+[error.search_failed]
+other = "検索に失敗しました: {{.Error}}"
+
+[error.instance_types_fetch]
+other = "インスタンスタイプの取得に失敗しました: {{.Error}}"
+
+[error.capacity_fetch]
+other = "キャパシティ予約の取得に失敗しました: {{.Error}}"
+
+[error.spot_pricing_fetch]
+other = "スポット価格の取得に失敗しました: {{.Error}}"
+
+[error.unsupported_output_format]
+other = "サポートされていない出力フォーマット: {{.Format}}"
+
+[error.platform_detect_failed]
+other = "プラットフォームの検出に失敗しました"
+
+[error.input_parse_failed]
+other = "入力の解析に失敗しました"
+
+[error.instance_type_required]
+other = "インスタンスタイプが必要です"
+
+[error.region_required]
+other = "リージョンが必要です"
+
+# =============================================================================
+# 追加の翻訳
+# =============================================================================
+
+# ウィザードイントロ
+[spawn.wizard.intro.help]
+other = "このウィザードはEC2インスタンスの設定をサポートします。Enterキーを押すとデフォルト値（角括弧内）を使用します。"
+
+[spawn.wizard.intro.default_hint]
+other = "ヒント: 空白のままEnterキーを押すとデフォルト値が使用されます。"
+
+# ウィザードステップ1 - インスタンスカテゴリー
+[spawn.wizard.step1.category.dev]
+other = "開発 & テスト:"
+
+[spawn.wizard.step1.category.general]
+other = "汎用:"
+
+# ウィザードステップ1 - インスタンスタイプ
+[spawn.wizard.step1.instance.t3_medium]
+other = "    t3.medium - 2 vCPU、4 GiB RAM（デフォルト）"
+
+[spawn.wizard.step1.instance.t3_large]
+other = "    t3.large  - 2 vCPU、8 GiB RAM"
+
+[spawn.wizard.step1.instance.m7i_large]
+other = "    m7i.large  - 2 vCPU、8 GiB RAM"
+
+[spawn.wizard.step1.instance.m7i_xlarge]
+other = "    m7i.xlarge - 4 vCPU、16 GiB RAM"
+
+[spawn.wizard.step1.instance.c7i_xlarge]
+other = "    c7i.xlarge  - 4 vCPU、8 GiB RAM"
+
+[spawn.wizard.step1.instance.c7i_2xlarge]
+other = "    c7i.2xlarge - 8 vCPU、16 GiB RAM"
+
+[spawn.wizard.step1.instance.g6_xlarge]
+other = "    g6.xlarge    - NVIDIA L4、4 vCPU、16 GiB RAM"
+
+[spawn.wizard.step1.instance.p5_48xlarge]
+other = "    p5.48xlarge  - 8x NVIDIA H100、192 vCPU、2 TiB RAM"
+
+[spawn.wizard.step1.detected]
+other = "選択: {{.InstanceType}}"
+
+[spawn.wizard.step1.detected_gpu]
+other = "選択: {{.InstanceType}}（GPU加速）"
+
+# ウィザードステップ2 - リージョン選択
+[spawn.wizard.step2.common_regions]
+other = "一般的なリージョン:"
+
+[spawn.wizard.step2.region.us]
+other = "米国:"
+
+[spawn.wizard.step2.region.eu]
+other = "ヨーロッパ:"
+
+[spawn.wizard.step2.region.asia]
+other = "アジア太平洋:"
+
+[spawn.wizard.step2.region.us_east_1]
+other = "    us-east-1      - バージニア北部"
+
+[spawn.wizard.step2.region.us_west_2]
+other = "    us-west-2      - オレゴン"
+
+[spawn.wizard.step2.region.eu_west_1]
+other = "    eu-west-1      - アイルランド"
+
+[spawn.wizard.step2.region.eu_central_1]
+other = "    eu-central-1   - フランクフルト"
+
+[spawn.wizard.step2.region.ap_northeast_1]
+other = "    ap-northeast-1 - 東京"
+
+[spawn.wizard.step2.region.ap_southeast_1]
+other = "    ap-southeast-1 - シンガポール"
+
+[spawn.wizard.step2.prompt]
+other = "リージョン [{{.DefaultRegion}}]: "
+
+# ウィザードステップ3 - スポットインスタンス
+[spawn.wizard.step3.description]
+other = "スポットインスタンスは50～90%安くなりますが、AWSによって2分前の通知で中断される可能性があります。"
+
+[spawn.wizard.step3.good_for]
+other = "適している用途: 開発/テスト、バッチジョブ、フォルトトレラントなワークロード"
+
+[spawn.wizard.step3.not_for]
+other = "適していない用途: 本番サーバー、データベース、長時間実行ジョブ"
+
+[spawn.wizard.step3.using_spot]
+other = "スポットインスタンスを使用（安価だが中断される可能性あり）"
+
+[spawn.wizard.step3.using_ondemand]
+other = "オンデマンドインスタンスを使用（信頼性高、中断されない）"
+
+# ウィザードステップ4 - 自動終了
+[spawn.wizard.step4.description]
+other = "アイドル状態または長時間実行中のインスタンスを自動終了して、予期しないコストを防止します。"
+
+[spawn.wizard.step4.option.ttl]
+other = "TTLのみ（X時間後に終了）"
+
+[spawn.wizard.step4.option.idle]
+other = "アイドルタイムアウトのみ（アイドル時に終了）"
+
+[spawn.wizard.step4.option.both]
+other = "TTL + アイドルタイムアウトの両方（推奨）"
+
+[spawn.wizard.step4.option.manual]
+other = "手動（自分で終了します）"
+
+[spawn.wizard.step4.prompt]
+other = "[1-4]を選択、または空白で両方 [3]: "
+
+[spawn.wizard.step4.ttl_prompt]
+other = "自動終了時間（例: 8h、24h）[8h]: "
+
+[spawn.wizard.step4.idle_prompt]
+other = "アイドルタイムアウト（例: 30m、1h）[30m]: "
+
+[spawn.wizard.step4.ttl_prompt_short]
+other = "TTL（例: 8h）[8h]: "
+
+[spawn.wizard.step4.idle_prompt_short]
+other = "アイドル（例: 30m）[30m]: "
+
+[spawn.wizard.step4.ttl_set]
+other = "{{.TTL}}後に終了します"
+
+[spawn.wizard.step4.idle_set]
+other = "{{.Idle}}アイドル時に終了します"
+
+[spawn.wizard.step4.both_set]
+other = "{{.TTL}}後、または{{.Idle}}アイドル時に終了します"
+
+[spawn.wizard.step4.manual_warning]
+other = "料金を避けるためインスタンスを終了することを忘れないでください！"
+
+[spawn.wizard.step4.manual_command]
+other = "    使用: spawn stop <instance-id>"
+
+# ウィザードステップ5 - SSHキー
+[spawn.wizard.step5.found_key]
+other = "SSHキーが見つかりました: {{.KeyPath}}"
+
+[spawn.wizard.step5.will_use_key]
+other = "SSHアクセスにこのキーを使用します。"
+
+[spawn.wizard.step5.no_key_found]
+other = "{{.KeyPath}}にSSHキーが見つかりません"
+
+[spawn.wizard.step5.key_required]
+other = "インスタンスにアクセスするにはSSHキーが必要です。"
+
+[spawn.wizard.step5.create_prompt]
+other = "新しいSSHキーを作成しますか？ [Y/n]: "
+
+[spawn.wizard.step5.creating_key]
+other = "SSHキーを作成中..."
+
+[spawn.wizard.step5.key_created]
+other = "SSHキーが作成されました: {{.KeyPath}}"
+
+# ウィザードステップ6 - インスタンス名
+[spawn.wizard.step6.prompt]
+other = "インスタンス名（オプション）[]: "
+
+[spawn.wizard.step6.name_set]
+other = "インスタンス名: {{.Name}}"
+
+# ウィザードサマリー
+[spawn.wizard.summary.field.instance_type]
+other = "インスタンスタイプ"
+
+[spawn.wizard.summary.field.region]
+other = "リージョン"
+
+[spawn.wizard.summary.field.spot]
+other = "スポット"
+
+[spawn.wizard.summary.field.ttl]
+other = "自動終了"
+
+[spawn.wizard.summary.field.idle]
+other = "アイドルタイムアウト"
+
+[spawn.wizard.summary.field.key]
+other = "SSHキー"
+
+[spawn.wizard.summary.field.name]
+other = "名前"
+
+[spawn.wizard.summary.estimated_cost]
+other = "推定コスト: {{.Cost}}/時間"
+
+[spawn.wizard.summary.confirm]
+other = "インスタンスを起動しますか？ [Y/n]: "
+
+# 進行状況監視
+[spawn.progress.success.monitoring.title]
+other = "自動監視が有効:"
+
+[spawn.progress.success.monitoring.ttl]
+other = "TTL: {{.TTL}}後に終了"
+
+[spawn.progress.success.monitoring.idle]
+other = "アイドル: {{.Idle}}アイドル時に終了"
+
+# Truffle検索
+[truffle.search.searching_across]
+other = "{{.Count}}リージョンを検索中..."
+
+# Truffleスポットサマリー
+[truffle.spot.summary.per_hour]
+other = "/時間"
+
+[truffle.spot.summary.vs_on_demand]
+other = "vs オンデマンド"
+
+# Truffleキャパシティサマリーフィールド
+[truffle.capacity.summary.instances]
+other = "インスタンス"
+
+[truffle.capacity.summary.free]
+other = "空き"
+
+[truffle.capacity.summary.utilized]
+other = "使用率"
+
+# Truffle出力ヘッダー
+[truffle.output.header.availability_zone]
+other = "アベイラビリティーゾーン"
+
+[truffle.output.header.az]
+other = "AZ"
+
+[truffle.output.header.total]
+other = "合計"
+
+[truffle.output.header.available]
+other = "利用可能"
+
+[truffle.output.header.used]
+other = "使用中"
+
+[truffle.output.header.state]
+other = "状態"
+
+[truffle.output.header.reservation_id]
+other = "予約ID"
+
+[truffle.output.header.spot_price]
+other = "スポット価格/時"
+
+[truffle.output.header.on_demand_price]
+other = "オンデマンド/時"
+
+[truffle.output.header.savings]
+other = "節約額"
+
+# 一般的なエラー
+[error.cancelled_by_user]
+other = "ユーザーによって操作がキャンセルされました"
+
+[error.ssh_key_create_failed]
+other = "SSHキーの作成に失敗しました: {{.Error}}"
+
+[error.ssh_key_required]
+other = "SSHキーが必要ですが、指定されていません"
+
+# Spawn Connectコマンド
+[spawn.connect.connecting_session_manager]
+other = "Session Manager経由で接続中..."
+
+[spawn.connect.fallback_session_manager]
+other = "SSHキーが利用できないため、AWS Session Managerにフォールバックします"
+
+[spawn.connect.key_not_found]
+other = "{{.KeyPath}}にSSHキーファイルが見つかりません"
+
+[spawn.connect.error.aws_cli_not_found]
+other = "AWS CLIが見つかりません。こちらからインストールしてください: https://aws.amazon.com/cli/"
+
+[spawn.connect.error.key_not_found_for_name]
+other = "キー名{{.KeyName}}のSSHキーファイルが見つかりません"
+
+[spawn.connect.error.no_key_name]
+other = "インスタンスにSSHキーが設定されていません"
+
+[spawn.connect.error.not_running]
+other = "インスタンスが実行されていません（状態: {{.State}}）"
+
+[spawn.connect.error.session_manager_failed]
+other = "Session Managerセッションの開始に失敗しました: {{.Error}}"
+
+# Spawn Stateコマンド
+[spawn.state.short]
+other = "インスタンスの状態遷移を表示"
+
+[spawn.state.long]
+other = "spawnインスタンスの状態履歴と現在のステータスを表示"
+
+# Spawn Listコマンド
+[spawn.list.no_instances]
+other = "spawnインスタンスが見つかりません"
+
+[spawn.list.no_instances_match]
+other = "指定された条件に一致するインスタンスが見つかりません"
+
+[spawn.list.searching_all_regions]
+other = "すべてのAWSリージョンを検索中..."
+
+[spawn.list.searching_region]
+other = "リージョン{{.Region}}を検索中..."
+
+[spawn.list.error.list_failed]
+other = "インスタンスのリスト表示に失敗しました: {{.Error}}"
+
+[spawn.list.header.instance_id]
+other = "インスタンスID"
+
+[spawn.list.header.name]
+other = "名前"
+
+[spawn.list.header.type]
+other = "タイプ"
+
+[spawn.list.header.state]
+other = "状態"
+
+[spawn.list.header.spot]
+other = "スポット"
+
+[spawn.list.header.az]
+other = "AZ"
+
+[spawn.list.header.public_ip]
+other = "パブリックIP"
+
+[spawn.list.header.age]
+other = "経過時間"
+
+[spawn.list.header.ttl]
+other = "TTL"
+
+# Spawn進行状況インジケーター
+[spawn.progress.error]
+other = "エラー"
+
+[spawn.progress.create_security_group]
+other = "セキュリティグループを作成中"
+
+[spawn.progress.get_public_ip]
+other = "パブリックIPを取得中"
+
+[spawn.progress.install_agent]
+other = "spawnエージェントをインストール中"
+
+[spawn.progress.launching_instance]
+other = "インスタンスを起動中"
+
+[spawn.progress.setup_iam_role]
+other = "IAMロールをセットアップ中"
+
+[spawn.progress.setup_ssh_key]
+other = "SSHキーをセットアップ中"
+
+[spawn.progress.success.title]
+other = "インスタンス準備完了！"
+
+[spawn.progress.success.details]
+other = "インスタンス詳細:"
+
+[spawn.progress.success.connect_now]
+other = "今すぐ接続:"
+
+[spawn.progress.success.status_running]
+other = "実行中"
+
+[spawn.progress.success.label.instance_id]
+other = "インスタンスID"
+
+[spawn.progress.success.label.public_ip]
+other = "パブリックIP"
+
+[spawn.progress.success.label.status]
+other = "ステータス"
+
+[spawn.progress.success.monitoring.agent_active]
+other = "spawnエージェントがアクティブで、使用状況を監視中"
+
+[spawn.progress.success.monitoring.close_laptop]
+other = "ノートパソコンを閉じるとインスタンスは自動停止します"
+
+# Spawnウィザードサマリー
+[spawn.wizard.summary.about_to_launch]
+other = "起動しようとしています:"
+
+[spawn.wizard.summary.label.instance_type]
+other = "インスタンスタイプ"
+
+[spawn.wizard.summary.label.region]
+other = "リージョン"
+
+[spawn.wizard.summary.label.type]
+other = "タイプ"
+
+[spawn.wizard.summary.label.name]
+other = "名前"
+
+[spawn.wizard.summary.label.time_limit]
+other = "時間制限"
+
+[spawn.wizard.summary.label.idle_timeout]
+other = "アイドルタイムアウト"
+
+[spawn.wizard.summary.type_spot]
+other = "スポットインスタンス"
+
+[spawn.wizard.summary.type_ondemand]
+other = "オンデマンド"
+
+[spawn.wizard.summary.total_cost]
+other = "推定総コスト"
+
+[spawn.wizard.summary.savings]
+other = "（オンデマンドと比較して{{.Savings}}節約）"
+
+# Truffle Searchコマンド
+[truffle.search.error.invalid_pattern]
+other = "無効な検索パターン: {{.Error}}"
+
+[truffle.search.error.search_failed]
+other = "検索に失敗しました: {{.Error}}"
+
+[truffle.search.error.get_regions_failed]
+other = "AWSリージョンの取得に失敗しました: {{.Error}}"
+
+[truffle.search.error.unsupported_format]
+other = "サポートされていない出力フォーマット: {{.Format}}"
+
+# Truffle Capacityコマンド
+[truffle.capacity.searching]
+other = "キャパシティ予約を検索中..."
+
+[truffle.capacity.searching_across]
+other = "{{.Count}}リージョンを検索中..."
+
+[truffle.capacity.fetching_regions]
+other = "利用可能なAWSリージョンを取得中..."
+
+[truffle.capacity.no_results]
+other = "条件に一致するキャパシティ予約が見つかりません"
+
+[truffle.capacity.error.get_failed]
+other = "キャパシティ予約の取得に失敗しました: {{.Error}}"
+
+[truffle.capacity.error.get_regions_failed]
+other = "AWSリージョンの取得に失敗しました: {{.Error}}"
+
+[truffle.capacity.error.unsupported_format]
+other = "サポートされていない出力フォーマット: {{.Format}}"
+
+[truffle.capacity.summary.total_reservations]
+other = "総予約数"
+
+[truffle.capacity.summary.active_reservations]
+other = "アクティブな予約"
+
+[truffle.capacity.summary.availability_zones]
+other = "アベイラビリティーゾーン"
+
+[truffle.capacity.summary.available_capacity]
+other = "利用可能キャパシティ"
+
+[truffle.capacity.summary.used_capacity]
+other = "使用中キャパシティ"
+
+# Truffle Spotコマンド
+[truffle.spot.searching_across]
+other = "{{.Count}}リージョンを検索中..."
+
+[truffle.spot.fetching_regions]
+other = "利用可能なAWSリージョンを取得中..."
+
+[truffle.spot.max_price_filter]
+other = "最高価格でフィルター: ${{.MaxPrice}}/時間"
+
+[truffle.spot.no_matching_types]
+other = "パターンに一致するインスタンスタイプが見つかりません"
+
+[truffle.spot.no_pricing_data]
+other = "一致するインスタンスのスポット価格データがありません"
+
+[truffle.spot.error.invalid_pattern]
+other = "無効な検索パターン: {{.Error}}"
+
+[truffle.spot.error.search_failed]
+other = "検索に失敗しました: {{.Error}}"
+
+[truffle.spot.error.get_regions_failed]
+other = "AWSリージョンの取得に失敗しました: {{.Error}}"
+
+[truffle.spot.error.get_pricing_failed]
+other = "スポット価格の取得に失敗しました: {{.Error}}"
+
+[truffle.spot.error.unsupported_format]
+other = "サポートされていない出力フォーマット: {{.Format}}"
+
+[truffle.spot.summary.availability_zones]
+other = "アベイラビリティーゾーン"
+
+[truffle.spot.summary.average_price]
+other = "平均スポット価格"
+
+[truffle.spot.summary.average_savings]
+other = "平均節約額"
+
+# Truffle出力ヘッダー
+[truffle.output.header.instance_type]
+other = "インスタンスタイプ"
+
+[truffle.output.header.region]
+other = "リージョン"
+
+[truffle.output.header.vcpus]
+other = "vCPU"
+
+[truffle.output.header.memory]
+other = "メモリ（GiB）"
+
+[truffle.output.header.architecture]
+other = "アーキテクチャ"
+
+[truffle.output.header.availability_zones]
+other = "アベイラビリティーゾーン"
+
+# END OF JAPANESE TRANSLATION - COMPLETE
