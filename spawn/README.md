@@ -43,6 +43,7 @@ spawn --instance-type m7i.large --region us-east-1 --ttl 8h
 - **📊 Live Progress**: Real-time step-by-step updates
 - **💰 Cost Estimates**: Shows hourly and total costs
 - **🪣 S3 Distribution**: Fast regional downloads (~20ms)
+- **🌍 Multilingual**: 6 languages supported (en, es, fr, de, ja, pt)
 
 ### Advanced Features
 - **🎮 GPU Support**: Auto-selects GPU-enabled AL2023 AMI
@@ -50,6 +51,7 @@ spawn --instance-type m7i.large --region us-east-1 --ttl 8h
 - **🔄 Spot Instances**: Up to 70% savings
 - **📡 spored Agent**: Self-monitoring (systemd service)
 - **🔧 Laptop-Independent**: Works even when laptop is off
+- **♿ Accessibility**: Screen reader support with --accessibility flag
 
 ## 📦 Installation
 
@@ -116,6 +118,135 @@ The IAM role (`spored-instance-role`) is automatically created the first time yo
 **Security Note:** The spored role can only terminate instances tagged with `spawn:managed=true`.
 
 For detailed information, see [IAM_PERMISSIONS.md](IAM_PERMISSIONS.md).
+
+## 🌍 Internationalization
+
+spawn supports multiple languages for a better user experience worldwide.
+
+### Supported Languages
+
+- 🇬🇧 **English** (en) - Default
+- 🇪🇸 **Spanish** (es) - Español
+- 🇫🇷 **French** (fr) - Français
+- 🇩🇪 **German** (de) - Deutsch
+- 🇯🇵 **Japanese** (ja) - 日本語
+- 🇵🇹 **Portuguese** (pt) - Português
+
+### Using Different Languages
+
+```bash
+# Spanish
+spawn --lang es
+spawn --lang es launch --instance-type m7i.large
+
+# Japanese
+spawn --lang ja
+spawn --lang ja launch
+
+# French
+spawn --lang fr --help
+spawn --lang fr list
+
+# German
+spawn --lang de connect i-1234567890
+
+# Portuguese
+spawn --lang pt launch --interactive
+```
+
+### Environment Variable
+
+Set your preferred language globally:
+
+```bash
+# Set language in your shell profile (~/.bashrc, ~/.zshrc)
+export SPAWN_LANG=es
+
+# Now all spawn commands use Spanish
+spawn launch
+spawn list
+spawn --help
+```
+
+### Language Detection Priority
+
+spawn detects language in this order:
+
+1. `--lang` flag (highest priority)
+2. `SPAWN_LANG` environment variable
+3. Config file (`~/.spawn/config.yaml`)
+4. System locale (`LANG`, `LC_ALL`)
+5. Default to English
+
+### What Gets Translated
+
+All user-facing text is translated:
+
+- ✅ Command descriptions and help text
+- ✅ Interactive wizard (all 6 steps)
+- ✅ Progress indicators and status messages
+- ✅ Success/warning/error messages
+- ✅ Table headers and output
+- ✅ Flag descriptions
+
+**Technical terms stay in English** (AWS, EC2, AMI, VPC, SSH) for consistency with AWS documentation.
+
+### Accessibility Features
+
+Screen reader-friendly output:
+
+```bash
+# Disable emoji only
+spawn --no-emoji launch
+
+# Full accessibility mode (no emoji, no color, screen reader-friendly)
+spawn --accessibility launch
+spawn --accessibility list
+```
+
+**Accessibility mode:**
+- Replaces emoji with text symbols (`[✓]`, `[✗]`, `[!]`, `[*]`)
+- Disables color output
+- Uses clear status announcements
+- Works with JAWS, NVDA, VoiceOver
+
+### Examples in Different Languages
+
+**Spanish Interactive Wizard:**
+```bash
+$ spawn --lang es
+
+🧙 Asistente de Configuración de spawn
+
+Paso 1 de 6: Elige el tipo de instancia
+[Interactive Spanish wizard...]
+```
+
+**Japanese Launch:**
+```bash
+$ spawn --lang ja launch --instance-type m7i.large
+
+インスタンスを生成中...
+  ✓ AMIを検出中
+  ✓ インスタンスを起動中
+  ✓ IPアドレスを待機中
+  ✓ SSHの準備完了を待機中
+
+成功！インスタンスの準備が完了しました
+```
+
+**French List:**
+```bash
+$ spawn --lang fr list
+
+Recherche d'instances gérées par spawn dans toutes les régions...
+
++---------------+-----------+--------+----------------+
+| ID Instance   | Région    | État   | IP Publique    |
++---------------+-----------+--------+----------------+
+| i-1234567890  | us-east-1 | actif  | 54.123.45.67   |
++---------------+-----------+--------+----------------+
+```
 
 ## 🎓 Usage
 

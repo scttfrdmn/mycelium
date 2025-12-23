@@ -221,6 +221,67 @@ $ truffle spot "t3.*" --sort-by-price --pick-first | \
 - ✅ **Hibernation** (save 99% when idle)
 - ✅ **Cross-platform** (Windows/Linux/macOS)
 - ✅ **Production-ready** (error handling, logging)
+- ✅ **Multilingual** (6 languages: English, Spanish, French, German, Japanese, Portuguese)
+
+---
+
+## 🌍 Internationalization
+
+Both **spawn** and **truffle** support multiple languages for a better user experience worldwide.
+
+### Supported Languages
+
+- 🇬🇧 **English** (en) - Default
+- 🇪🇸 **Spanish** (es) - Español
+- 🇫🇷 **French** (fr) - Français
+- 🇩🇪 **German** (de) - Deutsch
+- 🇯🇵 **Japanese** (ja) - 日本語
+- 🇵🇹 **Portuguese** (pt) - Português
+
+### Quick Usage
+
+```bash
+# Use Spanish
+spawn --lang es
+truffle --lang es search m7i.large
+
+# Use Japanese
+spawn --lang ja launch
+truffle --lang ja search m7i.large
+
+# Use French
+spawn --lang fr --help
+truffle --lang fr spot m7i.large
+```
+
+### Environment Variables
+
+Set your preferred language globally:
+
+```bash
+# For spawn
+export SPAWN_LANG=es
+spawn launch
+
+# For truffle
+export TRUFFLE_LANG=fr
+truffle search m7i.large
+```
+
+### Accessibility Features
+
+Screen reader-friendly output with no emoji:
+
+```bash
+# Disable emoji only
+spawn --no-emoji launch
+
+# Full accessibility mode (no emoji, no color)
+spawn --accessibility launch
+truffle --accessibility search m7i.large
+```
+
+**All user-facing text is translated** - commands, help, errors, wizard, progress indicators, and table outputs.
 
 ---
 

@@ -19,6 +19,8 @@ Truffle is a powerful CLI tool to discover which AWS regions and **availability 
 - 🎯 **AZ Command**: Dedicated `truffle az` command for AZ-centric searches
 - 💵 **Spot Command**: Dedicated `truffle spot` command for Spot pricing and savings
 - 🔋 **Capacity Command**: Dedicated `truffle capacity` command for ODCRs (critical for GPU/ML instances!)
+- 🌍 **Multilingual**: 6 languages supported (en, es, fr, de, ja, pt)
+- ♿ **Accessibility**: Screen reader support with --accessibility flag
 
 ## 🚀 Installation
 
@@ -91,6 +93,145 @@ A region may support an instance type, but not in all (or any!) of its availabil
 - ❌ **Region check alone** can lead to deployment failures
 
 **Truffle includes AZ data by default** to prevent these issues. See [AZ_GUIDE.md](AZ_GUIDE.md) for detailed examples.
+
+## 🌍 Internationalization
+
+truffle supports multiple languages for a better user experience worldwide.
+
+### Supported Languages
+
+- 🇬🇧 **English** (en) - Default
+- 🇪🇸 **Spanish** (es) - Español
+- 🇫🇷 **French** (fr) - Français
+- 🇩🇪 **German** (de) - Deutsch
+- 🇯🇵 **Japanese** (ja) - 日本語
+- 🇵🇹 **Portuguese** (pt) - Português
+
+### Using Different Languages
+
+```bash
+# Spanish
+truffle --lang es search m7i.large
+truffle --lang es spot "m8g.*" --sort-by-price
+
+# Japanese
+truffle --lang ja search "c7i.*"
+truffle --lang ja capacity --gpu-only
+
+# French
+truffle --lang fr --help
+truffle --lang fr az m7i.large
+
+# German
+truffle --lang de search m7i.large --min-vcpu 4
+
+# Portuguese
+truffle --lang pt spot m7i.large --show-savings
+```
+
+### Environment Variable
+
+Set your preferred language globally:
+
+```bash
+# Set language in your shell profile (~/.bashrc, ~/.zshrc)
+export TRUFFLE_LANG=es
+
+# Now all truffle commands use Spanish
+truffle search m7i.large
+truffle spot "m8g.*"
+truffle --help
+```
+
+### Language Detection Priority
+
+truffle detects language in this order:
+
+1. `--lang` flag (highest priority)
+2. `TRUFFLE_LANG` environment variable
+3. Config file (`~/.truffle/config.yaml`)
+4. System locale (`LANG`, `LC_ALL`)
+5. Default to English
+
+### What Gets Translated
+
+All user-facing text is translated:
+
+- ✅ Command descriptions and help text
+- ✅ Table headers and column names
+- ✅ Summary messages and statistics
+- ✅ Progress indicators
+- ✅ Success/warning/error messages
+- ✅ Flag descriptions
+
+**Technical terms stay in English** (AWS, EC2, vCPU, Spot, GPU, ODCR) for consistency with AWS documentation.
+
+### Accessibility Features
+
+Screen reader-friendly output:
+
+```bash
+# Disable emoji only
+truffle --no-emoji search m7i.large
+
+# Full accessibility mode (no emoji, no color, screen reader-friendly)
+truffle --accessibility search m7i.large
+truffle --accessibility spot "m8g.*"
+```
+
+**Accessibility mode:**
+- Replaces emoji with text symbols (`[✓]`, `[✗]`, `[!]`, `[*]`)
+- Disables color output
+- Uses ASCII-only table borders
+- Works with JAWS, NVDA, VoiceOver
+
+### Examples in Different Languages
+
+**Spanish Search:**
+```bash
+$ truffle --lang es search m7i.large
+
+Buscando tipos de instancia que coincidan con: m7i.large
+
++---------------+-----------+-------+--------------+---------------+
+| Tipo          | Región    | vCPUs | Memoria (GiB)| Arquitectura  |
++---------------+-----------+-------+--------------+---------------+
+| m7i.large     | us-east-1 |     2 |          8.0 | x86_64        |
+| m7i.large     | us-west-2 |     2 |          8.0 | x86_64        |
++---------------+-----------+-------+--------------+---------------+
+
+Se encontraron 2 tipos de instancia en 2 región(es)
+```
+
+**Japanese Spot Pricing:**
+```bash
+$ truffle --lang ja spot m7i.large
+
+m7i.largeのスポット価格を取得中...
+
++---------------+-----------+---------+----------------+
+| インスタンス  | リージョン| 価格/時間| 節約率         |
++---------------+-----------+---------+----------------+
+| m7i.large     | us-east-1 | $0.0331 | 68%            |
+| m7i.large     | us-west-2 | $0.0344 | 67%            |
++---------------+-----------+---------+----------------+
+```
+
+**French Capacity Check:**
+```bash
+$ truffle --lang fr capacity --gpu-only
+
+Vérification des réservations de capacité GPU...
+
++---------------+-----------+----------------+-------------------+
+| Type Instance | Région    | Capacité Dispo | Capacité Totale   |
++---------------+-----------+----------------+-------------------+
+| p5.48xlarge   | us-east-1 |             12 |                20 |
+| g6.xlarge     | us-west-2 |              8 |                10 |
++---------------+-----------+----------------+-------------------+
+
+Trouvé 2 réservations avec capacité disponible
+```
 
 ## 📚 Usage
 
