@@ -10,6 +10,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/olekukonko/tablewriter"
+	"github.com/scttfrdmn/mycelium/pkg/i18n"
 	"github.com/yourusername/truffle/pkg/aws"
 	"gopkg.in/yaml.v3"
 )
@@ -35,9 +36,15 @@ func (p *Printer) PrintTable(results []aws.InstanceTypeResult, includeAZs bool) 
 	table.SetAlignment(tablewriter.ALIGN_LEFT)
 	
 	// Set headers
-	headers := []string{"Instance Type", "Region", "vCPUs", "Memory (GiB)", "Architecture"}
+	headers := []string{
+		i18n.T("truffle.output.header.instance_type"),
+		i18n.T("truffle.output.header.region"),
+		i18n.T("truffle.output.header.vcpus"),
+		i18n.T("truffle.output.header.memory"),
+		i18n.T("truffle.output.header.architecture"),
+	}
 	if includeAZs {
-		headers = append(headers, "Availability Zones")
+		headers = append(headers, i18n.T("truffle.output.header.availability_zones"))
 	}
 	table.SetHeader(headers)
 
@@ -84,13 +91,16 @@ func (p *Printer) PrintTable(results []aws.InstanceTypeResult, includeAZs bool) 
 	}
 
 	// Print summary
+	summaryMsg := i18n.Tf("truffle.output.summary.found", map[string]interface{}{
+		"Count":   len(grouped),
+		"Regions": countUniqueRegions(results),
+	})
+
 	if p.useColor {
 		cyan := color.New(color.FgCyan, color.Bold)
-		cyan.Printf("\n🍄 Found %d instance type(s) across %d region(s)\n\n",
-			len(grouped), countUniqueRegions(results))
+		cyan.Printf("\n%s %s\n\n", i18n.Emoji("mushroom"), summaryMsg)
 	} else {
-		fmt.Printf("\nFound %d instance type(s) across %d region(s)\n\n",
-			len(grouped), countUniqueRegions(results))
+		fmt.Printf("\n%s\n\n", summaryMsg)
 	}
 
 	table.Render()
@@ -187,9 +197,16 @@ func (p *Printer) PrintSpotTable(results []aws.SpotPriceResult, showSavings bool
 	}
 
 	// Set headers
-	headers := []string{"Instance Type", "Region", "Availability Zone", "Spot Price/hr"}
+	headers := []string{
+		i18n.T("truffle.output.header.instance_type"),
+		i18n.T("truffle.output.header.region"),
+		i18n.T("truffle.output.header.availability_zone"),
+		i18n.T("truffle.output.header.spot_price"),
+	}
 	if showSavings {
-		headers = append(headers, "On-Demand/hr", "Savings")
+		headers = append(headers,
+			i18n.T("truffle.output.header.on_demand_price"),
+			i18n.T("truffle.output.header.savings"))
 	}
 	table.SetHeader(headers)
 
@@ -302,7 +319,16 @@ func (p *Printer) PrintCapacityTable(results []aws.CapacityReservationResult) er
 	}
 
 	// Set headers
-	headers := []string{"Instance Type", "Region", "AZ", "Total", "Available", "Used", "State", "Reservation ID"}
+	headers := []string{
+		i18n.T("truffle.output.header.instance_type"),
+		i18n.T("truffle.output.header.region"),
+		i18n.T("truffle.output.header.az"),
+		i18n.T("truffle.output.header.total"),
+		i18n.T("truffle.output.header.available"),
+		i18n.T("truffle.output.header.used"),
+		i18n.T("truffle.output.header.state"),
+		i18n.T("truffle.output.header.reservation_id"),
+	}
 	table.SetHeader(headers)
 
 	// Add rows

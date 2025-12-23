@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/scttfrdmn/mycelium/pkg/i18n"
 	"github.com/spf13/cobra"
 	"github.com/yourusername/truffle/pkg/aws"
 	"github.com/yourusername/truffle/pkg/output"
@@ -25,21 +26,10 @@ var (
 )
 
 var searchCmd = &cobra.Command{
-	Use:   "search [instance-type-pattern]",
-	Short: "Search for instance types across AWS regions",
-	Long: `Search for EC2 instance types and discover their availability across regions and AZs.
-
-Supports wildcard patterns using * and ? for flexible searching.
-
-Examples:
-  truffle search m7i.large
-  truffle search "m8g.*"
-  truffle search "*.large"
-  truffle search m7i.large --skip-azs  # Faster, region-level only
-  truffle search "c8g.*" --architecture arm64
-  truffle search "*.xlarge" --min-vcpu 4 --min-memory 16`,
+	Use:  "search [instance-type-pattern]",
 	Args: cobra.ExactArgs(1),
 	RunE: runSearch,
+	// Short and Long will be set after i18n initialization
 }
 
 func init() {
@@ -51,6 +41,13 @@ func init() {
 	searchCmd.Flags().Float64Var(&minMemory, "min-memory", 0, "Minimum memory in GiB")
 	searchCmd.Flags().StringVar(&instanceFamily, "family", "", "Filter by instance family (e.g., m5, c5)")
 	searchCmd.Flags().DurationVar(&timeout, "timeout", 5*time.Minute, "Timeout for AWS API calls")
+
+	// Register completion for instance type argument
+	searchCmd.ValidArgsFunction = completeInstanceType
+
+	// Register completion for flags
+	searchCmd.RegisterFlagCompletionFunc("architecture", completeArchitecture)
+	searchCmd.RegisterFlagCompletionFunc("family", completeInstanceFamily)
 }
 
 func runSearch(cmd *cobra.Command, args []string) error {
@@ -60,13 +57,17 @@ func runSearch(cmd *cobra.Command, args []string) error {
 	regexPattern := wildcardToRegex(pattern)
 	matcher, err := regexp.Compile(regexPattern)
 	if err != nil {
-		return fmt.Errorf("invalid pattern: %w", err)
+		return i18n.Te("truffle.search.error.invalid_pattern", err)
 	}
 
 	if verbose {
-		fmt.Fprintf(os.Stderr, "🔍 Searching for instance types matching: %s\n", pattern)
+		fmt.Fprintf(os.Stderr, "%s %s\n", i18n.Emoji("magnifying_glass"), i18n.Tf("truffle.search.searching", map[string]interface{}{
+			"Pattern": pattern,
+		}))
 		if len(regions) > 0 {
-			fmt.Fprintf(os.Stderr, "📍 Filtering regions: %s\n", strings.Join(regions, ", "))
+			fmt.Fprintf(os.Stderr, "%s %s\n", i18n.Emoji("pushpin"), i18n.Tf("truffle.search.filtering_regions", map[string]interface{}{
+				"Regions": strings.Join(regions, ", "),
+			}))
 		}
 	}
 
@@ -76,29 +77,33 @@ func runSearch(cmd *cobra.Command, args []string) error {
 	// Initialize AWS client
 	awsClient, err := aws.NewClient(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to initialize AWS client: %w", err)
+		return i18n.Te("error.aws_client_init", err)
 	}
 
 	// Get regions to search
 	searchRegions := regions
 	if len(searchRegions) == 0 {
 		if verbose {
-			fmt.Fprintln(os.Stderr, "🌍 Fetching all AWS regions...")
+			fmt.Fprintf(os.Stderr, "%s %s\n", i18n.Emoji("globe"), i18n.T("truffle.search.fetching_regions"))
 		}
 		searchRegions, err = awsClient.GetAllRegions(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to get regions: %w", err)
+			return i18n.Te("truffle.search.error.get_regions_failed", err)
 		}
 	}
 
 	// Show spinner for non-verbose mode
 	var spinner *progress.Spinner
 	if !verbose && outputFormat == "table" {
-		msg := fmt.Sprintf("Searching %d region(s)...", len(searchRegions))
+		msg := i18n.Tf("truffle.search.searching_regions", map[string]interface{}{
+			"Count": len(searchRegions),
+		})
 		spinner = progress.NewSpinner(os.Stderr, msg)
 		spinner.Start()
 	} else if verbose {
-		fmt.Fprintf(os.Stderr, "🔎 Searching across %d regions...\n", len(searchRegions))
+		fmt.Fprintf(os.Stderr, "%s %s\n", i18n.Emoji("magnifying_glass_tilted"), i18n.Tf("truffle.search.searching_across", map[string]interface{}{
+			"Count": len(searchRegions),
+		}))
 	}
 
 	// Search for instance types
@@ -116,7 +121,7 @@ func runSearch(cmd *cobra.Command, args []string) error {
 	}
 
 	if err != nil {
-		return fmt.Errorf("search failed: %w", err)
+		return i18n.Te("truffle.search.error.search_failed", err)
 	}
 
 	// Sort results for consistent output
@@ -128,7 +133,7 @@ func runSearch(cmd *cobra.Command, args []string) error {
 	})
 
 	if len(results) == 0 {
-		fmt.Println("No matching instance types found.")
+		fmt.Println(i18n.T("truffle.search.no_results"))
 		return nil
 	}
 
@@ -144,7 +149,9 @@ func runSearch(cmd *cobra.Command, args []string) error {
 	case "table":
 		return printer.PrintTable(results, !skipAZs) // Show AZs by default
 	default:
-		return fmt.Errorf("unsupported output format: %s", outputFormat)
+		return i18n.Te("truffle.search.error.unsupported_format", nil, map[string]interface{}{
+			"Format": outputFormat,
+		})
 	}
 }
 

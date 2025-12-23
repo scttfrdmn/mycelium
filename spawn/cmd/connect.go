@@ -8,8 +8,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/scttfrdmn/mycelium/pkg/i18n"
 	"github.com/spf13/cobra"
-	"github.com/yourusername/spawn/pkg/aws"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/aws"
 )
 
 var (
@@ -20,28 +21,11 @@ var (
 )
 
 var connectCmd = &cobra.Command{
-	Use:   "connect <instance-id>",
-	Short: "Connect to a spawn-managed instance via SSH",
-	Long: `Connect to a spawn-managed instance using SSH.
-
-Automatically detects the SSH key and public IP from instance metadata.
-Falls back to AWS Systems Manager Session Manager if no SSH access available.
-
-Examples:
-  # Connect to instance
-  spawn connect i-1234567890abcdef0
-
-  # Specify SSH key explicitly
-  spawn connect i-1234567890abcdef0 --key ~/.ssh/my-key.pem
-
-  # Use Session Manager instead of SSH
-  spawn connect i-1234567890abcdef0 --session-manager
-
-  # Connect with specific user
-  spawn connect i-1234567890abcdef0 --user ubuntu`,
+	Use:     "connect <instance-id>",
 	RunE:    runConnect,
 	Aliases: []string{"ssh"},
 	Args:    cobra.ExactArgs(1),
+	// Short and Long will be set after i18n initialization
 }
 
 func init() {
@@ -51,6 +35,9 @@ func init() {
 	connectCmd.Flags().StringVar(&connectKey, "key", "", "SSH private key path")
 	connectCmd.Flags().IntVar(&connectPort, "port", 22, "SSH port")
 	connectCmd.Flags().BoolVar(&connectSessionMgr, "session-manager", false, "Use AWS Session Manager instead of SSH")
+
+	// Register completion for instance ID argument
+	connectCmd.ValidArgsFunction = completeInstanceID
 }
 
 func runConnect(cmd *cobra.Command, args []string) error {
@@ -60,7 +47,7 @@ func runConnect(cmd *cobra.Command, args []string) error {
 	// Create AWS client
 	client, err := aws.NewClient(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to create AWS client: %w", err)
+		return i18n.Te("error.aws_client_init", err)
 	}
 
 	// Resolve instance (by ID or name)
@@ -69,11 +56,16 @@ func runConnect(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Fprintf(os.Stderr, "Found instance in %s (state: %s)\n", instance.Region, instance.State)
+	fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("spawn.connect.found_instance", map[string]interface{}{
+		"Region": instance.Region,
+		"State":  instance.State,
+	}))
 
 	// Check if instance is running
 	if instance.State != "running" {
-		return fmt.Errorf("instance is not running (state: %s)", instance.State)
+		return i18n.Te("spawn.connect.error.not_running", nil, map[string]interface{}{
+			"State": instance.State,
+		})
 	}
 
 	// Use Session Manager if requested or if no public IP
@@ -93,8 +85,10 @@ func runConnect(cmd *cobra.Command, args []string) error {
 		// Try to find the key based on the instance key name
 		keyPath, err = findSSHKey(instance.KeyName)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: Could not find SSH key for %s: %v\n", instance.KeyName, err)
-			fmt.Fprintf(os.Stderr, "Falling back to Session Manager...\n\n")
+			fmt.Fprintf(os.Stderr, "%s: %s: %v\n", i18n.Symbol("warning"), i18n.Tf("spawn.connect.key_not_found", map[string]interface{}{
+				"KeyName": instance.KeyName,
+			}), err)
+			fmt.Fprintf(os.Stderr, "%s\n\n", i18n.T("spawn.connect.fallback_session_manager"))
 			return connectViaSessionManager(instance.InstanceID, instance.Region)
 		}
 	}
@@ -108,7 +102,9 @@ func runConnect(cmd *cobra.Command, args []string) error {
 		fmt.Sprintf("%s@%s", user, instance.PublicIP),
 	}
 
-	fmt.Fprintf(os.Stderr, "Connecting via SSH: ssh %s\n\n", strings.Join(sshArgs, " "))
+	fmt.Fprintf(os.Stderr, "%s\n\n", i18n.Tf("spawn.connect.connecting_ssh", map[string]interface{}{
+		"Command": "ssh " + strings.Join(sshArgs, " "),
+	}))
 
 	// Execute SSH
 	sshCmd := exec.Command("ssh", sshArgs...)
@@ -123,10 +119,10 @@ func connectViaSessionManager(instanceID, region string) error {
 	// Check if AWS CLI and Session Manager plugin are installed
 	_, err := exec.LookPath("aws")
 	if err != nil {
-		return fmt.Errorf("AWS CLI not found. Install it to use Session Manager: https://aws.amazon.com/cli/")
+		return i18n.Te("spawn.connect.error.aws_cli_not_found", nil)
 	}
 
-	fmt.Fprintf(os.Stderr, "Connecting via AWS Session Manager...\n\n")
+	fmt.Fprintf(os.Stderr, "%s\n\n", i18n.T("spawn.connect.connecting_session_manager"))
 
 	// Build AWS SSM start-session command
 	ssmCmd := exec.Command("aws", "ssm", "start-session",
@@ -140,7 +136,7 @@ func connectViaSessionManager(instanceID, region string) error {
 
 	err = ssmCmd.Run()
 	if err != nil {
-		return fmt.Errorf("failed to start Session Manager session: %w\nMake sure the Session Manager plugin is installed: https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html", err)
+		return i18n.Te("spawn.connect.error.session_manager_failed", err)
 	}
 
 	return nil
@@ -148,7 +144,7 @@ func connectViaSessionManager(instanceID, region string) error {
 
 func findSSHKey(keyName string) (string, error) {
 	if keyName == "" {
-		return "", fmt.Errorf("no key name associated with instance")
+		return "", i18n.Te("spawn.connect.error.no_key_name", nil)
 	}
 
 	// Common SSH key locations and naming patterns
@@ -175,5 +171,7 @@ func findSSHKey(keyName string) (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("no SSH key found for key name: %s", keyName)
+	return "", i18n.Te("spawn.connect.error.key_not_found_for_name", nil, map[string]interface{}{
+		"KeyName": keyName,
+	})
 }

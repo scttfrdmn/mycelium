@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/scttfrdmn/mycelium/pkg/i18n"
 	"github.com/spf13/cobra"
 	"github.com/yourusername/truffle/pkg/aws"
 	"github.com/yourusername/truffle/pkg/output"
@@ -24,48 +25,9 @@ var (
 )
 
 var capacityCmd = &cobra.Command{
-	Use:   "capacity",
-	Short: "Check ML capacity reservations (Capacity Blocks & ODCRs)",
-	Long: `Check ML capacity reservations across regions and availability zones.
-
-AWS offers TWO types of capacity reservations for ML workloads:
-
-1. CAPACITY BLOCKS FOR ML (--blocks)
-   - Designed for HIGH-PERFORMANCE ML TRAINING (P5, P4d, Trn1)
-   - Reserved for 1-14 days, book up to 8 weeks in advance
-   - Co-located in EC2 UltraClusters (low-latency networking)
-   - Perfect for: Large LLM training, distributed training runs
-   - Pricing: Reservation fee + OS fee
-
-2. ON-DEMAND CAPACITY RESERVATIONS / ODCR (--odcr, default)
-   - For CONTINUOUS or UNPREDICTABLE workloads
-   - No fixed duration, create/cancel anytime
-   - Perfect for: ML inference, development, high-availability services
-   - Pricing: Pay only when instances are running
-
-Use Cases:
-  Capacity Blocks: Training GPT-4 scale models, multi-node training
-  ODCRs: Production inference APIs, ML development environments
-
-Examples:
-  # Check ODCRs (default - for inference/continuous workloads)
-  truffle capacity
-
-  # Check Capacity Blocks for ML (for training workloads)
-  truffle capacity --blocks
-
-  # GPU-only ODCRs
-  truffle capacity --gpu-only --odcr
-
-  # Specific instance types
-  truffle capacity --instance-types p5.48xlarge,g6.xlarge
-
-  # Only show reservations with available capacity
-  truffle capacity --available-only
-
-  # Find reservations with at least 10 instances available
-  truffle capacity --min-capacity 10`,
+	Use:  "capacity",
 	RunE: runCapacity,
+	// Short and Long will be set after i18n initialization
 }
 
 func init() {
@@ -83,9 +45,9 @@ func init() {
 
 func runCapacity(cmd *cobra.Command, args []string) error {
 	if verbose {
-		fmt.Fprintln(os.Stderr, "🔍 Searching for On-Demand Capacity Reservations...")
+		fmt.Fprintf(os.Stderr, "%s %s\n", i18n.Emoji("magnifying_glass"), i18n.T("truffle.capacity.searching"))
 		if crGPUOnly {
-			fmt.Fprintln(os.Stderr, "🎮 GPU/ML instances only")
+			fmt.Fprintf(os.Stderr, "%s %s\n", i18n.Emoji("video_game"), i18n.T("truffle.capacity.gpu_only"))
 		}
 	}
 
@@ -95,23 +57,25 @@ func runCapacity(cmd *cobra.Command, args []string) error {
 	// Initialize AWS client
 	awsClient, err := aws.NewClient(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to initialize AWS client: %w", err)
+		return i18n.Te("error.aws_client_init", err)
 	}
 
 	// Get regions to search
 	searchRegions := regions
 	if len(searchRegions) == 0 {
 		if verbose {
-			fmt.Fprintln(os.Stderr, "🌍 Fetching all AWS regions...")
+			fmt.Fprintf(os.Stderr, "%s %s\n", i18n.Emoji("globe"), i18n.T("truffle.capacity.fetching_regions"))
 		}
 		searchRegions, err = awsClient.GetAllRegions(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to get regions: %w", err)
+			return i18n.Te("truffle.capacity.error.get_regions_failed", err)
 		}
 	}
 
 	if verbose {
-		fmt.Fprintf(os.Stderr, "🔎 Searching across %d regions...\n", len(searchRegions))
+		fmt.Fprintf(os.Stderr, "%s %s\n", i18n.Emoji("magnifying_glass_tilted"), i18n.Tf("truffle.capacity.searching_across", map[string]interface{}{
+			"Count": len(searchRegions),
+		}))
 	}
 
 	// Get capacity reservations
@@ -123,7 +87,7 @@ func runCapacity(cmd *cobra.Command, args []string) error {
 		Verbose:       verbose,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to get capacity reservations: %w", err)
+		return i18n.Te("truffle.capacity.error.get_failed", err)
 	}
 
 	// Filter GPU instances if requested
@@ -132,7 +96,7 @@ func runCapacity(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(results) == 0 {
-		fmt.Println("No capacity reservations found matching criteria.")
+		fmt.Println(i18n.T("truffle.capacity.no_results"))
 		return nil
 	}
 
@@ -162,7 +126,9 @@ func runCapacity(cmd *cobra.Command, args []string) error {
 	case "table":
 		return printer.PrintCapacityTable(results)
 	default:
-		return fmt.Errorf("unsupported output format: %s", outputFormat)
+		return i18n.Te("truffle.capacity.error.unsupported_format", nil, map[string]interface{}{
+			"Format": outputFormat,
+		})
 	}
 }
 
@@ -227,14 +193,14 @@ func printCapacitySummary(results []aws.CapacityReservationResult) {
 		utilizationPercent = float64(usedCapacity) / float64(totalCapacity) * 100
 	}
 
-	fmt.Printf("\n📊 Capacity Reservation Summary:\n")
-	fmt.Printf("   Total Reservations: %d\n", len(results))
-	fmt.Printf("   Active Reservations: %d\n", activeCount)
-	fmt.Printf("   Instance Types: %d\n", len(instanceTypes))
-	fmt.Printf("   Regions: %d\n", len(regions))
-	fmt.Printf("   Availability Zones: %d\n", len(azs))
-	fmt.Printf("   Total Capacity: %d instances\n", totalCapacity)
-	fmt.Printf("   Available Capacity: %d instances (%.1f%% free)\n", availableCapacity, 100-utilizationPercent)
-	fmt.Printf("   Used Capacity: %d instances (%.1f%% utilized)\n", usedCapacity, utilizationPercent)
+	fmt.Printf("\n%s %s\n", i18n.Emoji("chart"), i18n.T("truffle.capacity.summary.title"))
+	fmt.Printf("   %s: %d\n", i18n.T("truffle.capacity.summary.total_reservations"), len(results))
+	fmt.Printf("   %s: %d\n", i18n.T("truffle.capacity.summary.active_reservations"), activeCount)
+	fmt.Printf("   %s: %d\n", i18n.T("truffle.capacity.summary.instance_types"), len(instanceTypes))
+	fmt.Printf("   %s: %d\n", i18n.T("truffle.capacity.summary.regions"), len(regions))
+	fmt.Printf("   %s: %d\n", i18n.T("truffle.capacity.summary.availability_zones"), len(azs))
+	fmt.Printf("   %s: %d %s\n", i18n.T("truffle.capacity.summary.total_capacity"), totalCapacity, i18n.T("truffle.capacity.summary.instances"))
+	fmt.Printf("   %s: %d %s (%.1f%% %s)\n", i18n.T("truffle.capacity.summary.available_capacity"), availableCapacity, i18n.T("truffle.capacity.summary.instances"), 100-utilizationPercent, i18n.T("truffle.capacity.summary.free"))
+	fmt.Printf("   %s: %d %s (%.1f%% %s)\n", i18n.T("truffle.capacity.summary.used_capacity"), usedCapacity, i18n.T("truffle.capacity.summary.instances"), utilizationPercent, i18n.T("truffle.capacity.summary.utilized"))
 	fmt.Println()
 }

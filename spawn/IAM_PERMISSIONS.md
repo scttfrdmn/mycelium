@@ -5,7 +5,7 @@
 To use `spawn`, your AWS IAM user or role needs specific permissions to:
 1. Create and manage EC2 instances
 2. Manage SSH key pairs
-3. Create and attach IAM roles (for spawnd agent)
+3. Create and attach IAM roles (for spored agent)
 4. Query instance metadata
 
 ## Required Permissions
@@ -61,8 +61,8 @@ Create an IAM policy with these permissions and attach it to your user/role:
         "iam:PassRole"
       ],
       "Resource": [
-        "arn:aws:iam::*:role/spawnd-instance-role",
-        "arn:aws:iam::*:instance-profile/spawnd-instance-profile"
+        "arn:aws:iam::*:role/spored-instance-role",
+        "arn:aws:iam::*:instance-profile/spored-instance-profile"
       ]
     },
     {
@@ -73,8 +73,8 @@ Create an IAM policy with these permissions and attach it to your user/role:
         "iam:TagInstanceProfile"
       ],
       "Resource": [
-        "arn:aws:iam::*:role/spawnd-instance-role",
-        "arn:aws:iam::*:instance-profile/spawnd-instance-profile"
+        "arn:aws:iam::*:role/spored-instance-role",
+        "arn:aws:iam::*:instance-profile/spored-instance-profile"
       ]
     }
   ]
@@ -97,21 +97,21 @@ Create an IAM policy with these permissions and attach it to your user/role:
 - **GetParameter**: Auto-detect latest Amazon Linux 2023 AMI IDs
 
 ### IAM Permissions
-- **CreateRole**: Create the `spawnd-instance-role` if it doesn't exist
+- **CreateRole**: Create the `spored-instance-role` if it doesn't exist
 - **GetRole**: Check if role already exists
 - **PutRolePolicy**: Attach permissions policy to the role
 - **CreateInstanceProfile**: Create instance profile for EC2
 - **GetInstanceProfile**: Check if profile already exists
 - **AddRoleToInstanceProfile**: Associate role with profile
-- **PassRole**: Allow EC2 to assume the spawnd role
+- **PassRole**: Allow EC2 to assume the spored role
 - **TagRole/TagInstanceProfile**: Tag IAM resources
 
 ## IAM Resources Created by spawn
 
 spawn automatically creates these IAM resources (once per account):
 
-### 1. IAM Role: `spawnd-instance-role`
-**Purpose**: Allows spawnd daemon to read its own tags and terminate the instance
+### 1. IAM Role: `spored-instance-role`
+**Purpose**: Allows spored daemon to read its own tags and terminate the instance
 
 **Trust Policy** (who can assume this role):
 ```json
@@ -161,7 +161,7 @@ spawn automatically creates these IAM resources (once per account):
 
 **Security Note**: The role can only terminate/stop instances tagged with `spawn:managed=true`, preventing accidental termination of other instances.
 
-### 2. Instance Profile: `spawnd-instance-profile`
+### 2. Instance Profile: `spored-instance-profile`
 **Purpose**: Attaches the IAM role to EC2 instances
 
 This is automatically attached to every instance launched by spawn.
@@ -199,8 +199,8 @@ The AWS-managed `PowerUser` policy grants full access to AWS services **except I
         "iam:PassRole"
       ],
       "Resource": [
-        "arn:aws:iam::*:role/spawnd-instance-role",
-        "arn:aws:iam::*:instance-profile/spawnd-instance-profile"
+        "arn:aws:iam::*:role/spored-instance-role",
+        "arn:aws:iam::*:instance-profile/spored-instance-profile"
       ]
     },
     {
@@ -211,15 +211,15 @@ The AWS-managed `PowerUser` policy grants full access to AWS services **except I
         "iam:TagInstanceProfile"
       ],
       "Resource": [
-        "arn:aws:iam::*:role/spawnd-instance-role",
-        "arn:aws:iam::*:instance-profile/spawnd-instance-profile"
+        "arn:aws:iam::*:role/spored-instance-role",
+        "arn:aws:iam::*:instance-profile/spored-instance-profile"
       ]
     }
   ]
 }
 ```
 
-This policy is **highly scoped** - it only allows creating/managing the specific `spawnd-instance-role` and `spawnd-instance-profile` resources. It cannot be used to create other IAM roles or escalate privileges.
+This policy is **highly scoped** - it only allows creating/managing the specific `spored-instance-role` and `spored-instance-profile` resources. It cannot be used to create other IAM roles or escalate privileges.
 
 ## Setup Instructions
 
@@ -271,7 +271,7 @@ For multi-account setups:
 
 ### Error: "User: arn:aws:iam::123456789012:user/myuser is not authorized to perform: iam:PassRole"
 
-**Solution**: Add `iam:PassRole` permission for the `spawnd-instance-role` resource
+**Solution**: Add `iam:PassRole` permission for the `spored-instance-role` resource
 
 ### Error: "You are not authorized to perform this operation"
 

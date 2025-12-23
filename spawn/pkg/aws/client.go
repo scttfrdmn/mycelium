@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -47,6 +48,7 @@ type LaunchConfig struct {
 	IdleTimeout     string
 	HibernateOnIdle bool
 	CostLimit       float64
+	DNSName         string
 
 	// Metadata
 	Name string
@@ -184,7 +186,11 @@ func buildTags(config LaunchConfig) []types.Tag {
 	if config.TTL != "" {
 		tags = append(tags, types.Tag{Key: aws.String("spawn:ttl"), Value: aws.String(config.TTL)})
 	}
-	
+
+	if config.DNSName != "" {
+		tags = append(tags, types.Tag{Key: aws.String("spawn:dns-name"), Value: aws.String(config.DNSName)})
+	}
+
 	if config.IdleTimeout != "" {
 		tags = append(tags, types.Tag{Key: aws.String("spawn:idle-timeout"), Value: aws.String(config.IdleTimeout)})
 	}
@@ -584,14 +590,14 @@ func (c *Client) UpdateInstanceTags(ctx context.Context, region, instanceID stri
 	return nil
 }
 
-// SetupSpawndIAMRole creates or retrieves the IAM role and instance profile for spawnd
+// SetupSporedIAMRole creates or retrieves the IAM role and instance profile for spored
 // Returns the instance profile name
-func (c *Client) SetupSpawndIAMRole(ctx context.Context) (string, error) {
+func (c *Client) SetupSporedIAMRole(ctx context.Context) (string, error) {
 	iamClient := iam.NewFromConfig(c.cfg)
 
-	roleName := "spawnd-instance-role"
-	instanceProfileName := "spawnd-instance-profile"
-	policyName := "spawnd-policy"
+	roleName := "spored-instance-role"
+	instanceProfileName := "spored-instance-profile"
+	policyName := "spored-policy"
 
 	roleCreated := false
 	profileCreated := false
@@ -620,7 +626,7 @@ func (c *Client) SetupSpawndIAMRole(ctx context.Context) (string, error) {
 		_, err = iamClient.CreateRole(ctx, &iam.CreateRoleInput{
 			RoleName:                 aws.String(roleName),
 			AssumeRolePolicyDocument: aws.String(trustPolicy),
-			Description:              aws.String("IAM role for spawnd daemon on EC2 instances"),
+			Description:              aws.String("IAM role for spored daemon on EC2 instances"),
 			Tags: []iamtypes.Tag{
 				{Key: aws.String("spawn:managed"), Value: aws.String("true")},
 			},
@@ -701,4 +707,25 @@ func (c *Client) SetupSpawndIAMRole(ctx context.Context) (string, error) {
 	}
 
 	return instanceProfileName, nil
+}
+
+// GetAccountID returns the AWS account ID of the current credentials
+func (c *Client) GetAccountID(ctx context.Context) (string, error) {
+	// We need to import STS service
+	// For now, use a workaround by getting it from EC2 instance metadata if available
+	// Or from IAM GetUser
+	
+	// Try IAM GetUser first
+	iamClient := iam.NewFromConfig(c.cfg)
+	userOutput, err := iamClient.GetUser(ctx, &iam.GetUserInput{})
+	if err == nil && userOutput.User != nil && userOutput.User.Arn != nil {
+		// Extract account ID from ARN: arn:aws:iam::123456789012:user/username
+		arn := *userOutput.User.Arn
+		parts := strings.Split(arn, ":")
+		if len(parts) >= 5 {
+			return parts[4], nil
+		}
+	}
+	
+	return "", fmt.Errorf("unable to determine account ID")
 }

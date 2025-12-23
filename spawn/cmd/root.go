@@ -2,49 +2,26 @@ package cmd
 
 import (
 	"fmt"
+	"log"
 	"os"
 
+	"github.com/scttfrdmn/mycelium/pkg/i18n"
 	"github.com/spf13/cobra"
 )
 
 const Version = "0.1.0"
 
+// Global flags for i18n and accessibility
+var (
+	flagLang          string
+	flagNoEmoji       bool
+	flagAccessibility bool
+)
+
 var rootCmd = &cobra.Command{
-	Use:   "spawn",
-	Short: "Launch AWS EC2 instances effortlessly",
-	Long: `spawn - Ephemeral AWS EC2 instance launcher (companion to truffle)
-
-spawn makes it super easy to launch AWS instances:
-  • Auto-detects AMI (Amazon Linux 2023, including GPU variants)
-  • Auto-configures SSH keys (uses ~/.ssh/id_rsa by default)
-  • Auto-creates VPC/subnet/security groups (tagged for cleanup)
-  • Installs spawnd agent for self-monitoring
-  • Auto-terminates on idle or TTL
-  • Auto-cleans up all resources
-
-Perfect for:
-  • Quick dev/test instances
-  • ML training jobs
-  • Spot instances
-  • Non-experts who just need compute
-
-Examples:
-  # From truffle
-  truffle search m7i.large | spawn
-  
-  # Spot instance
-  truffle spot m7i.large --max-price 0.10 | spawn --spot
-  
-  # GPU training with auto-terminate
-  truffle capacity --gpu-only | spawn --ttl 24h --hibernate-on-idle
-  
-  # Direct launch
-  spawn --instance-type m7i.large --region us-east-1
-
-Unix Philosophy:
-  truffle finds, spawn launches
-  Pipe JSON from truffle to spawn for seamless workflow`,
+	Use:     "spawn",
 	Version: Version,
+	// Short and Long descriptions will be set in init() after i18n initialization
 }
 
 func Execute() {
@@ -55,5 +32,75 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.CompletionOptions.DisableDefaultCmd = true
+	// Add global i18n and accessibility flags
+	rootCmd.PersistentFlags().StringVar(&flagLang, "lang", "", "Language for output (en, es, fr, de, ja)")
+	rootCmd.PersistentFlags().BoolVar(&flagNoEmoji, "no-emoji", false, "Disable emoji in output")
+	rootCmd.PersistentFlags().BoolVar(&flagAccessibility, "accessibility", false, "Enable accessibility mode (implies --no-emoji)")
+
+	// Initialize i18n before command execution
+	cobra.OnInitialize(initI18n)
+
+	// Enable shell completion for all supported shells
+	rootCmd.CompletionOptions.DisableDefaultCmd = false
+	rootCmd.CompletionOptions.DisableDescriptions = false
+}
+
+func initI18n() {
+	// Initialize i18n with configuration from flags
+	cfg := i18n.Config{
+		Language:          flagLang,
+		Verbose:           false,
+		AccessibilityMode: flagAccessibility,
+		NoEmoji:           flagNoEmoji,
+	}
+
+	if err := i18n.Init(cfg); err != nil {
+		log.Printf("Warning: failed to initialize i18n: %v", err)
+		// Continue with default English
+	}
+
+	// Set command descriptions after i18n is initialized
+	updateCommandDescriptions()
+}
+
+func updateCommandDescriptions() {
+	// Root command
+	rootCmd.Short = i18n.T("spawn.root.short")
+	rootCmd.Long = i18n.T("spawn.root.long")
+
+	// Launch command
+	if cmd, _, err := rootCmd.Find([]string{"launch"}); err == nil && cmd != nil {
+		cmd.Short = i18n.T("spawn.launch.short")
+		cmd.Long = i18n.T("spawn.launch.long")
+	}
+
+	// Connect command
+	if cmd, _, err := rootCmd.Find([]string{"connect"}); err == nil && cmd != nil {
+		cmd.Short = i18n.T("spawn.connect.short")
+		cmd.Long = i18n.T("spawn.connect.long")
+	}
+
+	// List command
+	if cmd, _, err := rootCmd.Find([]string{"list"}); err == nil && cmd != nil {
+		cmd.Short = i18n.T("spawn.list.short")
+		cmd.Long = i18n.T("spawn.list.long")
+	}
+
+	// DNS command
+	if cmd, _, err := rootCmd.Find([]string{"dns"}); err == nil && cmd != nil {
+		cmd.Short = i18n.T("spawn.dns.short")
+		cmd.Long = i18n.T("spawn.dns.long")
+	}
+
+	// Extend command
+	if cmd, _, err := rootCmd.Find([]string{"extend"}); err == nil && cmd != nil {
+		cmd.Short = i18n.T("spawn.extend.short")
+		cmd.Long = i18n.T("spawn.extend.long")
+	}
+
+	// State command
+	if cmd, _, err := rootCmd.Find([]string{"state"}); err == nil && cmd != nil {
+		cmd.Short = i18n.T("spawn.state.short")
+		cmd.Long = i18n.T("spawn.state.long")
+	}
 }

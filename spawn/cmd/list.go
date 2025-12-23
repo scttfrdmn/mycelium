@@ -9,8 +9,9 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/scttfrdmn/mycelium/pkg/i18n"
 	"github.com/spf13/cobra"
-	"github.com/yourusername/spawn/pkg/aws"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/aws"
 )
 
 var (
@@ -24,36 +25,10 @@ var (
 )
 
 var listCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List spawn-managed EC2 instances",
-	Long: `List all EC2 instances managed by spawn across regions.
-
-By default, shows all running and stopped instances in all regions.
-
-Examples:
-  # List all spawn instances
-  spawn list
-
-  # List instances in specific region
-  spawn list --region us-east-1
-
-  # List only running instances
-  spawn list --state running
-
-  # List stopped instances in us-west-2
-  spawn list --region us-west-2 --state stopped
-
-  # List by availability zone
-  spawn list --az us-east-1a
-
-  # List by instance type or family
-  spawn list --instance-type t3.micro
-  spawn list --instance-family m7i
-
-  # List by tag
-  spawn list --tag project=ml --tag team=research`,
+	Use:     "list",
 	RunE:    runList,
 	Aliases: []string{"ls"},
+	// Short and Long will be set after i18n initialization
 }
 
 func init() {
@@ -74,25 +49,25 @@ func runList(cmd *cobra.Command, args []string) error {
 	// Create AWS client
 	client, err := aws.NewClient(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to create AWS client: %w", err)
+		return i18n.Te("error.aws_client_init", err)
 	}
 
 	// List instances
-	fmt.Fprintf(os.Stderr, "Searching for spawn-managed instances")
 	if listRegion != "" {
-		fmt.Fprintf(os.Stderr, " in %s", listRegion)
+		fmt.Fprintf(os.Stderr, "%s...\n", i18n.Tf("spawn.list.searching_region", map[string]interface{}{
+			"Region": listRegion,
+		}))
 	} else {
-		fmt.Fprintf(os.Stderr, " across all regions")
+		fmt.Fprintf(os.Stderr, "%s...\n", i18n.T("spawn.list.searching_all_regions"))
 	}
-	fmt.Fprintln(os.Stderr, "...")
 
 	instances, err := client.ListInstances(ctx, listRegion, listState)
 	if err != nil {
-		return fmt.Errorf("failed to list instances: %w", err)
+		return i18n.Te("spawn.list.error.list_failed", err)
 	}
 
 	if len(instances) == 0 {
-		fmt.Println("\nNo spawn-managed instances found.")
+		fmt.Printf("\n%s\n", i18n.T("spawn.list.no_instances"))
 		return nil
 	}
 
@@ -100,7 +75,7 @@ func runList(cmd *cobra.Command, args []string) error {
 	instances = filterInstances(instances)
 
 	if len(instances) == 0 {
-		fmt.Println("\nNo instances match the specified filters.")
+		fmt.Printf("\n%s\n", i18n.T("spawn.list.no_instances_match"))
 		return nil
 	}
 
@@ -124,7 +99,17 @@ func outputTable(instances []aws.InstanceInfo) error {
 	defer w.Flush()
 
 	// Header
-	fmt.Fprintln(w, "INSTANCE ID\tNAME\tTYPE\tSTATE\tAZ\tAGE\tTTL\tPUBLIC IP\tSPOT")
+	fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+		i18n.T("spawn.list.header.instance_id"),
+		i18n.T("spawn.list.header.name"),
+		i18n.T("spawn.list.header.type"),
+		i18n.T("spawn.list.header.state"),
+		i18n.T("spawn.list.header.az"),
+		i18n.T("spawn.list.header.age"),
+		i18n.T("spawn.list.header.ttl"),
+		i18n.T("spawn.list.header.public_ip"),
+		i18n.T("spawn.list.header.spot"),
+	)
 
 	for _, inst := range instances {
 		// Calculate age

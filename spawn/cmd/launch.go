@@ -3,17 +3,21 @@ package cmd
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 
+	"github.com/scttfrdmn/mycelium/pkg/i18n"
 	"github.com/spf13/cobra"
-	"github.com/yourusername/spawn/pkg/aws"
-	"github.com/yourusername/spawn/pkg/input"
-	"github.com/yourusername/spawn/pkg/platform"
-	"github.com/yourusername/spawn/pkg/progress"
-	"github.com/yourusername/spawn/pkg/wizard"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/aws"
+	spawnconfig "github.com/scttfrdmn/mycelium/spawn/pkg/config"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/input"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/platform"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/progress"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/wizard"
 )
 
 var (
@@ -45,7 +49,10 @@ var (
 	name             string
 	userData         string
 	userDataFile     string
-	
+	dnsName          string
+	dnsDomain        string
+	dnsAPIEndpoint   string
+
 	// Mode
 	interactive      bool
 	quiet            bool
@@ -54,26 +61,10 @@ var (
 )
 
 var launchCmd = &cobra.Command{
-	Use:   "launch",
-	Short: "Launch an EC2 instance",
-	Long: `Launch an EC2 instance with smart defaults.
-
-Three ways to use:
-  1. Interactive wizard (default if no input)
-  2. From truffle JSON via pipe
-  3. Direct with flags
-
-Examples:
-  # Interactive wizard
-  spawn launch
-  
-  # From truffle
-  truffle search m7i.large | spawn launch
-  
-  # Direct
-  spawn launch --instance-type m7i.large --region us-east-1`,
-	RunE: runLaunch,
+	Use:     "launch",
+	RunE:    runLaunch,
 	Aliases: []string{"", "run", "create"},
+	// Short and Long will be set after i18n initialization
 }
 
 func init() {
@@ -109,30 +100,41 @@ func init() {
 	launchCmd.Flags().StringVar(&name, "name", "", "Instance name tag")
 	launchCmd.Flags().StringVar(&userData, "user-data", "", "User data (@file or inline)")
 	launchCmd.Flags().StringVar(&userDataFile, "user-data-file", "", "User data file")
-	
+	launchCmd.Flags().StringVar(&dnsName, "dns", "", "Register DNS name (e.g., my-instance for my-instance.spore.host)")
+	launchCmd.Flags().StringVar(&dnsDomain, "dns-domain", "", "Custom DNS domain (overrides default)")
+	launchCmd.Flags().StringVar(&dnsAPIEndpoint, "dns-api-endpoint", "", "Custom DNS API endpoint (overrides default)")
+
 	// Mode
 	launchCmd.Flags().BoolVar(&interactive, "interactive", false, "Force interactive wizard")
 	launchCmd.Flags().BoolVar(&quiet, "quiet", false, "Minimal output")
 	launchCmd.Flags().BoolVar(&waitForRunning, "wait-for-running", true, "Wait until running")
 	launchCmd.Flags().BoolVar(&waitForSSH, "wait-for-ssh", true, "Wait until SSH is ready")
+
+	// Register completions for flags
+	launchCmd.RegisterFlagCompletionFunc("region", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return completeRegion(cmd, args, toComplete)
+	})
+	launchCmd.RegisterFlagCompletionFunc("instance-type", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return completeInstanceType(cmd, args, toComplete)
+	})
 }
 
 func runLaunch(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
-	
+
 	// Detect platform
 	plat, err := platform.Detect()
 	if err != nil {
-		return fmt.Errorf("failed to detect platform: %w", err)
+		return i18n.Te("error.platform_detect_failed", err)
 	}
-	
+
 	// Enable colors on Windows
 	if plat.OS == "windows" {
 		platform.EnableWindowsColors()
 	}
-	
+
 	var config *aws.LaunchConfig
-	
+
 	// Determine mode: wizard, pipe, or flags
 	if interactive || (instanceType == "" && isTerminal(os.Stdin)) {
 		// Interactive wizard mode
@@ -145,9 +147,9 @@ func runLaunch(cmd *cobra.Command, args []string) error {
 		// Pipe mode (from truffle)
 		truffleInput, err := input.ParseFromStdin()
 		if err != nil {
-			return fmt.Errorf("failed to parse input: %w", err)
+			return i18n.Te("error.input_parse_failed", err)
 		}
-		
+
 		config, err = buildLaunchConfig(truffleInput)
 		if err != nil {
 			return err
@@ -159,21 +161,21 @@ func runLaunch(cmd *cobra.Command, args []string) error {
 			return err
 		}
 	}
-	
+
 	// Validate
 	if config.InstanceType == "" {
-		return fmt.Errorf("instance type required")
+		return i18n.Te("error.instance_type_required", nil)
 	}
 	if config.Region == "" {
-		return fmt.Errorf("region required")
+		return i18n.Te("error.region_required", nil)
 	}
-	
+
 	// Initialize AWS client
 	awsClient, err := aws.NewClient(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to initialize AWS client: %w", err)
+		return i18n.Te("error.aws_client_init", err)
 	}
-	
+
 	// Launch with progress display
 	return launchWithProgress(ctx, awsClient, config, plat)
 }
@@ -210,7 +212,7 @@ func launchWithProgress(ctx context.Context, awsClient *aws.Client, config *aws.
 	// Step 3: Setup IAM instance profile
 	prog.Start("Setting up IAM role")
 	if config.IamInstanceProfile == "" {
-		instanceProfile, err := awsClient.SetupSpawndIAMRole(ctx)
+		instanceProfile, err := awsClient.SetupSporedIAMRole(ctx)
 		if err != nil {
 			prog.Error("Setting up IAM role", err)
 			return err
@@ -240,10 +242,10 @@ func launchWithProgress(ctx context.Context, awsClient *aws.Client, config *aws.
 	prog.Complete("Launching instance")
 	time.Sleep(300 * time.Millisecond)
 
-	// Step 7: Installing spawnd
-	prog.Start("Installing spawnd agent")
+	// Step 7: Installing spored
+	prog.Start("Installing spored agent")
 	time.Sleep(30 * time.Second) // Wait for user-data
-	prog.Complete("Installing spawnd agent")
+	prog.Complete("Installing spored agent")
 	time.Sleep(300 * time.Millisecond)
 
 	// Step 8: Wait for running
@@ -271,11 +273,39 @@ func launchWithProgress(ctx context.Context, awsClient *aws.Client, config *aws.
 		time.Sleep(5 * time.Second) // Simplified
 	}
 	prog.Complete("Waiting for SSH")
-	
+
+	// Step 11: Register DNS (if requested)
+	var dnsRecord string
+	if dnsName != "" {
+		// Load DNS configuration with precedence
+		dnsConfig, err := spawnconfig.LoadDNSConfig(ctx, dnsDomain, dnsAPIEndpoint)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "\n⚠️  Failed to load DNS config: %v\n", err)
+		} else {
+			prog.Start("Registering DNS")
+			fqdn, err := registerDNS(plat, result.InstanceID, result.PublicIP, dnsName, dnsConfig.Domain, dnsConfig.APIEndpoint)
+			if err != nil {
+				prog.Error("Registering DNS", err)
+				// Non-fatal: continue even if DNS registration fails
+				fmt.Fprintf(os.Stderr, "\n⚠️  DNS registration failed: %v\n", err)
+			} else {
+				dnsRecord = fqdn
+				prog.Complete("Registering DNS")
+			}
+			time.Sleep(300 * time.Millisecond)
+		}
+	}
+
 	// Display success
 	sshCmd := plat.GetSSHCommand("ec2-user", result.PublicIP)
 	prog.DisplaySuccess(result.InstanceID, result.PublicIP, sshCmd, config)
-	
+
+	// Show DNS info if registered
+	if dnsRecord != "" {
+		fmt.Fprintf(os.Stdout, "\n🌐 DNS: %s\n", dnsRecord)
+		fmt.Fprintf(os.Stdout, "   Connect: ssh %s@%s\n", plat.GetUsername(), dnsRecord)
+	}
+
 	return nil
 }
 
@@ -323,6 +353,9 @@ func buildLaunchConfig(truffleInput *input.TruffleInput) (*aws.LaunchConfig, err
 	if ttl != "" {
 		config.TTL = ttl
 	}
+	if dnsName != "" {
+		config.DNSName = dnsName
+	}
 	if idleTimeout != "" {
 		config.IdleTimeout = idleTimeout
 	}
@@ -339,7 +372,21 @@ func buildLaunchConfig(truffleInput *input.TruffleInput) (*aws.LaunchConfig, err
 func setupSSHKey(ctx context.Context, awsClient *aws.Client, region string, plat *platform.Platform) (string, error) {
 	// Check for local SSH key
 	if !plat.HasSSHKey() {
-		return "", fmt.Errorf("no SSH key found at %s (run spawn with --interactive to create one)", plat.SSHKeyPath)
+		// Auto-create SSH key if running in a terminal
+		if isTerminal(os.Stdin) {
+			fmt.Fprintf(os.Stderr, "\n⚠️  No SSH key found at %s\n", plat.SSHKeyPath)
+			fmt.Fprintf(os.Stderr, "   Creating SSH key automatically...\n")
+
+			if err := plat.CreateSSHKey(); err != nil {
+				return "", fmt.Errorf("failed to create SSH key: %w", err)
+			}
+
+			fmt.Fprintf(os.Stderr, "✅ SSH key created: %s\n\n", plat.SSHKeyPath)
+		} else {
+			// Non-interactive stdin (piped input) - provide helpful error
+			return "", fmt.Errorf("no SSH key found at %s\n\nTo create one:\n  ssh-keygen -t rsa -b 4096 -f %s -N ''\n\nOr run spawn directly (not piped):\n  spawn launch --instance-type m7i.large --region us-east-1",
+				plat.SSHKeyPath, plat.SSHKeyPath)
+		}
 	}
 
 	// Get fingerprint of local key
@@ -406,7 +453,7 @@ func buildUserData(plat *platform.Platform) (string, error) {
 		}
 	}
 	
-	// Build user-data with spawnd installer (S3-based with SHA256 verification)
+	// Build user-data with spored installer (S3-based with SHA256 verification)
 	script := fmt.Sprintf(`#!/bin/bash
 set -e
 
@@ -417,7 +464,7 @@ LOCAL_SSH_KEY_BASE64="%s"
 
 # Detect architecture
 ARCH=$(uname -m)
-echo "Installing spawnd for architecture: $ARCH"
+echo "Installing spored for architecture: $ARCH"
 
 # Detect region
 TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" 2>/dev/null || true)
@@ -432,10 +479,10 @@ echo "Region: $REGION"
 # Determine binary name
 case "$ARCH" in
     x86_64)
-        BINARY="spawnd-linux-amd64"
+        BINARY="spored-linux-amd64"
         ;;
     aarch64)
-        BINARY="spawnd-linux-arm64"
+        BINARY="spored-linux-arm64"
         ;;
     *)
         echo "Unsupported architecture: $ARCH"
@@ -447,16 +494,16 @@ esac
 S3_BASE_URL="https://spawn-binaries-${REGION}.s3.amazonaws.com"
 FALLBACK_URL="https://spawn-binaries-us-east-1.s3.amazonaws.com"
 
-echo "Downloading spawnd binary..."
+echo "Downloading spored binary..."
 
 # Try regional bucket first, fallback to us-east-1
-if curl -f -o /usr/local/bin/spawnd "${S3_BASE_URL}/${BINARY}" 2>/dev/null; then
+if curl -f -o /usr/local/bin/spored "${S3_BASE_URL}/${BINARY}" 2>/dev/null; then
     CHECKSUM_URL="${S3_BASE_URL}/${BINARY}.sha256"
     echo "Downloaded from ${REGION}"
 else
     echo "Regional bucket unavailable, using us-east-1"
-    curl -f -o /usr/local/bin/spawnd "${FALLBACK_URL}/${BINARY}" || {
-        echo "Failed to download spawnd binary"
+    curl -f -o /usr/local/bin/spored "${FALLBACK_URL}/${BINARY}" || {
+        echo "Failed to download spored binary"
         exit 1
     }
     CHECKSUM_URL="${FALLBACK_URL}/${BINARY}.sha256"
@@ -464,25 +511,25 @@ fi
 
 # Download and verify SHA256 checksum
 echo "Verifying checksum..."
-curl -f -o /tmp/spawnd.sha256 "${CHECKSUM_URL}" || {
+curl -f -o /tmp/spored.sha256 "${CHECKSUM_URL}" || {
     echo "Failed to download checksum"
     exit 1
 }
 
 cd /usr/local/bin
-EXPECTED_CHECKSUM=$(cat /tmp/spawnd.sha256)
-ACTUAL_CHECKSUM=$(sha256sum spawnd | awk '{print $1}')
+EXPECTED_CHECKSUM=$(cat /tmp/spored.sha256)
+ACTUAL_CHECKSUM=$(sha256sum spored | awk '{print $1}')
 
 if [ "$EXPECTED_CHECKSUM" != "$ACTUAL_CHECKSUM" ]; then
     echo "❌ Checksum verification failed!"
     echo "   Expected: $EXPECTED_CHECKSUM"
     echo "   Actual:   $ACTUAL_CHECKSUM"
-    rm -f /usr/local/bin/spawnd
+    rm -f /usr/local/bin/spored
     exit 1
 fi
 
 echo "✅ Checksum verified: $EXPECTED_CHECKSUM"
-chmod +x /usr/local/bin/spawnd
+chmod +x /usr/local/bin/spored
 
 # Setup local user account
 echo "Setting up user: $LOCAL_USERNAME"
@@ -510,7 +557,7 @@ chown -R $LOCAL_USERNAME:$LOCAL_USERNAME /home/$LOCAL_USERNAME/.ssh
 echo "✅ User $LOCAL_USERNAME configured with SSH access and sudo privileges"
 
 # Create systemd service
-cat > /etc/systemd/system/spawnd.service <<'EOFSERVICE'
+cat > /etc/systemd/system/spored.service <<'EOFSERVICE'
 [Unit]
 Description=Spawn Agent - Instance self-monitoring
 After=network-online.target
@@ -518,7 +565,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/spawnd
+ExecStart=/usr/local/bin/spored
 Restart=always
 RestartSec=10
 
@@ -528,10 +575,10 @@ EOFSERVICE
 
 # Enable and start
 systemctl daemon-reload
-systemctl enable spawnd
-systemctl start spawnd
+systemctl enable spored
+systemctl start spored
 
-echo "spawnd installation complete"
+echo "spored installation complete"
 `
 	
 	if customUserData != "" {
@@ -548,4 +595,68 @@ func isTerminal(f *os.File) bool {
 		return false
 	}
 	return (stat.Mode() & os.ModeCharDevice) != 0
+}
+
+func registerDNS(plat *platform.Platform, instanceID, publicIP, recordName, domain, apiEndpoint string) (string, error) {
+	// Build SSH command to register DNS from within the instance
+	sshScript := fmt.Sprintf(`
+# Get IMDSv2 token
+TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" -s 2>/dev/null)
+
+# Get instance identity
+IDENTITY_DOC=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/dynamic/instance-identity/document 2>/dev/null | base64 -w0)
+IDENTITY_SIG=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/dynamic/instance-identity/signature 2>/dev/null | tr -d '\n')
+PUBLIC_IP=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null)
+
+# Call DNS API
+curl -s -X POST %s \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"instance_identity_document\": \"$IDENTITY_DOC\",
+    \"instance_identity_signature\": \"$IDENTITY_SIG\",
+    \"record_name\": \"%s\",
+    \"ip_address\": \"$PUBLIC_IP\",
+    \"action\": \"UPSERT\"
+  }" 2>/dev/null || echo '{"success":false,"error":"DNS API call failed"}'
+`, apiEndpoint, recordName)
+
+	// Execute SSH command
+	sshKeyPath := plat.SSHKeyPath
+	username := plat.GetUsername()
+
+	// Build SSH command arguments
+	sshArgs := []string{
+		"-i", sshKeyPath,
+		"-o", "StrictHostKeyChecking=no",
+		"-o", "UserKnownHostsFile=/dev/null",
+		"-o", "ConnectTimeout=10",
+		"-o", "LogLevel=ERROR",
+		fmt.Sprintf("%s@%s", username, publicIP),
+		sshScript,
+	}
+
+	// Execute
+	cmd := exec.Command("ssh", sshArgs...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("failed to execute SSH command: %w (output: %s)", err, string(output))
+	}
+
+	// Parse response
+	var response struct {
+		Success bool   `json:"success"`
+		Error   string `json:"error"`
+		Message string `json:"message"`
+		Record  string `json:"record"`
+	}
+
+	if err := json.Unmarshal([]byte(strings.TrimSpace(string(output))), &response); err != nil {
+		return "", fmt.Errorf("failed to parse DNS API response: %w (output: %s)", err, string(output))
+	}
+
+	if !response.Success {
+		return "", fmt.Errorf("%s", response.Error)
+	}
+
+	return response.Record, nil
 }

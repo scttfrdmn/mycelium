@@ -7,7 +7,7 @@ This document tracks the DNS configuration for automatic instance hostnames.
 This is an **open source project**, so anyone can use spawn and get automatic DNS. The security model uses a centralized Lambda API Gateway that validates instance identity before updating DNS.
 
 **Default Account** (Infrastructure provider - Account: 752123829273):
-- Hosts spawnd/spored binaries in S3
+- Hosts spored/spored binaries in S3
 - Route53 hosted zone for spore.host
 - Lambda DNS updater (Go-based)
 - API Gateway public endpoint
@@ -247,7 +247,7 @@ If KSK rotation is needed:
 - [x] Add DS record to registrar
 - [ ] Verify DNS propagation (24-48 hours)
 - [ ] Implement `spawn launch --dns` flag
-- [ ] Implement spawnd/spored DNS update logic (call API on launch/IP change)
+- [ ] Implement spored/spored DNS update logic (call API on launch/IP change)
 - [ ] Add `spawn dns` management commands (list, update, delete)
 
 ## Useful Commands

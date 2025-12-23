@@ -10,9 +10,9 @@ Built for Claude Code to compile and run.
 - Auto-detects AMI (AL2023 + GPU variants)
 - Multi-architecture support (x86_64 + ARM/Graviton)
 - Smart SSH key handling (uses ~/.ssh/id_rsa)
-- User data injection for spawnd
+- User data injection for spored
 
-### 2. **spawnd Agent** (Runs on instances)
+### 2. **spored Agent** (Runs on instances)
 - Systemd service integration
 - Self-monitoring (CPU, network, uptime)
 - TTL enforcement
@@ -24,7 +24,7 @@ Built for Claude Code to compile and run.
 ### 3. **Multi-Architecture Support**
 - x86_64 (Intel/AMD)
 - ARM64 (Graviton)
-- Both for spawn CLI and spawnd agent
+- Both for spawn CLI and spored agent
 - Makefile builds all variants
 
 ### 4. **AMI Detection**
@@ -58,19 +58,19 @@ spawn/
 ├── cmd/
 │   ├── root.go                  # CLI root
 │   ├── launch.go                # Main launch command
-│   └── spawnd/
-│       └── main.go              # spawnd agent entry
+│   └── spored/
+│       └── main.go              # spored agent entry
 ├── pkg/
 │   ├── agent/
-│   │   └── agent.go             # spawnd monitoring logic
+│   │   └── agent.go             # spored monitoring logic
 │   ├── aws/
 │   │   ├── client.go            # EC2 client
 │   │   └── ami.go               # AMI detection
 │   └── input/
 │       └── parser.go            # Parse truffle JSON
 └── scripts/
-    ├── spawnd.service           # systemd service file
-    └── install-spawnd.sh        # Installation script
+    ├── spored.service           # systemd service file
+    └── install-spored.sh        # Installation script
 ```
 
 ## 🚀 Building
@@ -87,8 +87,8 @@ make build-all
 # Outputs:
 # bin/spawn-linux-amd64       (x86_64)
 # bin/spawn-linux-arm64       (Graviton)
-# bin/spawnd-linux-amd64      (x86_64)
-# bin/spawnd-linux-arm64      (Graviton)
+# bin/spored-linux-amd64      (x86_64)
+# bin/spored-linux-arm64      (Graviton)
 # bin/spawn-darwin-amd64      (macOS Intel)
 # bin/spawn-darwin-arm64      (macOS M1/M2)
 ```
@@ -115,7 +115,7 @@ func (c *Client) GetRecommendedAMI(ctx, instanceType string) (string, error)
 - ✅ AL2023 x86_64 GPU (NVIDIA drivers)
 - ✅ AL2023 ARM64 GPU
 
-### spawnd Monitoring
+### spored Monitoring
 
 ```go
 // From pkg/agent/agent.go
@@ -152,7 +152,7 @@ After=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/spawnd
+ExecStart=/usr/local/bin/spored
 Restart=always
 RestartSec=10
 
@@ -179,7 +179,7 @@ truffle search m7i.large --pick-first | spawn launch
 ✅ Using SSH key: ~/.ssh/id_rsa
 🚀 Launching m7i.large in us-east-1...
 ✅ Instance launched: i-1234567890
-✅ spawnd agent installing...
+✅ spored agent installing...
 ```
 
 ### GPU with TTL
@@ -193,7 +193,7 @@ truffle capacity --instance-types p5.48xlarge | spawn launch --ttl 24h
    Instance Type: p5.48xlarge
    TTL: 24h (auto-terminate)
 🚀 Launching...
-💡 spawnd will self-terminate after 24h
+💡 spored will self-terminate after 24h
 ```
 
 ### Graviton Spot
@@ -226,25 +226,25 @@ truffle spot m8g.xlarge | spawn launch --spot
    ↓
 6. spawn: Setup SSH key (~/.ssh/id_rsa)
    ↓
-7. spawn: Build user-data with spawnd installer
+7. spawn: Build user-data with spored installer
    ↓
 8. spawn: Call ec2.RunInstances()
    ↓
 9. Instance boots → user-data runs
    ↓
-10. spawnd downloads and installs
+10. spored downloads and installs
     ↓
-11. systemctl enable/start spawnd
+11. systemctl enable/start spored
     ↓
-12. spawnd reads tags (ttl, idle-timeout)
+12. spored reads tags (ttl, idle-timeout)
     ↓
-13. spawnd monitors instance
+13. spored monitors instance
     ↓
 14. [Time passes, TTL reached or idle detected]
     ↓
-15. spawnd: Warn users (5 min)
+15. spored: Warn users (5 min)
     ↓
-16. spawnd: Self-terminate or hibernate
+16. spored: Self-terminate or hibernate
     ↓
 17. [Future] Cleanup lambda: Delete child resources
 ```
@@ -257,9 +257,9 @@ User's laptop can:
 ├─ Sleep
 ├─ Lose wifi
 ├─ Die completely
-└─ → spawnd keeps running!
+└─ → spored keeps running!
 
-Because spawnd runs ON the instance itself:
+Because spored runs ON the instance itself:
 ✅ Reads its own tags from AWS
 ✅ Monitors its own metrics
 ✅ Terminates itself when needed
@@ -308,7 +308,7 @@ These are mentioned in design but not yet coded:
 2. ✅ **AMI detection** - All 4 variants
 3. ✅ **Architecture detection** - x86_64 vs ARM
 4. ✅ **GPU detection** - Selects GPU AMI
-5. ✅ **spawnd agent** - Full monitoring
+5. ✅ **spored agent** - Full monitoring
 6. ✅ **TTL enforcement** - Auto-terminate
 7. ✅ **Idle detection** - CPU + network
 8. ✅ **Hibernation** - EBS encryption, volume sizing
@@ -316,7 +316,7 @@ These are mentioned in design but not yet coded:
 10. ✅ **Multi-arch builds** - Makefile for all platforms
 11. ✅ **Pipe from truffle** - JSON parsing
 12. ✅ **Spot support** - From truffle or flag
-13. ✅ **User data** - spawnd injection
+13. ✅ **User data** - spored injection
 
 ## 🚀 Ready for Claude Code
 
@@ -359,7 +359,7 @@ sudo mv spawn-linux-amd64 /usr/local/bin/spawn
 
 **Implemented:**
 - ✅ Complete spawn CLI
-- ✅ Complete spawnd agent
+- ✅ Complete spored agent
 - ✅ Multi-architecture (x86_64 + ARM)
 - ✅ GPU AMI detection
 - ✅ systemd integration

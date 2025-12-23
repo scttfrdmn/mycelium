@@ -17,8 +17,8 @@ make build-all
 # You'll get:
 # ✅ bin/spawn-linux-amd64
 # ✅ bin/spawn-linux-arm64
-# ✅ bin/spawnd-linux-amd64
-# ✅ bin/spawnd-linux-arm64
+# ✅ bin/spored-linux-amd64
+# ✅ bin/spored-linux-arm64
 # ✅ bin/spawn-darwin-amd64
 # ✅ bin/spawn-darwin-arm64
 # ✅ bin/spawn-windows-amd64.exe
@@ -46,16 +46,16 @@ make build
   ../spawn/bin/spawn
 ```
 
-### Step 5: Deploy spawnd to S3 (Optional)
+### Step 5: Deploy spored to S3 (Optional)
 
 ```bash
 cd /mnt/user-data/outputs/spawn
 
 # Make deploy script executable
-chmod +x scripts/deploy-spawnd.sh
+chmod +x scripts/deploy-spored.sh
 
 # Deploy to all regions
-./scripts/deploy-spawnd.sh 0.1.0
+./scripts/deploy-spored.sh 0.1.0
 
 # This creates regional S3 buckets and uploads binaries
 # Requires AWS credentials configured
@@ -79,7 +79,7 @@ chmod +x scripts/deploy-spawnd.sh
 - Pipe from truffle (power users)
 - Direct flags (quick launches)
 - Windows/Linux/macOS support
-- spawnd agent for self-monitoring
+- spored agent for self-monitoring
 - S3-based fast distribution
 
 ---
@@ -90,7 +90,7 @@ chmod +x scripts/deploy-spawnd.sh
 
 **Core Features:**
 - [x] spawn CLI with 3 input modes
-- [x] spawnd systemd agent
+- [x] spored systemd agent
 - [x] Multi-architecture (x86_64 + ARM64)
 - [x] AMI auto-detection (4 variants)
 - [x] Hibernation support
@@ -233,7 +233,7 @@ spawn/
 ├── pkg/wizard/             # Interactive wizard
 ├── pkg/progress/           # Live progress display
 ├── pkg/aws/ami.go          # AMI detection (4 variants)
-├── scripts/deploy-spawnd.sh # S3 deployment
+├── scripts/deploy-spored.sh # S3 deployment
 └── Makefile                # Build system
 ```
 
@@ -242,8 +242,8 @@ spawn/
 bin/
 ├── spawn-linux-amd64
 ├── spawn-linux-arm64
-├── spawnd-linux-amd64
-├── spawnd-linux-arm64
+├── spored-linux-amd64
+├── spored-linux-arm64
 ├── spawn-darwin-amd64
 ├── spawn-darwin-arm64
 └── spawn-windows-amd64.exe
@@ -274,7 +274,7 @@ bin/
 - Cross-platform
 
 ### 5. Auto-Monitoring
-- spawnd runs on instance
+- spored runs on instance
 - Laptop-independent
 - Self-terminates
 
@@ -296,9 +296,9 @@ Before first use:
    make build-all
    ```
 
-3. **Deploy spawnd** (optional but recommended)
+3. **Deploy spored** (optional but recommended)
    ```bash
-   ./scripts/deploy-spawnd.sh 0.1.0
+   ./scripts/deploy-spored.sh 0.1.0
    ```
 
 4. **Test Wizard**
@@ -327,7 +327,7 @@ spawn is working if:
 1. **Build**: `make build-all`
 2. **Test wizard**: `./bin/spawn`
 3. **Test with truffle**: See integration examples above
-4. **Deploy to S3**: `./scripts/deploy-spawnd.sh 0.1.0`
+4. **Deploy to S3**: `./scripts/deploy-spored.sh 0.1.0`
 5. **Ship it**: Give users Windows/Linux/macOS binaries!
 
 **Ready to make AWS accessible to everyone!** 🚀

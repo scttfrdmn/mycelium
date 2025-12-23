@@ -8,6 +8,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/scttfrdmn/mycelium/pkg/i18n"
 	"github.com/spf13/cobra"
 	"github.com/yourusername/truffle/pkg/aws"
 	"github.com/yourusername/truffle/pkg/output"
@@ -22,33 +23,10 @@ var (
 )
 
 var spotCmd = &cobra.Command{
-	Use:   "spot [instance-type-pattern]",
-	Short: "Search for Spot instance pricing and availability",
-	Long: `Search for EC2 Spot instances with pricing information.
-
-This command shows current Spot prices across regions and availability zones,
-helping you find the best Spot instance opportunities and maximize savings.
-
-Spot instances are identical to On-Demand instances but can be interrupted by AWS.
-They typically cost 50-90% less than On-Demand pricing.
-
-Examples:
-  # Get current Spot prices for m7i.large
-  truffle spot m7i.large
-
-  # Find Spot instances under $0.10/hour
-  truffle spot "m8g.*" --max-price 0.10
-
-  # Show savings vs On-Demand
-  truffle spot m7i.xlarge --show-savings
-
-  # Sort by price (cheapest first)
-  truffle spot "c7i.*" --sort-by-price
-
-  # Find Spot in specific regions
-  truffle spot r7i.2xlarge --regions us-east-1,us-west-2`,
+	Use:  "spot [instance-type-pattern]",
 	Args: cobra.ExactArgs(1),
 	RunE: runSpot,
+	// Short and Long will be set after i18n initialization
 }
 
 func init() {
@@ -60,6 +38,9 @@ func init() {
 	spotCmd.Flags().BoolVar(&spotOnlyActive, "active-only", false, "Only show AZs with active Spot capacity")
 	spotCmd.Flags().IntVar(&spotLookbackHours, "lookback-hours", 1, "Hours to look back for price history (1-720)")
 	spotCmd.Flags().DurationVar(&timeout, "timeout", 5*time.Minute, "Timeout for AWS API calls")
+
+	// Register completion for instance type argument
+	spotCmd.ValidArgsFunction = completeInstanceType
 }
 
 func runSpot(cmd *cobra.Command, args []string) error {
@@ -69,13 +50,17 @@ func runSpot(cmd *cobra.Command, args []string) error {
 	regexPattern := wildcardToRegex(pattern)
 	matcher, err := regexp.Compile(regexPattern)
 	if err != nil {
-		return fmt.Errorf("invalid pattern: %w", err)
+		return i18n.Te("truffle.spot.error.invalid_pattern", err)
 	}
 
 	if verbose {
-		fmt.Fprintf(os.Stderr, "💰 Searching for Spot instances matching: %s\n", pattern)
+		fmt.Fprintf(os.Stderr, "%s %s\n", i18n.Emoji("money_bag"), i18n.Tf("truffle.spot.searching", map[string]interface{}{
+			"Pattern": pattern,
+		}))
 		if spotMaxPrice > 0 {
-			fmt.Fprintf(os.Stderr, "💵 Max price filter: $%.4f/hour\n", spotMaxPrice)
+			fmt.Fprintf(os.Stderr, "%s %s\n", i18n.Emoji("dollar"), i18n.Tf("truffle.spot.max_price_filter", map[string]interface{}{
+				"MaxPrice": spotMaxPrice,
+			}))
 		}
 	}
 
@@ -85,23 +70,25 @@ func runSpot(cmd *cobra.Command, args []string) error {
 	// Initialize AWS client
 	awsClient, err := aws.NewClient(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to initialize AWS client: %w", err)
+		return i18n.Te("error.aws_client_init", err)
 	}
 
 	// Get regions to search
 	searchRegions := regions
 	if len(searchRegions) == 0 {
 		if verbose {
-			fmt.Fprintln(os.Stderr, "🌍 Fetching all AWS regions...")
+			fmt.Fprintf(os.Stderr, "%s %s\n", i18n.Emoji("globe"), i18n.T("truffle.spot.fetching_regions"))
 		}
 		searchRegions, err = awsClient.GetAllRegions(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to get regions: %w", err)
+			return i18n.Te("truffle.spot.error.get_regions_failed", err)
 		}
 	}
 
 	if verbose {
-		fmt.Fprintf(os.Stderr, "🔎 Searching Spot prices across %d regions...\n", len(searchRegions))
+		fmt.Fprintf(os.Stderr, "%s %s\n", i18n.Emoji("magnifying_glass_tilted"), i18n.Tf("truffle.spot.searching_across", map[string]interface{}{
+			"Count": len(searchRegions),
+		}))
 	}
 
 	// First find instance types (need to match pattern)
@@ -114,17 +101,17 @@ func runSpot(cmd *cobra.Command, args []string) error {
 		Verbose:        verbose,
 	})
 	if err != nil {
-		return fmt.Errorf("search failed: %w", err)
+		return i18n.Te("truffle.spot.error.search_failed", err)
 	}
 
 	if len(results) == 0 {
-		fmt.Println("No matching instance types found.")
+		fmt.Println(i18n.T("truffle.spot.no_matching_types"))
 		return nil
 	}
 
 	// Get Spot pricing for found instances
 	if verbose {
-		fmt.Fprintln(os.Stderr, "💰 Fetching Spot pricing data...")
+		fmt.Fprintf(os.Stderr, "%s %s\n", i18n.Emoji("money_bag"), i18n.T("truffle.spot.fetching_pricing"))
 	}
 
 	spotResults, err := awsClient.GetSpotPricing(ctx, results, aws.SpotOptions{
@@ -135,11 +122,11 @@ func runSpot(cmd *cobra.Command, args []string) error {
 		Verbose:       verbose,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to get Spot pricing: %w", err)
+		return i18n.Te("truffle.spot.error.get_pricing_failed", err)
 	}
 
 	if len(spotResults) == 0 {
-		fmt.Println("No Spot pricing data available for matching instances.")
+		fmt.Println(i18n.T("truffle.spot.no_pricing_data"))
 		return nil
 	}
 
@@ -176,7 +163,9 @@ func runSpot(cmd *cobra.Command, args []string) error {
 	case "table":
 		return printer.PrintSpotTable(spotResults, spotShowSavings)
 	default:
-		return fmt.Errorf("unsupported output format: %s", outputFormat)
+		return i18n.Te("truffle.spot.error.unsupported_format", nil, map[string]interface{}{
+			"Format": outputFormat,
+		})
 	}
 }
 
@@ -221,14 +210,14 @@ func printSpotSummary(results []aws.SpotPriceResult) {
 		avgSavings = totalSavings / float64(savingsCount)
 	}
 
-	fmt.Printf("\n💰 Spot Instance Summary:\n")
-	fmt.Printf("   Instance Types: %d\n", len(instanceTypes))
-	fmt.Printf("   Regions: %d\n", len(regions))
-	fmt.Printf("   Availability Zones: %d\n", len(azs))
-	fmt.Printf("   Price Range: $%.4f - $%.4f per hour\n", minPrice, maxPrice)
-	fmt.Printf("   Average Price: $%.4f per hour\n", avgPrice)
+	fmt.Printf("\n%s %s\n", i18n.Emoji("money_bag"), i18n.T("truffle.spot.summary.title"))
+	fmt.Printf("   %s: %d\n", i18n.T("truffle.spot.summary.instance_types"), len(instanceTypes))
+	fmt.Printf("   %s: %d\n", i18n.T("truffle.spot.summary.regions"), len(regions))
+	fmt.Printf("   %s: %d\n", i18n.T("truffle.spot.summary.availability_zones"), len(azs))
+	fmt.Printf("   %s: $%.4f - $%.4f %s\n", i18n.T("truffle.spot.summary.price_range"), minPrice, maxPrice, i18n.T("truffle.spot.summary.per_hour"))
+	fmt.Printf("   %s: $%.4f %s\n", i18n.T("truffle.spot.summary.average_price"), avgPrice, i18n.T("truffle.spot.summary.per_hour"))
 	if avgSavings > 0 {
-		fmt.Printf("   Average Savings: %.1f%% vs On-Demand\n", avgSavings)
+		fmt.Printf("   %s: %.1f%% %s\n", i18n.T("truffle.spot.summary.average_savings"), avgSavings, i18n.T("truffle.spot.summary.vs_on_demand"))
 	}
 	fmt.Println()
 }

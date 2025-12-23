@@ -7,74 +7,46 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/scttfrdmn/mycelium/pkg/i18n"
 	"github.com/spf13/cobra"
-	"github.com/yourusername/spawn/pkg/aws"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/aws"
 )
 
 // stop command
 var stopCmd = &cobra.Command{
-	Use:   "stop <instance-id-or-name>",
-	Short: "Stop a spawn-managed instance",
-	Long: `Stop a spawn-managed EC2 instance (EBS-backed only).
-
-The instance will be stopped, preserving the EBS volume but stopping compute charges.
-The TTL countdown will pause while the instance is stopped.
-
-Examples:
-  # Stop an instance
-  spawn stop i-1234567890abcdef0
-
-  # Stop by name
-  spawn stop my-instance`,
+	Use:  "stop <instance-id-or-name>",
 	RunE: runStop,
 	Args: cobra.ExactArgs(1),
+	// Short and Long will be set after i18n initialization
 }
 
 // hibernate command
 var hibernateCmd = &cobra.Command{
-	Use:   "hibernate <instance-id-or-name>",
-	Short: "Hibernate a spawn-managed instance",
-	Long: `Hibernate a spawn-managed EC2 instance.
-
-The instance will be hibernated, saving RAM contents to EBS and stopping compute charges.
-Hibernation allows for faster startup than a regular stop.
-The TTL countdown will pause while the instance is hibernated.
-
-Note: Instance must support hibernation and have it enabled at launch time.
-
-Examples:
-  # Hibernate an instance
-  spawn hibernate i-1234567890abcdef0
-
-  # Hibernate by name
-  spawn hibernate my-instance`,
+	Use:     "hibernate <instance-id-or-name>",
 	RunE:    runHibernate,
 	Aliases: []string{"sleep"},
 	Args:    cobra.ExactArgs(1),
+	// Short and Long will be set after i18n initialization
 }
 
 // start command
 var startCmd = &cobra.Command{
-	Use:   "start <instance-id-or-name>",
-	Short: "Start a stopped or hibernated instance",
-	Long: `Start a stopped or hibernated spawn-managed EC2 instance.
-
-The instance will be started and the TTL countdown will resume.
-
-Examples:
-  # Start an instance
-  spawn start i-1234567890abcdef0
-
-  # Start by name
-  spawn start my-instance`,
+	Use:  "start <instance-id-or-name>",
 	RunE: runStart,
 	Args: cobra.ExactArgs(1),
+	// Short and Long will be set after i18n initialization
 }
+
 
 func init() {
 	rootCmd.AddCommand(stopCmd)
 	rootCmd.AddCommand(hibernateCmd)
 	rootCmd.AddCommand(startCmd)
+
+	// Register completion for instance ID arguments
+	stopCmd.ValidArgsFunction = completeInstanceID
+	hibernateCmd.ValidArgsFunction = completeInstanceID
+	startCmd.ValidArgsFunction = completeInstanceID
 }
 
 func runStop(cmd *cobra.Command, args []string) error {
@@ -91,7 +63,7 @@ func stopOrHibernate(identifier string, hibernate bool) error {
 	// Create AWS client
 	client, err := aws.NewClient(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to create AWS client: %w", err)
+		return i18n.Te("error.aws_client_init", err)
 	}
 
 	// Resolve instance
@@ -180,7 +152,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 	// Create AWS client
 	client, err := aws.NewClient(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to create AWS client: %w", err)
+		return i18n.Te("error.aws_client_init", err)
 	}
 
 	// Resolve instance

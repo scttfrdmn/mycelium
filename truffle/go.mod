@@ -14,6 +14,7 @@ require (
 )
 
 require (
+	github.com/BurntSushi/toml v1.4.0 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.16.16 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.14.11 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.16 // indirect
@@ -30,8 +31,11 @@ require (
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.9 // indirect
+	github.com/nicksnyder/go-i18n/v2 v2.4.1 // indirect
+	github.com/scttfrdmn/mycelium/pkg/i18n v0.0.0-00010101000000-000000000000 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	golang.org/x/sys v0.14.0 // indirect
+	golang.org/x/text v0.21.0 // indirect
 )
 
 // Package truffle provides AWS EC2 instance type discovery and analysis.
@@ -47,3 +51,5 @@ require (
 //
 //   client, _ := aws.NewClient(ctx)
 //   results, _ := client.SearchInstanceTypes(ctx, regions, matcher, opts)
+
+replace github.com/scttfrdmn/mycelium/pkg/i18n => ../pkg/i18n

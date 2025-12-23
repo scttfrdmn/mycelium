@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"runtime"
 	"time"
+
+	"github.com/scttfrdmn/mycelium/pkg/i18n"
 )
 
 // Progress tracks and displays spawn progress
@@ -24,15 +26,15 @@ type Step struct {
 func NewProgress() *Progress {
 	return &Progress{
 		steps: []Step{
-			{Name: "Detecting AMI", Status: "pending"},
-			{Name: "Setting up SSH key", Status: "pending"},
-			{Name: "Setting up IAM role", Status: "pending"},
-			{Name: "Creating security group", Status: "pending"},
-			{Name: "Launching instance", Status: "pending"},
-			{Name: "Installing spawnd agent", Status: "pending"},
-			{Name: "Waiting for instance", Status: "pending"},
-			{Name: "Getting public IP", Status: "pending"},
-			{Name: "Waiting for SSH", Status: "pending"},
+			{Name: i18n.T("spawn.progress.detecting_ami"), Status: "pending"},
+			{Name: i18n.T("spawn.progress.setup_ssh_key"), Status: "pending"},
+			{Name: i18n.T("spawn.progress.setup_iam_role"), Status: "pending"},
+			{Name: i18n.T("spawn.progress.create_security_group"), Status: "pending"},
+			{Name: i18n.T("spawn.progress.launching_instance"), Status: "pending"},
+			{Name: i18n.T("spawn.progress.install_agent"), Status: "pending"},
+			{Name: i18n.T("spawn.progress.waiting_instance"), Status: "pending"},
+			{Name: i18n.T("spawn.progress.get_public_ip"), Status: "pending"},
+			{Name: i18n.T("spawn.progress.waiting_ssh"), Status: "pending"},
 		},
 		currentStep: 0,
 	}
@@ -71,7 +73,7 @@ func (p *Progress) Error(stepName string, err error) {
 			p.steps[i].EndTime = time.Now()
 			p.display()
 			fmt.Println()
-			fmt.Printf("❌ Error: %v\n", err)
+			fmt.Printf("%s %s: %v\n", i18n.Symbol("error"), i18n.T("spawn.progress.error"), err)
 			return
 		}
 	}
@@ -101,7 +103,7 @@ func (p *Progress) display() {
 
 	fmt.Println()
 	fmt.Println("╔════════════════════════════════════════════════════════╗")
-	fmt.Println("║  🚀 Spawning Instance...                               ║")
+	fmt.Printf("║  %s %-48s║\n", i18n.Emoji("rocket"), i18n.T("spawn.progress.title"))
 	fmt.Println("╚════════════════════════════════════════════════════════╝")
 	fmt.Println()
 
@@ -136,18 +138,18 @@ func (p *Progress) display() {
 func (p *Progress) DisplaySuccess(instanceID, publicIP, sshCommand string, config interface{}) {
 	fmt.Println()
 	fmt.Println("╔════════════════════════════════════════════════════════╗")
-	fmt.Println("║  🎉 Instance Ready!                                    ║")
+	fmt.Printf("║  %s %-48s║\n", i18n.Emoji("party"), i18n.T("spawn.progress.success.title"))
 	fmt.Println("╚════════════════════════════════════════════════════════╝")
 	fmt.Println()
-	fmt.Println("Instance Details:")
+	fmt.Println(i18n.T("spawn.progress.success.details"))
 	fmt.Println()
-	fmt.Printf("  Instance ID:  %s\n", instanceID)
-	fmt.Printf("  Public IP:    %s\n", publicIP)
-	fmt.Printf("  Status:       running\n")
+	fmt.Printf("  %s  %s\n", i18n.T("spawn.progress.success.label.instance_id"), instanceID)
+	fmt.Printf("  %s    %s\n", i18n.T("spawn.progress.success.label.public_ip"), publicIP)
+	fmt.Printf("  %s       %s\n", i18n.T("spawn.progress.success.label.status"), i18n.T("spawn.progress.success.status_running"))
 	fmt.Println()
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 	fmt.Println()
-	fmt.Println("🔌 Connect Now:")
+	fmt.Printf("%s %s\n", i18n.Emoji("plug"), i18n.T("spawn.progress.success.connect_now"))
 	fmt.Println()
 	fmt.Printf("  %s\n", sshCommand)
 	fmt.Println()
@@ -157,17 +159,21 @@ func (p *Progress) DisplaySuccess(instanceID, publicIP, sshCommand string, confi
 	// Show monitoring info if applicable
 	if launchConfig, ok := config.(LaunchConfigInterface); ok {
 		if launchConfig.GetTTL() != "" || launchConfig.GetIdleTimeout() != "" {
-			fmt.Println("💡 Automatic Monitoring:")
+			fmt.Printf("%s %s\n", i18n.Emoji("lightbulb"), i18n.T("spawn.progress.success.monitoring.title"))
 			fmt.Println()
 			if ttl := launchConfig.GetTTL(); ttl != "" {
-				fmt.Printf("   ⏰ Will terminate after: %s\n", ttl)
+				fmt.Printf("   %s %s\n", i18n.Emoji("clock"), i18n.Tf("spawn.progress.success.monitoring.ttl", map[string]interface{}{
+					"TTL": ttl,
+				}))
 			}
 			if idle := launchConfig.GetIdleTimeout(); idle != "" {
-				fmt.Printf("   💤 Will terminate if idle: %s\n", idle)
+				fmt.Printf("   %s %s\n", i18n.Emoji("zzz"), i18n.Tf("spawn.progress.success.monitoring.idle", map[string]interface{}{
+					"Idle": idle,
+				}))
 			}
 			fmt.Println()
-			fmt.Println("   The spawnd agent is monitoring your instance.")
-			fmt.Println("   You can close your laptop - it will handle everything!")
+			fmt.Println(i18n.T("spawn.progress.success.monitoring.agent_active"))
+			fmt.Println(i18n.T("spawn.progress.success.monitoring.close_laptop"))
 			fmt.Println()
 		}
 	}
@@ -185,15 +191,15 @@ type LaunchConfigInterface interface {
 func getSymbol(status string) string {
 	switch status {
 	case "pending":
-		return "⏸️ "
+		return i18n.Symbol("pending") + " "
 	case "running":
-		return "⏳"
+		return i18n.Symbol("running")
 	case "complete":
-		return "✅"
+		return i18n.Symbol("success")
 	case "error":
-		return "❌"
+		return i18n.Symbol("error")
 	case "skipped":
-		return "⏭️ "
+		return i18n.Symbol("skipped") + " "
 	default:
 		return "  "
 	}
@@ -236,8 +242,8 @@ func (s *Spinner) Start() {
 func (s *Spinner) Stop(success bool) {
 	s.stop <- true
 	if success {
-		fmt.Printf("\r  ✅ %s\n", s.message)
+		fmt.Printf("\r  %s %s\n", i18n.Symbol("success"), s.message)
 	} else {
-		fmt.Printf("\r  ❌ %s\n", s.message)
+		fmt.Printf("\r  %s %s\n", i18n.Symbol("error"), s.message)
 	}
 }

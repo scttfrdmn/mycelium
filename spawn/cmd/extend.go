@@ -8,42 +8,23 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/scttfrdmn/mycelium/pkg/i18n"
 	"github.com/spf13/cobra"
-	"github.com/yourusername/spawn/pkg/aws"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/aws"
 )
 
 var extendCmd = &cobra.Command{
-	Use:   "extend <instance-id> <duration>",
-	Short: "Extend the TTL for a spawn-managed instance",
-	Long: `Extend the time-to-live (TTL) for a spawn-managed instance.
-
-The spawnd daemon running on the instance will automatically detect the updated TTL
-and adjust its termination schedule accordingly.
-
-Duration format: <number><unit> where unit is s, m, h, or d
-  s = seconds
-  m = minutes
-  h = hours
-  d = days
-
-Examples:
-  # Extend by 2 hours
-  spawn extend i-1234567890abcdef0 2h
-
-  # Extend by 30 minutes
-  spawn extend i-1234567890abcdef0 30m
-
-  # Extend by 1 day
-  spawn extend i-1234567890abcdef0 1d
-
-  # Extend by 3 hours and 30 minutes
-  spawn extend i-1234567890abcdef0 3h30m`,
+	Use:  "extend <instance-id> <duration>",
 	RunE: runExtend,
 	Args: cobra.ExactArgs(2),
+	// Short and Long will be set after i18n initialization
 }
 
 func init() {
 	rootCmd.AddCommand(extendCmd)
+
+	// Register completion for instance ID argument
+	extendCmd.ValidArgsFunction = completeInstanceID
 }
 
 func runExtend(cmd *cobra.Command, args []string) error {
@@ -59,7 +40,7 @@ func runExtend(cmd *cobra.Command, args []string) error {
 	// Create AWS client
 	client, err := aws.NewClient(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to create AWS client: %w", err)
+		return i18n.Te("error.aws_client_init", err)
 	}
 
 	// Resolve instance (by ID or name)
@@ -83,7 +64,7 @@ func runExtend(cmd *cobra.Command, args []string) error {
 	fmt.Fprintf(os.Stdout, "   Instance: %s\n", instance.InstanceID)
 	fmt.Fprintf(os.Stdout, "   Old TTL:  %s\n", instance.TTL)
 	fmt.Fprintf(os.Stdout, "   New TTL:  %s\n", newTTL)
-	fmt.Fprintf(os.Stdout, "\nThe spawnd daemon will automatically detect the new TTL and adjust its schedule.\n")
+	fmt.Fprintf(os.Stdout, "\nThe spored daemon will automatically detect the new TTL and adjust its schedule.\n")
 
 	return nil
 }

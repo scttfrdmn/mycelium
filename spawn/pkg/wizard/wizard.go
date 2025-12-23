@@ -8,8 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yourusername/spawn/pkg/aws"
-	"github.com/yourusername/spawn/pkg/platform"
+	"github.com/scttfrdmn/mycelium/pkg/i18n"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/aws"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/platform"
 )
 
 // Wizard guides users through spawning an instance
@@ -34,11 +35,11 @@ func NewWizard(plat *platform.Platform) *Wizard {
 func (w *Wizard) Run(ctx context.Context) (*aws.LaunchConfig, error) {
 	fmt.Println()
 	fmt.Println("╔════════════════════════════════════════════════════════╗")
-	fmt.Println("║  🧙 spawn Setup Wizard                                ║")
+	fmt.Printf("║  %s %-48s║\n", i18n.Emoji("wizard"), i18n.T("spawn.wizard.title"))
 	fmt.Println("╚════════════════════════════════════════════════════════╝")
 	fmt.Println()
-	fmt.Println("I'll help you launch an AWS EC2 instance!")
-	fmt.Println("Press Enter to use the default shown in [brackets]")
+	fmt.Println(i18n.T("spawn.wizard.intro.help"))
+	fmt.Println(i18n.T("spawn.wizard.intro.default_hint"))
 	fmt.Println()
 
 	// Step 1: Instance Type
@@ -77,28 +78,28 @@ func (w *Wizard) Run(ctx context.Context) (*aws.LaunchConfig, error) {
 
 func (w *Wizard) askInstanceType() error {
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	fmt.Println("📦 Step 1 of 6: Choose Instance Type")
+	fmt.Printf("%s %s\n", i18n.Emoji("package"), i18n.T("spawn.wizard.step1.title"))
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 	fmt.Println()
-	fmt.Println("Common choices:")
+	fmt.Println(i18n.T("spawn.wizard.step1.common_choices"))
 	fmt.Println()
-	fmt.Println("  💻 Development & Testing:")
-	fmt.Println("     • t3.medium     - $0.04/hr  (2 vCPU, 4 GB)")
-	fmt.Println("     • t3.large      - $0.08/hr  (2 vCPU, 8 GB)")
+	fmt.Printf("  %s %s\n", i18n.Emoji("computer"), i18n.T("spawn.wizard.step1.category.dev"))
+	fmt.Println(i18n.T("spawn.wizard.step1.instance.t3_medium"))
+	fmt.Println(i18n.T("spawn.wizard.step1.instance.t3_large"))
 	fmt.Println()
-	fmt.Println("  ⚙️  General Purpose:")
-	fmt.Println("     • m7i.large     - $0.10/hr  (2 vCPU, 8 GB)")
-	fmt.Println("     • m7i.xlarge    - $0.20/hr  (4 vCPU, 16 GB)")
+	fmt.Printf("  %s %s\n", i18n.Emoji("gear"), i18n.T("spawn.wizard.step1.category.general"))
+	fmt.Println(i18n.T("spawn.wizard.step1.instance.m7i_large"))
+	fmt.Println(i18n.T("spawn.wizard.step1.instance.m7i_xlarge"))
 	fmt.Println()
-	fmt.Println("  🚀 Compute Optimized:")
-	fmt.Println("     • c7i.xlarge    - $0.17/hr  (4 vCPU, 8 GB)")
-	fmt.Println("     • c7i.2xlarge   - $0.34/hr  (8 vCPU, 16 GB)")
+	fmt.Printf("  %s %s\n", i18n.Emoji("rocket"), i18n.T("spawn.wizard.step1.category.compute"))
+	fmt.Println(i18n.T("spawn.wizard.step1.instance.c7i_xlarge"))
+	fmt.Println(i18n.T("spawn.wizard.step1.instance.c7i_2xlarge"))
 	fmt.Println()
-	fmt.Println("  🎮 GPU / ML Training:")
-	fmt.Println("     • g6.xlarge     - $1.21/hr  (L4 GPU, 16 GB)")
-	fmt.Println("     • p5.48xlarge   - $98/hr    (8x H100 GPU)")
+	fmt.Printf("  %s %s\n", i18n.Emoji("gpu"), i18n.T("spawn.wizard.step1.category.gpu"))
+	fmt.Println(i18n.T("spawn.wizard.step1.instance.g6_xlarge"))
+	fmt.Println(i18n.T("spawn.wizard.step1.instance.p5_48xlarge"))
 	fmt.Println()
-	fmt.Print("Instance type [t3.medium]: ")
+	fmt.Print(i18n.T("spawn.wizard.step1.prompt"))
 
 	instanceType := w.readLine()
 	if instanceType == "" {
@@ -112,11 +113,15 @@ func (w *Wizard) askInstanceType() error {
 	gpu := aws.DetectGPUInstance(instanceType)
 
 	fmt.Println()
-	fmt.Printf("  ✅ Detected: %s", arch)
 	if gpu {
-		fmt.Print(", GPU-enabled")
+		fmt.Printf("  %s %s\n", i18n.Symbol("success"), i18n.Tf("spawn.wizard.step1.detected_gpu", map[string]interface{}{
+			"Architecture": arch,
+		}))
+	} else {
+		fmt.Printf("  %s %s\n", i18n.Symbol("success"), i18n.Tf("spawn.wizard.step1.detected", map[string]interface{}{
+			"Architecture": arch,
+		}))
 	}
-	fmt.Println()
 	fmt.Println()
 
 	return nil
@@ -124,26 +129,28 @@ func (w *Wizard) askInstanceType() error {
 
 func (w *Wizard) askRegion() error {
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	fmt.Println("🌍 Step 2 of 6: Choose AWS Region")
+	fmt.Printf("%s %s\n", i18n.Emoji("globe"), i18n.T("spawn.wizard.step2.title"))
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 	fmt.Println()
-	fmt.Println("Common regions:")
+	fmt.Println(i18n.T("spawn.wizard.step2.common_regions"))
 	fmt.Println()
-	fmt.Println("  🇺🇸 United States:")
-	fmt.Println("     • us-east-1     (Virginia)   [Cheapest, most services]")
-	fmt.Println("     • us-west-2     (Oregon)     [Good for west coast]")
+	fmt.Printf("  %s %s\n", i18n.Emoji("flag_us"), i18n.T("spawn.wizard.step2.region.us"))
+	fmt.Println(i18n.T("spawn.wizard.step2.region.us_east_1"))
+	fmt.Println(i18n.T("spawn.wizard.step2.region.us_west_2"))
 	fmt.Println()
-	fmt.Println("  🇪🇺 Europe:")
-	fmt.Println("     • eu-west-1     (Ireland)")
-	fmt.Println("     • eu-central-1  (Frankfurt)")
+	fmt.Printf("  %s %s\n", i18n.Emoji("flag_eu"), i18n.T("spawn.wizard.step2.region.eu"))
+	fmt.Println(i18n.T("spawn.wizard.step2.region.eu_west_1"))
+	fmt.Println(i18n.T("spawn.wizard.step2.region.eu_central_1"))
 	fmt.Println()
-	fmt.Println("  🌏 Asia Pacific:")
-	fmt.Println("     • ap-northeast-1  (Tokyo)")
-	fmt.Println("     • ap-southeast-1  (Singapore)")
+	fmt.Printf("  %s %s\n", i18n.Emoji("flag_asia"), i18n.T("spawn.wizard.step2.region.asia"))
+	fmt.Println(i18n.T("spawn.wizard.step2.region.ap_northeast_1"))
+	fmt.Println(i18n.T("spawn.wizard.step2.region.ap_southeast_1"))
 	fmt.Println()
 
 	defaultRegion := "us-east-1"
-	fmt.Printf("Region [%s]: ", defaultRegion)
+	fmt.Printf(i18n.Tf("spawn.wizard.step2.prompt", map[string]interface{}{
+		"Default": defaultRegion,
+	}))
 
 	region := w.readLine()
 	if region == "" {
@@ -158,24 +165,24 @@ func (w *Wizard) askRegion() error {
 
 func (w *Wizard) askSpot() error {
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	fmt.Println("💰 Step 3 of 6: Spot or On-Demand?")
+	fmt.Printf("%s %s\n", i18n.Emoji("money"), i18n.T("spawn.wizard.step3.title"))
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 	fmt.Println()
-	fmt.Println("💡 Spot instances are up to 70% cheaper but can be interrupted.")
+	fmt.Printf("%s %s\n", i18n.Emoji("lightbulb"), i18n.T("spawn.wizard.step3.description"))
 	fmt.Println()
-	fmt.Println("   ✅ Good for: Development, testing, fault-tolerant workloads")
-	fmt.Println("   ⚠️  Not for: Production databases, critical services")
+	fmt.Printf("   %s %s\n", i18n.Symbol("success"), i18n.T("spawn.wizard.step3.good_for"))
+	fmt.Printf("   %s %s\n", i18n.Symbol("warning"), i18n.T("spawn.wizard.step3.not_for"))
 	fmt.Println()
-	fmt.Print("Use Spot instances? [y/N]: ")
+	fmt.Print(i18n.T("spawn.wizard.step3.prompt"))
 
 	response := strings.ToLower(w.readLine())
 	if response == "y" || response == "yes" {
 		w.config.Spot = true
 		fmt.Println()
-		fmt.Println("  ✅ Using Spot instances (save up to 70%!)")
+		fmt.Printf("  %s %s\n", i18n.Symbol("success"), i18n.T("spawn.wizard.step3.using_spot"))
 	} else {
 		fmt.Println()
-		fmt.Println("  ✅ Using On-Demand (reliable, no interruptions)")
+		fmt.Printf("  %s %s\n", i18n.Symbol("success"), i18n.T("spawn.wizard.step3.using_ondemand"))
 	}
 	fmt.Println()
 
@@ -184,17 +191,17 @@ func (w *Wizard) askSpot() error {
 
 func (w *Wizard) askAutoTerminate() error {
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	fmt.Println("⏱️  Step 4 of 6: Auto-Termination (Prevent Surprise Bills!)")
+	fmt.Printf("%s %s\n", i18n.Emoji("clock"), i18n.T("spawn.wizard.step4.title"))
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 	fmt.Println()
-	fmt.Println("The instance will automatically terminate to prevent charges:")
+	fmt.Println(i18n.T("spawn.wizard.step4.description"))
 	fmt.Println()
-	fmt.Println("  1️⃣  After time limit (TTL) - e.g., 8h work day")
-	fmt.Println("  2️⃣  When idle (no CPU/network) - e.g., forgot to close")
-	fmt.Println("  3️⃣  Both (recommended) - whichever comes first")
-	fmt.Println("  4️⃣  Manual only - I'll terminate it myself")
+	fmt.Printf("  %s %s\n", i18n.Emoji("one"), i18n.T("spawn.wizard.step4.option.ttl"))
+	fmt.Printf("  %s %s\n", i18n.Emoji("two"), i18n.T("spawn.wizard.step4.option.idle"))
+	fmt.Printf("  %s %s\n", i18n.Emoji("three"), i18n.T("spawn.wizard.step4.option.both"))
+	fmt.Printf("  %s %s\n", i18n.Emoji("four"), i18n.T("spawn.wizard.step4.option.manual"))
 	fmt.Println()
-	fmt.Print("Choice [3]: ")
+	fmt.Print(i18n.T("spawn.wizard.step4.prompt"))
 
 	choice := w.readLine()
 	if choice == "" {
@@ -205,42 +212,49 @@ func (w *Wizard) askAutoTerminate() error {
 
 	switch choice {
 	case "1":
-		fmt.Print("Time limit (e.g., 8h, 24h, 7d) [8h]: ")
+		fmt.Print(i18n.T("spawn.wizard.step4.ttl_prompt"))
 		ttl := w.readLine()
 		if ttl == "" {
 			ttl = "8h"
 		}
 		w.config.TTL = ttl
-		fmt.Printf("  ✅ Will terminate after %s\n", ttl)
+		fmt.Printf("  %s %s\n", i18n.Symbol("success"), i18n.Tf("spawn.wizard.step4.ttl_set", map[string]interface{}{
+			"TTL": ttl,
+		}))
 
 	case "2":
-		fmt.Print("Idle timeout (e.g., 30m, 1h, 2h) [1h]: ")
+		fmt.Print(i18n.T("spawn.wizard.step4.idle_prompt"))
 		idle := w.readLine()
 		if idle == "" {
 			idle = "1h"
 		}
 		w.config.IdleTimeout = idle
-		fmt.Printf("  ✅ Will terminate if idle for %s\n", idle)
+		fmt.Printf("  %s %s\n", i18n.Symbol("success"), i18n.Tf("spawn.wizard.step4.idle_set", map[string]interface{}{
+			"Idle": idle,
+		}))
 
 	case "3":
-		fmt.Print("Time limit [8h]: ")
+		fmt.Print(i18n.T("spawn.wizard.step4.ttl_prompt_short"))
 		ttl := w.readLine()
 		if ttl == "" {
 			ttl = "8h"
 		}
 		w.config.TTL = ttl
 
-		fmt.Print("Idle timeout [1h]: ")
+		fmt.Print(i18n.T("spawn.wizard.step4.idle_prompt_short"))
 		idle := w.readLine()
 		if idle == "" {
 			idle = "1h"
 		}
 		w.config.IdleTimeout = idle
-		fmt.Printf("  ✅ TTL: %s, Idle: %s (whichever comes first)\n", ttl, idle)
+		fmt.Printf("  %s %s\n", i18n.Symbol("success"), i18n.Tf("spawn.wizard.step4.both_set", map[string]interface{}{
+			"TTL":  ttl,
+			"Idle": idle,
+		}))
 
 	case "4":
-		fmt.Println("  ⚠️  Remember to terminate manually to avoid charges!")
-		fmt.Println("      Run: aws ec2 terminate-instances --instance-ids i-xxx")
+		fmt.Printf("  %s %s\n", i18n.Symbol("warning"), i18n.T("spawn.wizard.step4.manual_warning"))
+		fmt.Println(i18n.T("spawn.wizard.step4.manual_command"))
 	}
 
 	fmt.Println()
@@ -249,35 +263,41 @@ func (w *Wizard) askAutoTerminate() error {
 
 func (w *Wizard) askSSHKey() error {
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	fmt.Println("🔑 Step 5 of 6: SSH Key Setup")
+	fmt.Printf("%s %s\n", i18n.Emoji("key"), i18n.T("spawn.wizard.step5.title"))
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 	fmt.Println()
 
 	// Check for existing key
 	if w.platform.HasSSHKey() {
-		fmt.Printf("✅ Found existing SSH key: %s\n", w.platform.SSHKeyPath)
-		fmt.Println("   Will use this key for connecting to your instance")
+		fmt.Printf("%s %s\n", i18n.Symbol("success"), i18n.Tf("spawn.wizard.step5.found_key", map[string]interface{}{
+			"Path": w.platform.SSHKeyPath,
+		}))
+		fmt.Println(i18n.T("spawn.wizard.step5.will_use_key"))
 		w.config.KeyName = "default-ssh-key"
 	} else {
-		fmt.Printf("⚠️  No SSH key found at: %s\n", w.platform.SSHKeyPath)
+		fmt.Printf("%s %s\n", i18n.Symbol("warning"), i18n.Tf("spawn.wizard.step5.no_key_found", map[string]interface{}{
+			"Path": w.platform.SSHKeyPath,
+		}))
 		fmt.Println()
-		fmt.Println("   An SSH key is required to connect to your instance.")
+		fmt.Println(i18n.T("spawn.wizard.step5.key_required"))
 		fmt.Println()
-		fmt.Print("   Create one now? [Y/n]: ")
+		fmt.Print(i18n.T("spawn.wizard.step5.create_prompt"))
 
 		response := strings.ToLower(w.readLine())
 		if response == "" || response == "y" || response == "yes" {
 			fmt.Println()
-			fmt.Println("  🔧 Creating SSH key...")
+			fmt.Printf("  %s %s\n", i18n.Emoji("wrench"), i18n.T("spawn.wizard.step5.creating_key"))
 
 			if err := w.platform.CreateSSHKey(); err != nil {
-				return fmt.Errorf("failed to create SSH key: %w", err)
+				return i18n.Te("error.ssh_key_create_failed", err)
 			}
 
-			fmt.Printf("  ✅ SSH key created at: %s\n", w.platform.SSHKeyPath)
+			fmt.Printf("  %s %s\n", i18n.Symbol("success"), i18n.Tf("spawn.wizard.step5.key_created", map[string]interface{}{
+				"Path": w.platform.SSHKeyPath,
+			}))
 			w.config.KeyName = "default-ssh-key"
 		} else {
-			return fmt.Errorf("SSH key required to connect to instance")
+			return i18n.Te("error.ssh_key_required", nil)
 		}
 	}
 
@@ -287,15 +307,17 @@ func (w *Wizard) askSSHKey() error {
 
 func (w *Wizard) askName() error {
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	fmt.Println("🏷️  Step 6 of 6: Instance Name (Optional)")
+	fmt.Printf("%s %s\n", i18n.Emoji("tag"), i18n.T("spawn.wizard.step6.title"))
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 	fmt.Println()
-	fmt.Print("Name for this instance [leave blank to skip]: ")
+	fmt.Print(i18n.T("spawn.wizard.step6.prompt"))
 
 	name := w.readLine()
 	if name != "" {
 		w.config.Name = name
-		fmt.Printf("  ✅ Instance will be named: %s\n", name)
+		fmt.Printf("  %s %s\n", i18n.Symbol("success"), i18n.Tf("spawn.wizard.step6.name_set", map[string]interface{}{
+			"Name": name,
+		}))
 	}
 
 	fmt.Println()
@@ -305,57 +327,65 @@ func (w *Wizard) askName() error {
 func (w *Wizard) confirm() (*aws.LaunchConfig, error) {
 	fmt.Println()
 	fmt.Println("╔════════════════════════════════════════════════════════╗")
-	fmt.Println("║  📋 Configuration Summary                              ║")
+	fmt.Printf("║  %s %-48s║\n", i18n.Emoji("clipboard"), i18n.T("spawn.wizard.summary.title"))
 	fmt.Println("╚════════════════════════════════════════════════════════╝")
 	fmt.Println()
 
 	// Display configuration
-	fmt.Println("You're about to launch:")
+	fmt.Println(i18n.T("spawn.wizard.summary.about_to_launch"))
 	fmt.Println()
-	fmt.Printf("  Instance Type:  %s\n", w.config.InstanceType)
-	fmt.Printf("  Region:         %s\n", w.config.Region)
+	fmt.Printf("  %s %s\n", i18n.T("spawn.wizard.summary.label.instance_type"), w.config.InstanceType)
+	fmt.Printf("  %s         %s\n", i18n.T("spawn.wizard.summary.label.region"), w.config.Region)
 
 	if w.config.Name != "" {
-		fmt.Printf("  Name:           %s\n", w.config.Name)
+		fmt.Printf("  %s           %s\n", i18n.T("spawn.wizard.summary.label.name"), w.config.Name)
 	}
 
 	if w.config.Spot {
-		fmt.Println("  Type:           Spot (up to 70% cheaper)")
+		fmt.Printf("  %s           %s\n", i18n.T("spawn.wizard.summary.label.type"), i18n.T("spawn.wizard.summary.type_spot"))
 	} else {
-		fmt.Println("  Type:           On-Demand (reliable)")
+		fmt.Printf("  %s           %s\n", i18n.T("spawn.wizard.summary.label.type"), i18n.T("spawn.wizard.summary.type_ondemand"))
 	}
 
 	if w.config.TTL != "" {
-		fmt.Printf("  Time Limit:     %s\n", w.config.TTL)
+		fmt.Printf("  %s     %s\n", i18n.T("spawn.wizard.summary.label.time_limit"), w.config.TTL)
 	}
 
 	if w.config.IdleTimeout != "" {
-		fmt.Printf("  Idle Timeout:   %s\n", w.config.IdleTimeout)
+		fmt.Printf("  %s   %s\n", i18n.T("spawn.wizard.summary.label.idle_timeout"), w.config.IdleTimeout)
 	}
 
 	// Estimate cost
 	fmt.Println()
 	cost := estimateCost(w.config.InstanceType, w.config.Spot)
-	fmt.Printf("💰 Estimated cost: ~$%.2f/hour", cost)
+	fmt.Printf("%s %s\n", i18n.Emoji("money"), i18n.Tf("spawn.wizard.summary.estimated_cost", map[string]interface{}{
+		"Cost": fmt.Sprintf("%.2f", cost),
+	}))
 
 	if w.config.Spot {
 		onDemandCost := estimateCost(w.config.InstanceType, false)
 		savings := ((onDemandCost - cost) / onDemandCost) * 100
-		fmt.Printf(" (%.0f%% savings vs On-Demand)", savings)
+		fmt.Printf(" (%s)\n", i18n.Tf("spawn.wizard.summary.savings", map[string]interface{}{
+			"Percent": fmt.Sprintf("%.0f", savings),
+		}))
+	} else {
+		fmt.Println()
 	}
-	fmt.Println()
 
 	if w.config.TTL != "" {
 		duration, _ := time.ParseDuration(w.config.TTL)
 		hours := duration.Hours()
 		totalCost := cost * hours
-		fmt.Printf("   Total for %s: ~$%.2f\n", w.config.TTL, totalCost)
+		fmt.Printf("   %s\n", i18n.Tf("spawn.wizard.summary.total_cost", map[string]interface{}{
+			"Duration": w.config.TTL,
+			"Cost":     fmt.Sprintf("%.2f", totalCost),
+		}))
 	}
 
 	fmt.Println()
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 	fmt.Println()
-	fmt.Print("🚀 Launch instance? [Y/n]: ")
+	fmt.Printf("%s %s", i18n.Emoji("rocket"), i18n.T("spawn.wizard.summary.confirm"))
 
 	response := strings.ToLower(w.readLine())
 	if response == "" || response == "y" || response == "yes" {
@@ -363,7 +393,7 @@ func (w *Wizard) confirm() (*aws.LaunchConfig, error) {
 		return w.config, nil
 	}
 
-	return nil, fmt.Errorf("cancelled by user")
+	return nil, i18n.Te("error.cancelled_by_user", nil)
 }
 
 func (w *Wizard) readLine() string {

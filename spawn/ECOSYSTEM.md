@@ -68,7 +68,7 @@ spawn --instance-type m7i.large    # Flag mode
 
 **Implementation:**
 - Go CLI (cross-platform)
-- spawnd agent (systemd service)
+- spored agent (systemd service)
 - AWS EC2 + SSM integration
 - Regional S3 buckets
 
@@ -198,11 +198,11 @@ $ truffle capacity \
 │                                                              │
 │   User-data runs:                                           │
 │   • Detects region (us-east-1) and arch (x86_64)            │
-│   • Downloads: s3://spawn-binaries-us-east-1/spawnd        │
+│   • Downloads: s3://spawn-binaries-us-east-1/spored        │
 │   • Installs systemd service                                │
-│   • Starts spawnd                                           │
+│   • Starts spored                                           │
 │                                                              │
-│   spawnd monitors:                                          │
+│   spored monitors:                                          │
 │   • Uptime vs TTL (reads spawn:ttl tag)                     │
 │   • CPU usage (idle detection)                              │
 │   • Network traffic (idle detection)                        │
@@ -247,10 +247,10 @@ Right tool for each user.
 
 ```
 ❌ OLD: Cron on laptop (breaks when laptop sleeps)
-✅ NEW: spawnd on instance (works even when disconnected)
+✅ NEW: spored on instance (works even when disconnected)
 ```
 
-spawnd reads its own tags and self-monitors.
+spored reads its own tags and self-monitors.
 
 ### 4. S3 Regional Distribution
 
@@ -326,7 +326,7 @@ Native paths, native tools (ssh.exe vs ssh).
 - ✅ Cost visibility (prevents surprises)
 - ✅ 90% of users just press Enter
 
-### Why spawnd on Instance?
+### Why spored on Instance?
 - ✅ Laptop-independent (works when disconnected)
 - ✅ More reliable than local cron
 - ✅ Reads tags directly from AWS
@@ -368,7 +368,7 @@ spawn succeeds if:
 
 5. **Production-ready**
    - S3 distribution reliable
-   - spawnd doesn't crash
+   - spored doesn't crash
    - Clean error handling
 
 ---

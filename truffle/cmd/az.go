@@ -50,6 +50,9 @@ func init() {
 	azCmd.Flags().IntVar(&minAZCount, "min-az-count", 0, "Minimum number of AZs required per region")
 	azCmd.Flags().BoolVar(&showRegionOnly, "regions-only", false, "Show only regions that meet AZ count requirement")
 	azCmd.Flags().DurationVar(&timeout, "timeout", 5*time.Minute, "Timeout for AWS API calls")
+
+	// Register completion for instance type argument
+	azCmd.ValidArgsFunction = completeInstanceType
 }
 
 func runAZSearch(cmd *cobra.Command, args []string) error {

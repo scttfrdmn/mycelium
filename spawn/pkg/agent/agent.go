@@ -17,15 +17,20 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/ec2/imds"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/dns"
 )
 
 type Agent struct {
-	instanceID      string
-	region          string
-	ec2Client       *ec2.Client
-	imdsClient      *imds.Client
-	config          AgentConfig
-	startTime       time.Time
+	instanceID       string
+	region           string
+	accountID        string
+	publicIP         string
+	dnsName          string
+	dnsClient        *dns.Client
+	ec2Client        *ec2.Client
+	imdsClient       *imds.Client
+	config           AgentConfig
+	startTime        time.Time
 	lastActivityTime time.Time
 }
 
@@ -46,7 +51,7 @@ func NewAgent(ctx context.Context) (*Agent, error) {
 
 	imdsClient := imds.NewFromConfig(cfg)
 
-	// Get instance ID
+	// Get instance identity document
 	idDoc, err := imdsClient.GetInstanceIdentityDocument(ctx, &imds.GetInstanceIdentityDocumentInput{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get instance identity: %w", err)
@@ -54,13 +59,24 @@ func NewAgent(ctx context.Context) (*Agent, error) {
 
 	instanceID := idDoc.InstanceID
 	region := idDoc.Region
+	accountID := idDoc.AccountID
+
+	// Get public IP from metadata
+	publicIPResult, err := imdsClient.GetMetadata(ctx, &imds.GetMetadataInput{
+		Path: "public-ipv4",
+	})
+	var publicIP string
+	if err == nil {
+		ipBytes, _ := ioutil.ReadAll(publicIPResult.Content)
+		publicIP = strings.TrimSpace(string(ipBytes))
+	}
 
 	// Update config with region
 	cfg.Region = region
 	ec2Client := ec2.NewFromConfig(cfg)
 
 	// Get instance tags to read configuration
-	agentConfig, err := loadConfigFromTags(ctx, ec2Client, instanceID)
+	agentConfig, dnsName, err := loadConfigFromTags(ctx, ec2Client, instanceID)
 	if err != nil {
 		log.Printf("Warning: Could not load config from tags: %v", err)
 		agentConfig = AgentConfig{
@@ -71,6 +87,9 @@ func NewAgent(ctx context.Context) (*Agent, error) {
 	agent := &Agent{
 		instanceID:       instanceID,
 		region:           region,
+		accountID:        accountID,
+		publicIP:         publicIP,
+		dnsName:          dnsName,
 		ec2Client:        ec2Client,
 		imdsClient:       imdsClient,
 		config:           agentConfig,
@@ -78,14 +97,36 @@ func NewAgent(ctx context.Context) (*Agent, error) {
 		lastActivityTime: time.Now(),
 	}
 
-	log.Printf("Agent initialized for instance %s in %s", instanceID, region)
+	log.Printf("Agent initialized for instance %s in %s (account: %s)", instanceID, region, accountID)
 	log.Printf("Config: TTL=%v, IdleTimeout=%v, Hibernate=%v",
 		agentConfig.TTL, agentConfig.IdleTimeout, agentConfig.HibernateOnIdle)
+
+	// Initialize DNS client and register if DNS name is configured
+	if dnsName != "" && publicIP != "" {
+		dnsClient, err := dns.NewClient(ctx, "", "") // Use defaults
+		if err != nil {
+			log.Printf("Warning: Failed to create DNS client: %v", err)
+		} else {
+			agent.dnsClient = dnsClient
+
+			// Register DNS
+			log.Printf("Registering DNS: %s -> %s", dnsName, publicIP)
+			resp, err := dnsClient.RegisterDNS(ctx, dnsName, publicIP)
+			if err != nil {
+				log.Printf("Warning: Failed to register DNS: %v", err)
+			} else {
+				fqdn := dns.GetFullDNSName(dnsName, accountID, "spore.host")
+				log.Printf("✓ DNS registered: %s -> %s (change: %s)", fqdn, publicIP, resp.ChangeID)
+			}
+		}
+	} else if dnsName != "" {
+		log.Printf("Warning: DNS name configured (%s) but no public IP available", dnsName)
+	}
 
 	return agent, nil
 }
 
-func loadConfigFromTags(ctx context.Context, client *ec2.Client, instanceID string) (AgentConfig, error) {
+func loadConfigFromTags(ctx context.Context, client *ec2.Client, instanceID string) (AgentConfig, string, error) {
 	output, err := client.DescribeTags(ctx, &ec2.DescribeTagsInput{
 		Filters: []types.Filter{
 			{
@@ -95,12 +136,13 @@ func loadConfigFromTags(ctx context.Context, client *ec2.Client, instanceID stri
 		},
 	})
 	if err != nil {
-		return AgentConfig{}, err
+		return AgentConfig{}, "", err
 	}
 
 	config := AgentConfig{
 		IdleCPUPercent: 5.0, // Default
 	}
+	var dnsName string
 
 	for _, tag := range output.Tags {
 		if tag.Key == nil || tag.Value == nil {
@@ -126,10 +168,12 @@ func loadConfigFromTags(ctx context.Context, client *ec2.Client, instanceID stri
 			if cpu, err := strconv.ParseFloat(*tag.Value, 64); err == nil {
 				config.IdleCPUPercent = cpu
 			}
+		case "spawn:dns-name":
+			dnsName = *tag.Value
 		}
 	}
 
-	return config, nil
+	return config, dnsName, nil
 }
 
 func (a *Agent) Monitor(ctx context.Context) {
@@ -473,6 +517,11 @@ func (a *Agent) checkSpotInterruption(ctx context.Context) bool {
 		log.Printf("Error parsing Spot interruption JSON: %v", err)
 	}
 
+	// Clean up DNS immediately to avoid stale records
+	log.Printf("Spot interruption: Running cleanup tasks")
+	cleanupCtx := context.Background()
+	a.Cleanup(cleanupCtx)
+
 	// Alert users immediately
 	message := fmt.Sprintf("🚨 SPOT INTERRUPTION WARNING! 🚨\n"+
 		"AWS will %s this instance at %s\n"+
@@ -511,7 +560,7 @@ func (a *Agent) isSpotInstance() bool {
 }
 
 func (a *Agent) sendSpotInterruptionNotification(action, interruptTime string) {
-	// Log to spawnd logs (always)
+	// Log to spored logs (always)
 	log.Printf("📢 NOTIFICATION: Spot interruption detected - action=%s time=%s", action, interruptTime)
 
 	// Write to a file that can be picked up by external systems
@@ -546,6 +595,9 @@ func (a *Agent) warnUsers(message string) {
 func (a *Agent) hibernate(ctx context.Context) {
 	log.Printf("Hibernating instance %s", a.instanceID)
 
+	// Clean up DNS before hibernating
+	a.Cleanup(ctx)
+
 	a.warnUsers("💤 HIBERNATING NOW - Instance will pause, resume later")
 
 	// Wait a moment for users to see warning
@@ -567,8 +619,33 @@ func (a *Agent) hibernate(ctx context.Context) {
 	log.Printf("Hibernate request sent")
 }
 
+// Cleanup performs cleanup tasks before shutdown (DNS deregistration, etc.)
+func (a *Agent) Cleanup(ctx context.Context) {
+	log.Printf("Running cleanup tasks...")
+
+	// Clean up DNS
+	if a.dnsClient != nil && a.dnsName != "" && a.publicIP != "" {
+		log.Printf("Deleting DNS record: %s", a.dnsName)
+		cleanupCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+
+		_, err := a.dnsClient.DeleteDNS(cleanupCtx, a.dnsName, a.publicIP)
+		if err != nil {
+			log.Printf("Warning: Failed to delete DNS: %v", err)
+		} else {
+			fqdn := dns.GetFullDNSName(a.dnsName, a.accountID, "spore.host")
+			log.Printf("✓ DNS deleted: %s", fqdn)
+		}
+	}
+
+	log.Printf("Cleanup complete")
+}
+
 func (a *Agent) terminate(ctx context.Context, reason string) {
 	log.Printf("Terminating instance %s (reason: %s)", a.instanceID, reason)
+
+	// Clean up DNS before terminating
+	a.Cleanup(ctx)
 
 	a.warnUsers(fmt.Sprintf("🔴 TERMINATING NOW - Reason: %s", reason))
 

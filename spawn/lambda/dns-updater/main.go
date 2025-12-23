@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"regexp"
 	"strings"
 	"time"
@@ -51,6 +52,20 @@ var (
 	cfg          aws.Config
 	route53Client *route53.Client
 )
+
+// encodeAccountID converts AWS account ID to base36 (7 chars)
+func encodeAccountID(accountID string) string {
+	n := new(big.Int)
+	n.SetString(accountID, 10)
+	return strings.ToLower(n.Text(36))
+}
+
+// getFullDNSName returns the complete DNS name with base36-encoded account subdomain
+// Example: ("my-instance", "123456789012") -> "my-instance.1kpqzg2c.spore.host"
+func getFullDNSName(recordName, accountID string) string {
+	encoded := encodeAccountID(accountID)
+	return fmt.Sprintf("%s.%s.%s", recordName, encoded, domain)
+}
 
 func init() {
 	var err error
@@ -118,8 +133,9 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 		return errorResponse(403, err.Error())
 	}
 
-	// Build full DNS name
-	fqdn := fmt.Sprintf("%s.%s", req.RecordName, domain)
+	// Build full DNS name with base36-encoded account subdomain
+	// Example: my-instance.1kpqzg2c.spore.host (for account 123456789012)
+	fqdn := getFullDNSName(req.RecordName, identityDoc.AccountID)
 
 	// Update DNS record
 	var changeID string

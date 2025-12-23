@@ -2,7 +2,7 @@
 
 Three major features that make spawn accessible to everyone!
 
-## 🪣 Feature 1: S3-Based spawnd Distribution
+## 🪣 Feature 1: S3-Based spored Distribution
 
 ### Why S3 Over GitHub Releases?
 
@@ -21,9 +21,9 @@ Instance boots in us-east-1
   ↓
 User-data detects region and architecture
   ↓
-Downloads: s3://spawn-binaries-us-east-1/spawnd-linux-amd64
+Downloads: s3://spawn-binaries-us-east-1/spored-linux-amd64
   ↓ (in-region, ~20ms)
-Installs and starts spawnd
+Installs and starts spored
   ↓
 Ready in <1 minute
 ```
@@ -32,22 +32,22 @@ Ready in <1 minute
 
 ```
 spawn-binaries-us-east-1/       # Regional bucket
-├── spawnd-linux-amd64          # Latest (main)
-├── spawnd-linux-arm64          # Latest (main)
+├── spored-linux-amd64          # Latest (main)
+├── spored-linux-arm64          # Latest (main)
 └── versions/
     ├── 0.1.0/
-    │   ├── spawnd-linux-amd64
-    │   └── spawnd-linux-arm64
+    │   ├── spored-linux-amd64
+    │   └── spored-linux-arm64
     └── 0.2.0/
-        ├── spawnd-linux-amd64
-        └── spawnd-linux-arm64
+        ├── spored-linux-amd64
+        └── spored-linux-arm64
 
 spawn-binaries-us-west-2/      # Replicated
-├── spawnd-linux-amd64
+├── spored-linux-amd64
 └── ...
 
 spawn-binaries-eu-west-1/      # Replicated
-├── spawnd-linux-amd64
+├── spored-linux-amd64
 └── ...
 ```
 
@@ -58,7 +58,7 @@ spawn-binaries-eu-west-1/      # Replicated
 make build-all
 
 # 2. Deploy to all regions
-./scripts/deploy-spawnd.sh 0.2.0
+./scripts/deploy-spored.sh 0.2.0
 
 # Output:
 # ✅ Deployed to us-east-1
@@ -78,8 +78,8 @@ REGION=$(curl http://169.254.169.254/latest/meta-data/placement/region)
 ARCH=$(uname -m)
 
 # Downloads from regional bucket
-aws s3 cp s3://spawn-binaries-${REGION}/spawnd-linux-${ARCH} \
-  /usr/local/bin/spawnd --region $REGION
+aws s3 cp s3://spawn-binaries-${REGION}/spored-linux-${ARCH} \
+  /usr/local/bin/spored --region $REGION
 
 # Fallback to us-east-1 if regional bucket doesn't exist
 ```
@@ -101,7 +101,7 @@ aws s3 cp s3://spawn-binaries-${REGION}/spawnd-linux-${ARCH} \
 
 ```bash
 # 1. Create buckets (one-time)
-./scripts/deploy-spawnd.sh 0.1.0
+./scripts/deploy-spored.sh 0.1.0
 
 # This creates:
 # - spawn-binaries-us-east-1
@@ -123,7 +123,7 @@ aws s3api put-bucket-policy \
 
 # 3. Future updates - just deploy
 make build-all
-./scripts/deploy-spawnd.sh 0.2.0
+./scripts/deploy-spored.sh 0.2.0
 ```
 
 ---
@@ -360,7 +360,7 @@ You're about to launch:
   ✅ Setting up SSH key (0.3s)
   ⏭️  Creating security group
   ✅ Launching instance (2.1s)
-  ⏳ Installing spawnd agent (30.0s)
+  ⏳ Installing spored agent (30.0s)
   ⏸️  Waiting for instance
   ⏸️  Getting public IP
   ⏸️  Waiting for SSH
@@ -394,7 +394,7 @@ Instance Details:
    ⏰ Will terminate after: 8h
    💤 Will terminate if idle: 1h
 
-   The spawnd agent is monitoring your instance.
+   The spored agent is monitoring your instance.
    You can close your laptop - it will handle everything!
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -450,7 +450,7 @@ PS C:\> spawn
 # Confirms
 
 # Live progress shows each step
-# spawnd downloads from S3 (fast!)
+# spored downloads from S3 (fast!)
 # SSH command ready
 
 # User connects:
@@ -468,7 +468,7 @@ $ truffle capacity --instance-types p5.48xlarge --available-only | \
   spawn --ttl 24h --hibernate-on-idle
 
 # No wizard, direct launch
-# spawnd from S3 (regional bucket)
+# spored from S3 (regional bucket)
 # Ready in 60 seconds
 ```
 
@@ -509,7 +509,7 @@ $ truffle capacity --instance-types p5.48xlarge --available-only | \
    - Success screen
    - Cross-platform (Windows compatible)
 
-4. **S3 Deployment** (`scripts/deploy-spawnd.sh`)
+4. **S3 Deployment** (`scripts/deploy-spored.sh`)
    - Regional bucket creation
    - Multi-region deployment
    - Versioning support

@@ -42,8 +42,8 @@ spawn/
 ├── cmd/
 │   ├── root.go                          ✅ CLI root
 │   ├── launch.go                        ✅ Launch with wizard/progress
-│   └── spawnd/
-│       └── main.go                      ✅ spawnd daemon
+│   └── spored/
+│       └── main.go                      ✅ spored daemon
 │
 ├── pkg/
 │   ├── agent/
@@ -61,9 +61,9 @@ spawn/
 │       └── progress.go                  ✅ Live progress display
 │
 └── scripts/
-    ├── spawnd.service                   ✅ systemd unit
-    ├── install-spawnd.sh                ✅ S3-based installer
-    └── deploy-spawnd.sh                 ✅ Deploy to S3 regions
+    ├── spored.service                   ✅ systemd unit
+    ├── install-spored.sh                ✅ S3-based installer
+    └── deploy-spored.sh                 ✅ Deploy to S3 regions
 ```
 
 ---
@@ -78,7 +78,7 @@ make build
 
 # Output:
 # bin/spawn        (your platform)
-# bin/spawnd       (your platform)
+# bin/spored       (your platform)
 ```
 
 ### For All Platforms
@@ -89,8 +89,8 @@ make build-all
 # Output:
 # bin/spawn-linux-amd64          (x86_64 Linux)
 # bin/spawn-linux-arm64          (Graviton Linux)
-# bin/spawnd-linux-amd64         (x86_64 Linux)
-# bin/spawnd-linux-arm64         (Graviton Linux)
+# bin/spored-linux-amd64         (x86_64 Linux)
+# bin/spored-linux-arm64         (Graviton Linux)
 # bin/spawn-darwin-amd64         (Intel macOS)
 # bin/spawn-darwin-arm64         (M1/M2 macOS)
 # bin/spawn-windows-amd64.exe    (Windows 11)
@@ -190,7 +190,7 @@ You're about to launch:
   ✅ Setting up SSH key (0.3s)
   ⏭️  Creating security group
   ✅ Launching instance (2.1s)
-  ✅ Installing spawnd agent (30.2s)
+  ✅ Installing spored agent (30.2s)
   ✅ Waiting for instance (10.0s)
   ✅ Getting public IP (0.8s)
   ✅ Waiting for SSH (5.2s)
@@ -218,7 +218,7 @@ Instance Details:
    ⏰ Will terminate after: 8h
    💤 Will terminate if idle: 1h
 
-   The spawnd agent is monitoring your instance.
+   The spored agent is monitoring your instance.
    You can close your laptop - it will handle everything!
 ```
 
@@ -231,7 +231,7 @@ $ truffle capacity --instance-types p5.48xlarge --available-only | \
   spawn --ttl 24h --hibernate-on-idle
 
 # Skips wizard, uses truffle JSON
-# Downloads spawnd from regional S3
+# Downloads spored from regional S3
 # GPU AMI auto-detected
 # Ready in 60 seconds
 ```
@@ -260,14 +260,14 @@ $ spawn --instance-type m7i.large \
 make build-all
 
 # 2. Deploy to all regions
-chmod +x scripts/deploy-spawnd.sh
-./scripts/deploy-spawnd.sh 0.1.0
+chmod +x scripts/deploy-spored.sh
+./scripts/deploy-spored.sh 0.1.0
 
 # Output:
 # 📦 Deploying to us-east-1...
 #    ✓ Bucket exists: spawn-binaries-us-east-1
-#    Uploading spawnd-linux-amd64...
-#    Uploading spawnd-linux-arm64...
+#    Uploading spored-linux-amd64...
+#    Uploading spored-linux-arm64...
 #    ✅ Deployed to us-east-1
 #
 # 📦 Deploying to us-west-2...
@@ -289,9 +289,9 @@ chmod +x scripts/deploy-spawnd.sh
 ```
 1. Instance boots in us-east-1
 2. User-data runs: detect region (us-east-1) and arch (x86_64)
-3. Download: aws s3 cp s3://spawn-binaries-us-east-1/spawnd-linux-amd64
+3. Download: aws s3 cp s3://spawn-binaries-us-east-1/spored-linux-amd64
 4. Install in ~20ms (regional bucket is FAST)
-5. Start spawnd systemd service
+5. Start spored systemd service
 6. Ready!
 ```
 
@@ -419,8 +419,8 @@ sudo make install
 # Test with truffle
 cd ../truffle && ./bin/truffle search t3.medium | ../spawn/bin/spawn
 
-# Deploy spawnd to S3
-./scripts/deploy-spawnd.sh 0.2.0
+# Deploy spored to S3
+./scripts/deploy-spored.sh 0.2.0
 
 # Clean
 make clean
@@ -493,7 +493,7 @@ spawn is now:
 ## 📦 Next Steps
 
 1. **Build**: `make build-all`
-2. **Deploy spawnd**: `./scripts/deploy-spawnd.sh 0.1.0`
+2. **Deploy spored**: `./scripts/deploy-spored.sh 0.1.0`
 3. **Test**: `./bin/spawn`
 4. **Share**: Give to users!
 

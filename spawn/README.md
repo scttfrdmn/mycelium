@@ -8,9 +8,9 @@ spawn is designed for **non-experts** who just need compute:
 - ✅ Launch instances in seconds, not hours
 - ✅ Auto-detects everything (AMI, SSH keys, network)
 - ✅ Ephemeral by default - no leftover resources
-- ✅ Self-monitoring with **spawnd agent**
+- ✅ Self-monitoring with **spored agent**
 - ✅ Auto-terminates (TTL, idle timeout)
-- ✅ Laptop-independent (spawnd runs ON the instance)
+- ✅ Laptop-independent (spored runs ON the instance)
 
 ## 🚀 Quick Start
 
@@ -48,7 +48,7 @@ spawn --instance-type m7i.large --region us-east-1 --ttl 8h
 - **🎮 GPU Support**: Auto-selects GPU-enabled AL2023 AMI
 - **💪 Multi-Architecture**: x86_64 and ARM (Graviton)
 - **🔄 Spot Instances**: Up to 70% savings
-- **📡 spawnd Agent**: Self-monitoring (systemd service)
+- **📡 spored Agent**: Self-monitoring (systemd service)
 - **🔧 Laptop-Independent**: Works even when laptop is off
 
 ## 📦 Installation
@@ -66,7 +66,7 @@ sudo make install
 
 # Verify
 spawn version
-spawnd version
+spored version
 ```
 
 ### Pre-built Binaries
@@ -106,14 +106,14 @@ spawn requires specific IAM permissions to launch instances and manage resources
 
 **What spawn needs:**
 - **EC2**: Launch instances, manage SSH keys, query instance types
-- **IAM**: Create `spawnd-instance-role` (auto-created once per account)
+- **IAM**: Create `spored-instance-role` (auto-created once per account)
 - **SSM**: Query latest Amazon Linux 2023 AMI IDs
 
-The IAM role (`spawnd-instance-role`) is automatically created the first time you launch an instance. This role allows the spawnd agent to:
+The IAM role (`spored-instance-role`) is automatically created the first time you launch an instance. This role allows the spored agent to:
 - Read its own EC2 tags (for TTL/idle configuration)
 - Terminate itself when TTL/idle limits are reached
 
-**Security Note:** The spawnd role can only terminate instances tagged with `spawn:managed=true`.
+**Security Note:** The spored role can only terminate instances tagged with `spawn:managed=true`.
 
 For detailed information, see [IAM_PERMISSIONS.md](IAM_PERMISSIONS.md).
 
@@ -183,19 +183,19 @@ spawn launch --hibernate --idle-timeout 1h --hibernate-on-idle
 │  truffle → finds instances                              │
 │     ↓ (JSON via pipe)                                   │
 │  spawn → launches instance                              │
-│     ↓ (injects spawnd via user-data)                    │
+│     ↓ (injects spored via user-data)                    │
 └─────────────────────────────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────────────────────┐
 │ EC2 Instance                                            │
 │                                                         │
-│  spawnd → systemd service                               │
+│  spored → systemd service                               │
 │     • Reads tags (spawn:ttl, spawn:idle-timeout)        │
 │     • Monitors CPU, network                             │
 │     • Self-terminates when conditions met               │
 │     • Hibernates if configured                          │
 │                                                         │
-│  💡 Laptop can close - spawnd handles everything!       │
+│  💡 Laptop can close - spored handles everything!       │
 └─────────────────────────────────────────────────────────┘
                     ↓ (on termination)
 ┌─────────────────────────────────────────────────────────┐
@@ -206,14 +206,14 @@ spawn launch --hibernate --idle-timeout 1h --hibernate-on-idle
 └─────────────────────────────────────────────────────────┘
 ```
 
-### spawnd Agent
+### spored Agent
 
-**spawnd** runs as a systemd service on each instance:
+**spored** runs as a systemd service on each instance:
 
 ```bash
 # On instance
-systemctl status spawnd
-journalctl -u spawnd -f
+systemctl status spored
+journalctl -u spored -f
 
 # Configuration via tags (set by spawn)
 spawn:ttl=24h              # Auto-terminate after 24h
@@ -222,7 +222,7 @@ spawn:hibernate-on-idle=true # Hibernate instead of terminate
 spawn:idle-cpu=5            # CPU threshold for idle (default: 5%)
 ```
 
-**What spawnd monitors:**
+**What spored monitors:**
 - ✅ Uptime vs TTL
 - ✅ CPU usage (idle detection)
 - ✅ Network traffic (idle detection)
@@ -232,7 +232,7 @@ spawn:idle-cpu=5            # CPU threshold for idle (default: 5%)
 - Self-terminates when TTL expires
 - Self-terminates when idle timeout reached
 - Self-hibernates if configured
-- Logs to `/var/log/spawnd.log` and journald
+- Logs to `/var/log/spored.log` and journald
 
 ## 🎨 AMI Selection
 
@@ -402,8 +402,8 @@ make build-all
 # Outputs:
 # bin/spawn-linux-amd64
 # bin/spawn-linux-arm64
-# bin/spawnd-linux-amd64
-# bin/spawnd-linux-arm64
+# bin/spored-linux-amd64
+# bin/spored-linux-arm64
 # (+ macOS variants)
 ```
 
@@ -420,19 +420,19 @@ make install
 # Installs to /usr/local/bin/
 ```
 
-## 📊 spawnd Monitoring
+## 📊 spored Monitoring
 
 ### On Instance
 
 ```bash
 # Check status
-systemctl status spawnd
+systemctl status spored
 
 # View logs
-journalctl -u spawnd -f
+journalctl -u spored -f
 
 # Check configuration
-cat /var/log/spawnd.log
+cat /var/log/spored.log
 
 # See warnings
 cat /tmp/SPAWN_WARNING
@@ -496,7 +496,7 @@ spawn reads this and launches accordingly!
 ### Spot Instances
 
 - ⚠️ Can be interrupted (spawn handles gracefully)
-- ✅ spawnd saves state before interruption
+- ✅ spored saves state before interruption
 - ✅ Use with hibernation for best results
 
 ### GPU Instances
@@ -512,7 +512,7 @@ spawn reads this and launches accordingly!
 1. ✅ **Smart**: Auto-detects AMI, architecture, GPU
 2. ✅ **Safe**: Auto-terminates, auto-cleans up
 3. ✅ **Simple**: One command to launch
-4. ✅ **Laptop-independent**: spawnd monitors from instance
+4. ✅ **Laptop-independent**: spored monitors from instance
 5. ✅ **Cost-aware**: Hibernation, idle detection
 6. ✅ **Non-expert friendly**: Just works!
 
@@ -526,7 +526,7 @@ spawn reads this and launches accordingly!
 **Next Steps:**
 - Try: `truffle search m7i.large | spawn launch`
 - Read: `spawn launch --help`
-- Monitor: `ssh instance; systemctl status spawnd`
+- Monitor: `ssh instance; systemctl status spored`
 
 **Companion Tools:**
 - [truffle](../truffle) - Find the right instance type
