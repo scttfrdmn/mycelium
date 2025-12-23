@@ -1,10 +1,3 @@
-# Portuguese (pt) translations for spawn and truffle CLIs - COMPLETE VERSION
-# Traduções em Português - Versão completa
-
-# =============================================================================
-# STRINGS COMUNS (Shared between spawn and truffle)
-# =============================================================================
-
 [common.region]
 other = "Região"
 
@@ -219,9 +212,6 @@ other = "GPU:"
 [spawn.wizard.step2.title]
 other = "Passo 2 de 6: Escolha a Região"
 
-[spawn.wizard.step2.prompt]
-other = "Região AWS [us-east-1]: "
-
 [spawn.wizard.step3.title]
 other = "Passo 3 de 6: Instância Spot?"
 
@@ -232,11 +222,12 @@ other = "Instâncias Spot economizam até 90%, mas podem ser interrompidas pela 
 other = "Usar instância Spot? [y/N]: "
 
 [spawn.wizard.step3.using_spot]
-other = "Usando instâncias Spot (economiza ~70%)"
+other = "Usando instância Spot (mais barata, pode ser interrompida)"
 
 [spawn.wizard.step3.using_ondemand]
-other = "Usando On-Demand (confiável, mais caro)"
+other = "Usando instância On-Demand (confiável, não interrompida)"
 
+# Passo 4 do assistente - Auto-terminação
 [spawn.wizard.step4.title]
 other = "Passo 4 de 6: Auto-Terminação"
 
@@ -256,7 +247,7 @@ other = "3. Ambos (TTL + detecção de ociosidade)"
 other = "4. Nenhum (apenas terminação manual)"
 
 [spawn.wizard.step4.prompt]
-other = "Escolha [1-4]: "
+other = "Escolha [1-4] ou deixe em branco para ambos [3]: "
 
 [spawn.wizard.step5.title]
 other = "Passo 5 de 6: Chave SSH"
@@ -268,7 +259,7 @@ other = "Nome do par de chaves SSH [detectar automaticamente]: "
 other = "Passo 6 de 6: Nomeie Sua Instância"
 
 [spawn.wizard.step6.prompt]
-other = "Nome da instância [gerado automaticamente]: "
+other = "Nome da instância (opcional) []: "
 
 [spawn.wizard.summary.title]
 other = "Resumo da Configuração"
@@ -276,6 +267,7 @@ other = "Resumo da Configuração"
 [spawn.wizard.summary.confirm]
 other = "Lançar instância? [Y/n]: "
 
+# Monitoramento de progresso
 [spawn.wizard.cancelled]
 other = "Lançamento cancelado pelo usuário"
 
@@ -457,9 +449,6 @@ other = "Formato de saída (table, json, yaml)"
 
 [spawn.list.searching]
 other = "Procurando instâncias gerenciadas pelo spawn..."
-
-[spawn.list.searching_region]
-other = "Procurando em {{.Region}}..."
 
 [spawn.list.no_results]
 other = "Nenhuma instância corresponde aos filtros especificados."
@@ -1187,13 +1176,6 @@ other = "Bom para: Dev/test, trabalhos em lote, cargas de trabalho tolerantes a 
 [spawn.wizard.step3.not_for]
 other = "Não para: Servidores de produção, bancos de dados, trabalhos de longa execução"
 
-[spawn.wizard.step3.using_spot]
-other = "Usando instância Spot (mais barata, pode ser interrompida)"
-
-[spawn.wizard.step3.using_ondemand]
-other = "Usando instância On-Demand (confiável, não interrompida)"
-
-# Passo 4 do assistente - Auto-terminação
 [spawn.wizard.step4.description]
 other = "Previna custos descontrolados terminando automaticamente instâncias ociosas ou de longa execução."
 
@@ -1208,9 +1190,6 @@ other = "Ambos TTL + timeout de ociosidade (recomendado)"
 
 [spawn.wizard.step4.option.manual]
 other = "Manual (eu terminarei)"
-
-[spawn.wizard.step4.prompt]
-other = "Escolha [1-4] ou deixe em branco para ambos [3]: "
 
 [spawn.wizard.step4.ttl_prompt]
 other = "Auto-terminar após (ex: 8h, 24h) [8h]: "
@@ -1262,9 +1241,6 @@ other = "Criando chave SSH..."
 other = "Chave SSH criada: {{.KeyPath}}"
 
 # Passo 6 do assistente - Nome da instância
-[spawn.wizard.step6.prompt]
-other = "Nome da instância (opcional) []: "
-
 [spawn.wizard.step6.name_set]
 other = "Instância será nomeada: {{.Name}}"
 
@@ -1293,10 +1269,6 @@ other = "Nome"
 [spawn.wizard.summary.estimated_cost]
 other = "Custo estimado: {{.Cost}}/hora"
 
-[spawn.wizard.summary.confirm]
-other = "Lançar instância? [Y/n]: "
-
-# Monitoramento de progresso
 [spawn.progress.success.monitoring.title]
 other = "Monitoramento Automático Ativado:"
 

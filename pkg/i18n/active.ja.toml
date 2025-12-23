@@ -1,10 +1,3 @@
-# Japanese (ja) translations for spawn and truffle CLIs - COMPLETE VERSION
-# 日本語翻訳 - 完全版
-
-# =============================================================================
-# 共通文字列 (Shared between spawn and truffle)
-# =============================================================================
-
 [common.region]
 other = "リージョン"
 
@@ -219,9 +212,6 @@ other = "GPU："
 [spawn.wizard.step2.title]
 other = "ステップ2/6：リージョンを選択"
 
-[spawn.wizard.step2.prompt]
-other = "AWSリージョン [us-east-1]: "
-
 [spawn.wizard.step3.title]
 other = "ステップ3/6：スポットインスタンス？"
 
@@ -232,11 +222,12 @@ other = "スポットインスタンスは最大90%節約できますが、AWS�
 other = "スポットインスタンスを使用しますか？ [y/N]: "
 
 [spawn.wizard.step3.using_spot]
-other = "スポットインスタンスを使用（約70%節約）"
+other = "スポットインスタンスを使用（安価だが中断される可能性あり）"
 
 [spawn.wizard.step3.using_ondemand]
-other = "オンデマンドを使用（信頼性が高いが高価）"
+other = "オンデマンドインスタンスを使用（信頼性高、中断されない）"
 
+# ウィザードステップ4 - 自動終了
 [spawn.wizard.step4.title]
 other = "ステップ4/6：自動終了"
 
@@ -256,7 +247,7 @@ other = "3. 両方（TTL + アイドル検出）"
 other = "4. なし（手動終了のみ）"
 
 [spawn.wizard.step4.prompt]
-other = "選択 [1-4]: "
+other = "[1-4]を選択、または空白で両方 [3]: "
 
 [spawn.wizard.step5.title]
 other = "ステップ5/6：SSHキー"
@@ -268,7 +259,7 @@ other = "SSHキーペア名 [自動検出]: "
 other = "ステップ6/6：インスタンスに名前を付ける"
 
 [spawn.wizard.step6.prompt]
-other = "インスタンス名 [自動生成]: "
+other = "インスタンス名（オプション）[]: "
 
 [spawn.wizard.summary.title]
 other = "設定サマリー"
@@ -276,6 +267,7 @@ other = "設定サマリー"
 [spawn.wizard.summary.confirm]
 other = "インスタンスを起動しますか？ [Y/n]: "
 
+# 進行状況監視
 [spawn.wizard.cancelled]
 other = "ユーザーによって起動がキャンセルされました"
 
@@ -457,9 +449,6 @@ other = "出力フォーマット（table、json、yaml）"
 
 [spawn.list.searching]
 other = "spawn管理インスタンスを検索中..."
-
-[spawn.list.searching_region]
-other = "{{.Region}}を検索中..."
 
 [spawn.list.no_results]
 other = "指定されたフィルターに一致するインスタンスはありません。"
@@ -1187,13 +1176,6 @@ other = "適している用途: 開発/テスト、バッチジョブ、フォ�
 [spawn.wizard.step3.not_for]
 other = "適していない用途: 本番サーバー、データベース、長時間実行ジョブ"
 
-[spawn.wizard.step3.using_spot]
-other = "スポットインスタンスを使用（安価だが中断される可能性あり）"
-
-[spawn.wizard.step3.using_ondemand]
-other = "オンデマンドインスタンスを使用（信頼性高、中断されない）"
-
-# ウィザードステップ4 - 自動終了
 [spawn.wizard.step4.description]
 other = "アイドル状態または長時間実行中のインスタンスを自動終了して、予期しないコストを防止します。"
 
@@ -1208,9 +1190,6 @@ other = "TTL + アイドルタイムアウトの両方（推奨）"
 
 [spawn.wizard.step4.option.manual]
 other = "手動（自分で終了します）"
-
-[spawn.wizard.step4.prompt]
-other = "[1-4]を選択、または空白で両方 [3]: "
 
 [spawn.wizard.step4.ttl_prompt]
 other = "自動終了時間（例: 8h、24h）[8h]: "
@@ -1262,9 +1241,6 @@ other = "SSHキーを作成中..."
 other = "SSHキーが作成されました: {{.KeyPath}}"
 
 # ウィザードステップ6 - インスタンス名
-[spawn.wizard.step6.prompt]
-other = "インスタンス名（オプション）[]: "
-
 [spawn.wizard.step6.name_set]
 other = "インスタンス名: {{.Name}}"
 
@@ -1293,10 +1269,6 @@ other = "名前"
 [spawn.wizard.summary.estimated_cost]
 other = "推定コスト: {{.Cost}}/時間"
 
-[spawn.wizard.summary.confirm]
-other = "インスタンスを起動しますか？ [Y/n]: "
-
-# 進行状況監視
 [spawn.progress.success.monitoring.title]
 other = "自動監視が有効:"
 

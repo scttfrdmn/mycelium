@@ -27,7 +27,13 @@ var rootCmd = &cobra.Command{
 	// Short and Long will be set after i18n initialization
 }
 
+var i18nInitialized = false
+
 func Execute() {
+	// Parse flags early to get --lang value before help is displayed
+	rootCmd.ParseFlags(os.Args[1:])
+	ensureI18nInitialized()
+
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -35,8 +41,14 @@ func Execute() {
 }
 
 func init() {
+	// Set PersistentPreRunE to initialize i18n after flag parsing
+	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
+		ensureI18nInitialized()
+		return nil
+	}
+
 	// Add i18n and accessibility flags
-	rootCmd.PersistentFlags().StringVar(&flagLang, "lang", "", "Language for output (en, es, fr, de, ja)")
+	rootCmd.PersistentFlags().StringVar(&flagLang, "lang", "", "Language for output (en, es, fr, de, ja, pt)")
 	rootCmd.PersistentFlags().BoolVar(&flagNoEmoji, "no-emoji", false, "Disable emoji in output")
 	rootCmd.PersistentFlags().BoolVar(&flagAccessibility, "accessibility", false, "Enable accessibility mode (implies --no-emoji)")
 
@@ -44,9 +56,6 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "Disable colorized output")
 	rootCmd.PersistentFlags().StringSliceVarP(&regions, "regions", "r", []string{}, "Filter by specific regions (comma-separated)")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose output")
-
-	// Initialize i18n before command execution
-	cobra.OnInitialize(initI18n)
 
 	// Enable shell completion for all supported shells
 	rootCmd.CompletionOptions.DisableDefaultCmd = false
@@ -59,6 +68,14 @@ func init() {
 	rootCmd.RegisterFlagCompletionFunc("regions", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return completeRegion(cmd, args, toComplete)
 	})
+}
+
+func ensureI18nInitialized() {
+	if i18nInitialized {
+		return
+	}
+	initI18n()
+	i18nInitialized = true
 }
 
 func initI18n() {

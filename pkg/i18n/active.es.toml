@@ -1,13 +1,3 @@
-# Spanish (es) translations for spawn and truffle CLIs
-# Traducciones al español - Primera versión (requiere revisión por hablante nativo)
-# 
-# NOTA: Estas son traducciones generadas por IA.
-# Se recomienda revisión por hablantes nativos para precisión cultural y técnica.
-
-# =============================================================================
-# COMMON STRINGS
-# =============================================================================
-
 [common.region]
 other = "Región"
 

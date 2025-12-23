@@ -1,10 +1,3 @@
-# English (en) translations for spawn and truffle CLIs
-# This is the source language file - all other languages are translated from this
-
-# =============================================================================
-# COMMON STRINGS (Shared between spawn and truffle)
-# =============================================================================
-
 [common.region]
 description = "AWS region label"
 other = "Region"
@@ -240,11 +233,11 @@ description = "Step 1 title - instance type selection"
 other = "Step 1 of 6: Choose Instance Type"
 
 [spawn.wizard.step1.prompt]
-description = "Prompt for instance type input"
+description = "Instance type prompt"
 other = "Instance type [t3.medium]: "
 
 [spawn.wizard.step1.common_choices]
-description = "Header for common instance type choices"
+description = "Common choices heading"
 other = "Common choices:"
 
 [spawn.wizard.step1.category.dev_testing]
@@ -256,9 +249,10 @@ description = "Category: General purpose compute"
 other = "General Purpose:"
 
 [spawn.wizard.step1.category.compute]
-description = "Category: Compute optimized"
+description = "Compute Optimized category"
 other = "Compute Optimized:"
 
+# Wizard step 1 - Instance types
 [spawn.wizard.step1.category.memory]
 description = "Category: Memory optimized"
 other = "🧠 Memory Optimized:"
@@ -271,10 +265,6 @@ other = "GPU:"
 description = "Step 2 title - region selection"
 other = "Step 2 of 6: Choose Region"
 
-[spawn.wizard.step2.prompt]
-description = "Prompt for region input"
-other = "AWS region [us-east-1]: "
-
 [spawn.wizard.step3.title]
 description = "Step 3 title - spot vs on-demand"
 other = "Step 3 of 6: Spot Instance?"
@@ -284,17 +274,18 @@ description = "Explanation of spot instances"
 other = "Spot instances save up to 90% but can be interrupted by AWS."
 
 [spawn.wizard.step3.prompt]
-description = "Prompt for spot decision"
+description = "Spot instance prompt"
 other = "Use Spot instance? [y/N]: "
 
 [spawn.wizard.step3.using_spot]
-description = "Confirmation message for using spot"
-other = "Using Spot instances (save ~70%)"
+description = "Spot instance selected"
+other = "Using Spot instance (cheaper, can be interrupted)"
 
 [spawn.wizard.step3.using_ondemand]
-description = "Confirmation message for using on-demand"
-other = "Using On-Demand (reliable, more expensive)"
+description = "On-demand instance selected"
+other = "Using On-Demand instance (reliable, not interrupted)"
 
+# Wizard step 4 - Auto-termination
 [spawn.wizard.step4.title]
 description = "Step 4 title - auto-termination"
 other = "Step 4 of 6: Auto-Termination"
@@ -320,8 +311,8 @@ description = "Auto-termination option 4"
 other = "4. None (manual termination only)"
 
 [spawn.wizard.step4.prompt]
-description = "Prompt for auto-termination choice"
-other = "Choose [1-4]: "
+description = "Auto-termination prompt"
+other = "Choose [1-4] or leave blank for both [3]: "
 
 [spawn.wizard.step5.title]
 description = "Step 5 title - SSH key"
@@ -336,17 +327,18 @@ description = "Step 6 title - instance name"
 other = "Step 6 of 6: Name Your Instance"
 
 [spawn.wizard.step6.prompt]
-description = "Prompt for instance name"
-other = "Instance name [auto-generated]: "
+description = "Instance name prompt"
+other = "Instance name (optional) []: "
 
 [spawn.wizard.summary.title]
 description = "Configuration summary title"
 other = "Configuration Summary"
 
 [spawn.wizard.summary.confirm]
-description = "Launch confirmation prompt"
+description = "Confirmation prompt"
 other = "Launch instance? [Y/n]: "
 
+# Progress monitoring
 [spawn.wizard.cancelled]
 description = "Message when user cancels wizard"
 other = "Launch cancelled by user"
@@ -501,7 +493,7 @@ description = "Warning when SSH key is not found"
 other = "Could not find SSH key for {{.KeyName}}"
 
 [spawn.connect.connecting_ssh]
-description = "Message when connecting via SSH"
+description = "Connecting via SSH"
 other = "Connecting via SSH..."
 
 [spawn.connect.aws_cli_not_found]
@@ -574,10 +566,6 @@ other = "Output format (table, json, yaml)"
 [spawn.list.searching]
 description = "Message when searching for instances"
 other = "Searching for spawn-managed instances..."
-
-[spawn.list.searching_region]
-description = "Message when searching specific region"
-other = "Searching {{.Region}}..."
 
 [spawn.list.no_results]
 description = "Message when no instances found"
@@ -1392,10 +1380,6 @@ description = "Default value hint"
 other = "Tip: Leave blank and press Enter to use the default value."
 
 # Wizard step 1 - Instance categories
-[spawn.wizard.step1.common_choices]
-description = "Common choices heading"
-other = "Common choices:"
-
 [spawn.wizard.step1.category.dev]
 description = "Development & Testing category"
 other = "Development & Testing:"
@@ -1404,11 +1388,6 @@ other = "Development & Testing:"
 description = "General Purpose category"
 other = "General Purpose:"
 
-[spawn.wizard.step1.category.compute]
-description = "Compute Optimized category"
-other = "Compute Optimized:"
-
-# Wizard step 1 - Instance types
 [spawn.wizard.step1.instance.t3_medium]
 description = "Instance type option"
 other = "    t3.medium - 2 vCPU, 4 GiB RAM (default)"
@@ -1440,10 +1419,6 @@ other = "    g6.xlarge    - NVIDIA L4, 4 vCPU, 16 GiB RAM"
 [spawn.wizard.step1.instance.p5_48xlarge]
 description = "Instance type option"
 other = "    p5.48xlarge  - 8x NVIDIA H100, 192 vCPU, 2 TiB RAM"
-
-[spawn.wizard.step1.prompt]
-description = "Instance type prompt"
-other = "Instance type [t3.medium]: "
 
 [spawn.wizard.step1.detected]
 description = "Instance type detected confirmation"
@@ -1511,19 +1486,6 @@ other = "Good for: Dev/test, batch jobs, fault-tolerant workloads"
 description = "Not good for spot"
 other = "Not for: Production servers, databases, long-running jobs"
 
-[spawn.wizard.step3.prompt]
-description = "Spot instance prompt"
-other = "Use Spot instance? [y/N]: "
-
-[spawn.wizard.step3.using_spot]
-description = "Spot instance selected"
-other = "Using Spot instance (cheaper, can be interrupted)"
-
-[spawn.wizard.step3.using_ondemand]
-description = "On-demand instance selected"
-other = "Using On-Demand instance (reliable, not interrupted)"
-
-# Wizard step 4 - Auto-termination
 [spawn.wizard.step4.description]
 description = "Auto-termination description"
 other = "Prevent runaway costs by automatically terminating idle or long-running instances."
@@ -1543,10 +1505,6 @@ other = "Both TTL + idle timeout (recommended)"
 [spawn.wizard.step4.option.manual]
 description = "Manual termination option"
 other = "Manual (I'll terminate it myself)"
-
-[spawn.wizard.step4.prompt]
-description = "Auto-termination prompt"
-other = "Choose [1-4] or leave blank for both [3]: "
 
 [spawn.wizard.step4.ttl_prompt]
 description = "TTL duration prompt"
@@ -1614,10 +1572,6 @@ description = "SSH key created message"
 other = "SSH key created: {{.KeyPath}}"
 
 # Wizard step 6 - Instance name
-[spawn.wizard.step6.prompt]
-description = "Instance name prompt"
-other = "Instance name (optional) []: "
-
 [spawn.wizard.step6.name_set]
 description = "Instance name set message"
 other = "Instance will be named: {{.Name}}"
@@ -1655,11 +1609,6 @@ other = "Name"
 description = "Estimated cost message"
 other = "Estimated cost: {{.Cost}}/hour"
 
-[spawn.wizard.summary.confirm]
-description = "Confirmation prompt"
-other = "Launch instance? [Y/n]: "
-
-# Progress monitoring
 [spawn.progress.success.monitoring.title]
 description = "Monitoring section title"
 other = "Auto-Monitoring Enabled:"
@@ -1762,10 +1711,6 @@ other = "SSH key is required but none specified"
 [spawn.connect.connecting_session_manager]
 description = "Connecting via Session Manager"
 other = "Connecting via AWS Session Manager..."
-
-[spawn.connect.connecting_ssh]
-description = "Connecting via SSH"
-other = "Connecting via SSH..."
 
 [spawn.connect.fallback_session_manager]
 description = "Falling back to Session Manager"

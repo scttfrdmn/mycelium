@@ -57,7 +57,7 @@ func initBundle() {
 		bundle.RegisterUnmarshalFunc("toml", toml.Unmarshal)
 
 		// Load all embedded translations
-		supportedLangs := []string{"en", "es", "fr", "de", "ja"}
+		supportedLangs := []string{"en", "es", "fr", "de", "ja", "pt"}
 		for _, lang := range supportedLangs {
 			filename := fmt.Sprintf("active.%s.toml", lang)
 			_, err := bundle.LoadMessageFileFS(translationFS, filename)
@@ -232,7 +232,7 @@ func (l *Localizer) NoEmoji() bool {
 
 // SupportedLanguages returns the list of supported language codes
 func SupportedLanguages() []string {
-	return []string{"en", "es", "fr", "de", "ja"}
+	return []string{"en", "es", "fr", "de", "ja", "pt"}
 }
 
 // IsSupported checks if a language code is supported
