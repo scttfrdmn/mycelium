@@ -1,6 +1,11 @@
-# mycelium
+<p align="center">
+  <img src="assets/logo-light.png#gh-light-mode-only" alt="Mycelium Logo" width="600">
+  <img src="assets/logo-dark.png#gh-dark-mode-only" alt="Mycelium Logo" width="600">
+</p>
 
-> The underground network for AWS compute
+<h1 align="center">mycelium</h1>
+
+<p align="center"><em>The underground network for AWS compute</em></p>
 
 **mycelium** is a suite of tools that makes AWS EC2 accessible to everyone - from complete beginners to ML engineers.
 

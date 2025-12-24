@@ -1,3 +1,8 @@
+<p align="center">
+  <img src="../assets/logo-light.png#gh-light-mode-only" alt="Mycelium Logo" width="500">
+  <img src="../assets/logo-dark.png#gh-dark-mode-only" alt="Mycelium Logo" width="500">
+</p>
+
 # spawn - Ephemeral AWS EC2 Instance Launcher
 
 **spawn** makes launching AWS EC2 instances effortless and foolproof. Perfect companion to [truffle](../truffle).

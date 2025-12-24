@@ -1,3 +1,8 @@
+<p align="center">
+  <img src="../assets/logo-light.png#gh-light-mode-only" alt="Mycelium Logo" width="500">
+  <img src="../assets/logo-dark.png#gh-dark-mode-only" alt="Mycelium Logo" width="500">
+</p>
+
 # 🍄 Truffle - AWS EC2 Instance Type Region Finder
 
 Truffle is a powerful CLI tool to discover which AWS regions and **availability zones** support specific EC2 instance types. Perfect for planning multi-region deployments, cost optimization, and infrastructure as code!
