@@ -148,7 +148,7 @@ func (w *Wizard) askRegion() error {
 	fmt.Println()
 
 	defaultRegion := "us-east-1"
-	fmt.Printf(i18n.Tf("spawn.wizard.step2.prompt", map[string]interface{}{
+	fmt.Print(i18n.Tf("spawn.wizard.step2.prompt", map[string]interface{}{
 		"Default": defaultRegion,
 	}))
 

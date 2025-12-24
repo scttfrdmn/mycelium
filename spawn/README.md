@@ -249,6 +249,204 @@ Recherche d'instances gérées par spawn dans toutes les régions...
 +---------------+-----------+--------+----------------+
 ```
 
+## 📋 Commands
+
+### spawn list
+
+List all spawn-managed instances across regions with powerful filtering options.
+
+```bash
+# List all instances across all regions
+spawn list
+
+# Filter by specific region
+spawn list --region us-east-1
+
+# Filter by instance state
+spawn list --state running
+spawn list --state stopped
+
+# Filter by instance type (exact match)
+spawn list --instance-type m7i.large
+
+# Filter by instance family (all sizes in family)
+spawn list --family m7i
+# Matches: m7i.large, m7i.xlarge, m7i.2xlarge, etc.
+
+# Filter by tag
+spawn list --tag env=prod
+spawn list --tag Name=my-instance
+
+# Combine multiple filters (AND logic)
+spawn list --region us-east-1 --state running --family m7i --tag env=prod
+# Only shows instances matching ALL criteria
+
+# JSON output for automation
+spawn list --format json
+spawn list --format json | jq '.[] | select(.State == "running")'
+
+# YAML output
+spawn list --format yaml
+```
+
+**Output format:**
+
+```
+Finding spawn-managed instances in all regions...
+
++------------------+------------+---------+----------------+--------+-------+
+| Instance ID      | Region     | State   | Public IP      | Type   | Age   |
++------------------+------------+---------+----------------+--------+-------+
+| i-0123456789abc  | us-east-1  | running | 54.123.45.67   | m7i.lg | 2h30m |
+| i-0987654321def  | us-west-2  | running | 52.98.76.54    | t3.med | 5d6h  |
++------------------+------------+---------+----------------+--------+-------+
+
+Total: 2 instances
+```
+
+**What gets listed:**
+- Only instances tagged with `spawn:managed=true`
+- Searches all regions by default (unless `--region` specified)
+- Shows: ID, region, state, public IP, instance type, age
+- Age format: `2h30m` (2 hours 30 minutes), `5d6h` (5 days 6 hours)
+
+### spawn extend
+
+Extend the TTL (time-to-live) for running instances to prevent automatic termination.
+
+```bash
+# Extend by instance ID
+spawn extend i-0123456789abcdef 2h
+# Adds 2 hours to current TTL
+
+# Extend by instance name
+spawn extend my-instance 1d
+# Adds 1 day to current TTL
+
+# Various time formats supported
+spawn extend i-xxx 30m      # 30 minutes
+spawn extend i-xxx 2h       # 2 hours
+spawn extend i-xxx 1d       # 1 day
+spawn extend i-xxx 3h30m    # 3 hours 30 minutes
+spawn extend i-xxx 2d12h    # 2 days 12 hours
+spawn extend i-xxx 1d2h30m  # 1 day 2 hours 30 minutes
+
+# For long-running tasks
+spawn extend training-job 24h
+# Prevents termination for next 24 hours
+```
+
+**How it works:**
+1. Reads current `spawn:ttl` tag from instance
+2. Parses duration (e.g., "2h", "30m", "1d")
+3. Updates the tag with extended time
+4. Updates the spored agent configuration (if instance has spored)
+5. Confirms extension with formatted duration
+
+**Example output:**
+
+```
+Extending TTL for instance i-0123456789abcdef...
+  ✓ Current TTL: 4 hours
+  ✓ Extension: 2 hours
+  ✓ New TTL: 6 hours
+
+Instance will now run for approximately 6 hours from now.
+```
+
+**TTL format rules:**
+- Valid units: `s` (seconds), `m` (minutes), `h` (hours), `d` (days)
+- Can combine multiple units: `2h30m`, `1d12h`, `3h45m15s`
+- Order doesn't matter: `2h30m` and `30m2h` are both valid
+- No spaces allowed: `2h30m` ✅, `2h 30m` ❌
+
+**Requirements:**
+- Instance must be running
+- Instance must have `spawn:managed=true` tag
+- Only works on instances created by spawn
+
+### spawn connect / spawn ssh
+
+Connect to instances via SSH. Both commands are **aliases** - they work identically.
+
+```bash
+# Connect by instance ID (both commands work the same)
+spawn connect i-0123456789abcdef
+spawn ssh i-0123456789abcdef
+
+# Connect by instance name
+spawn connect my-instance
+spawn ssh my-instance
+
+# Specify custom user
+spawn connect i-xxx --user ubuntu
+spawn ssh my-instance --user ec2-user
+
+# Specify custom port
+spawn connect i-xxx --port 2222
+spawn ssh i-xxx --port 2222
+
+# Force Session Manager (bypasses public IP)
+spawn connect i-xxx --session-manager
+spawn ssh i-xxx --session-manager
+
+# Custom SSH key
+spawn connect i-xxx --key ~/.ssh/my-key.pem
+spawn ssh i-xxx --key my-key  # Auto-finds ~/.ssh/my-key or my-key.pem
+```
+
+**SSH key resolution:**
+
+spawn searches for SSH keys in this order:
+1. Exact name: `~/.ssh/my-key`
+2. With .pem extension: `~/.ssh/my-key.pem`
+3. With .key extension: `~/.ssh/my-key.key`
+4. Default keys: `~/.ssh/id_rsa`, `~/.ssh/id_ed25519`, `~/.ssh/id_ecdsa`
+
+**Connection methods:**
+
+1. **Public IP + SSH** (default, fastest)
+   - Requires instance to have public IP
+   - Uses SSH key from `~/.ssh/`
+   - Direct connection
+
+2. **AWS Session Manager** (fallback or forced)
+   - No public IP required
+   - Uses AWS SSM (Systems Manager)
+   - Requires `session-manager-plugin` installed
+   - Works through AWS API
+
+**Examples:**
+
+```bash
+# Quick connect to recent instance
+spawn list | grep running | head -1
+# Copy the instance ID
+spawn ssh i-0123456789abcdef
+
+# Connect with custom user for Ubuntu
+spawn ssh ubuntu-instance --user ubuntu
+
+# Connect to private instance (no public IP)
+spawn connect private-instance --session-manager
+
+# Connect with specific key
+spawn connect i-xxx --key my-project-key
+```
+
+**What happens:**
+1. Resolves instance ID (if name provided, looks up by Name tag)
+2. Waits for instance to be running
+3. Checks for public IP
+4. Finds SSH key (searches `~/.ssh/` directory)
+5. Establishes SSH connection
+6. Falls back to Session Manager if public IP unavailable
+
+**Default values:**
+- User: Detected from AMI (usually `ec2-user` for Amazon Linux)
+- Port: `22`
+- Key: Auto-detected from `~/.ssh/` (checks multiple patterns)
+
 ## 🎓 Usage
 
 ### Basic Launch
