@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spore - The Underground Network for AWS Compute</title>
+    <meta name="description" content="Launch ephemeral AWS EC2 instances effortlessly. Powered by Mycelium - making cloud compute accessible to everyone.">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="icon" type="image/png" href="assets/favicon.png">
+</head>
+<body>
+    <div class="container">
+        <!-- Hero Section -->
+        <header class="hero">
+            <div class="logo-container">
+                <img src="assets/logo-light.png" alt="Mycelium Logo" class="logo">
+            </div>
+            <h1 class="glow">spore.host</h1>
+            <p class="tagline">The underground network for AWS compute</p>
+            <div class="hero-buttons">
+                <a href="#install" class="btn btn-primary">Get Started</a>
+                <a href="https://github.com/scttfrdmn/mycelium" class="btn btn-secondary" target="_blank">View on GitHub</a>
+            </div>
+        </header>
+
+        <!-- Features Grid -->
+        <section class="features">
+            <div class="feature-card">
+                <div class="icon">🔍</div>
+                <h3>Truffle</h3>
+                <p>Find and discover instance types, check Spot prices, manage quotas</p>
+                <span class="badge">No AWS account needed</span>
+            </div>
+            <div class="feature-card">
+                <div class="icon">🚀</div>
+                <h3>Spawn</h3>
+                <p>Launch instances in 2 minutes with interactive wizard or CLI</p>
+                <span class="badge">Auto-termination</span>
+            </div>
+            <div class="feature-card">
+                <div class="icon">🤖</div>
+                <h3>Spored</h3>
+                <p>Monitor automatically with TTL, idle detection, and hibernation</p>
+                <span class="badge">Laptop-independent</span>
+            </div>
+        </section>
+
+        <!-- Quick Start -->
+        <section id="install" class="quick-start">
+            <h2>Quick Start</h2>
+            <div class="install-tabs">
+                <button class="tab-btn active" onclick="showTab('homebrew')">macOS/Linux</button>
+                <button class="tab-btn" onclick="showTab('scoop')">Windows</button>
+                <button class="tab-btn" onclick="showTab('manual')">Manual</button>
+            </div>
+
+            <div id="homebrew" class="tab-content active">
+                <pre><code># Install via Homebrew
+brew install scttfrdmn/tap/truffle
+brew install scttfrdmn/tap/spawn
+
+# Launch your first instance
+spawn</code></pre>
+            </div>
+
+            <div id="scoop" class="tab-content">
+                <pre><code># Install via Scoop
+scoop bucket add scttfrdmn https://github.com/scttfrdmn/scoop-bucket
+scoop install truffle
+scoop install spawn
+
+# Launch your first instance
+spawn</code></pre>
+            </div>
+
+            <div id="manual" class="tab-content">
+                <pre><code># Download from GitHub releases
+# https://github.com/scttfrdmn/mycelium/releases/latest
+
+# Extract and run
+tar -xzf spawn_*_$(uname -s)_$(uname -m).tar.gz
+./spawn</code></pre>
+            </div>
+        </section>
+
+        <!-- Key Features -->
+        <section class="key-features">
+            <h2>Why Spore?</h2>
+            <div class="features-grid">
+                <div class="feature-item">
+                    <span class="check">✓</span>
+                    <strong>2-Minute Setup</strong> - From zero to instance instantly
+                </div>
+                <div class="feature-item">
+                    <span class="check">✓</span>
+                    <strong>No Surprise Bills</strong> - Auto-termination with TTL
+                </div>
+                <div class="feature-item">
+                    <span class="check">✓</span>
+                    <strong>Cross-Platform</strong> - Windows, macOS, Linux
+                </div>
+                <div class="feature-item">
+                    <span class="check">✓</span>
+                    <strong>GPU Support</strong> - Auto-detects GPU-enabled AMIs
+                </div>
+                <div class="feature-item">
+                    <span class="check">✓</span>
+                    <strong>Hibernation</strong> - Save 99% costs when idle
+                </div>
+                <div class="feature-item">
+                    <span class="check">✓</span>
+                    <strong>Multilingual</strong> - 6 languages supported
+                </div>
+            </div>
+        </section>
+
+        <!-- Coming Soon -->
+        <section class="coming-soon">
+            <h2>🚧 Coming Soon: Web Dashboard</h2>
+            <div class="dashboard-preview">
+                <div class="preview-card">
+                    <h4>📊 Instance Management</h4>
+                    <p>View, control, and monitor all your spores in one place</p>
+                </div>
+                <div class="preview-card">
+                    <h4>💻 Web SSH</h4>
+                    <p>Connect to instances directly from your browser</p>
+                </div>
+                <div class="preview-card">
+                    <h4>📈 Real-Time Monitoring</h4>
+                    <p>CPU, network, disk I/O, and GPU utilization</p>
+                </div>
+                <div class="preview-card">
+                    <h4>🎮 Remote Desktop</h4>
+                    <p>NICE DCV integration for graphical workloads</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Examples -->
+        <section class="examples">
+            <h2>Common Use Cases</h2>
+            <div class="example">
+                <h4>💰 Cheapest Dev Box</h4>
+                <pre><code>truffle spot "t3.*" --sort-by-price --pick-first | spawn --ttl 8h
+# Cost: ~$0.01/hr • Auto-terminates after 8h</code></pre>
+            </div>
+            <div class="example">
+                <h4>🎮 GPU Training</h4>
+                <pre><code>truffle capacity --instance-types g5.xlarge | spawn --ttl 24h --hibernate-on-idle
+# Auto-hibernates when idle • Saves 99% cost</code></pre>
+            </div>
+            <div class="example">
+                <h4>🌍 Multi-Language Support</h4>
+                <pre><code>spawn --lang es    # Spanish
+spawn --lang ja    # Japanese
+spawn --lang fr    # French</code></pre>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer>
+            <div class="footer-links">
+                <a href="https://github.com/scttfrdmn/mycelium">GitHub</a>
+                <a href="https://github.com/scttfrdmn/mycelium/releases">Releases</a>
+                <a href="https://github.com/scttfrdmn/mycelium/blob/main/README.md">Documentation</a>
+                <a href="https://github.com/scttfrdmn/mycelium/issues">Issues</a>
+            </div>
+            <p class="footer-text">
+                Made with 🍄 by <a href="https://github.com/scttfrdmn">@scttfrdmn</a>
+                <br>
+                Licensed under <a href="https://github.com/scttfrdmn/mycelium/blob/main/LICENSE">MIT</a>
+            </p>
+        </footer>
+    </div>
+
+    <script src="js/main.js"></script>
+</body>
+</html>
