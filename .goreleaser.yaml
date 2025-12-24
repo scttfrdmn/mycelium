@@ -52,11 +52,11 @@ builds:
       - -X main.Date={{.Date}}
     mod_timestamp: '{{ .CommitTimestamp }}'
 
-  # spawnd - Daemon (Linux only)
-  - id: spawnd
+  # spored - Daemon (Linux only)
+  - id: spored
     dir: spawn
-    main: ./cmd/spawnd
-    binary: spawnd
+    main: ./cmd/spored
+    binary: spored
     env:
       - CGO_ENABLED=0
     goos:
@@ -87,10 +87,10 @@ archives:
     files:
       - LICENSE*
 
-  - id: spawnd-archive
+  - id: spored-archive
     ids:
-      - spawnd
-    name_template: 'spawnd_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+      - spored
+    name_template: 'spored_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
     files:
       - LICENSE*
 
