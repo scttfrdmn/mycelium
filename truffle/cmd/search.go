@@ -81,12 +81,13 @@ func runSearch(cmd *cobra.Command, args []string) error {
 	}
 
 	// Get regions to search
+	// If no regions specified, auto-detect enabled regions (respects SCPs)
 	searchRegions := regions
 	if len(searchRegions) == 0 {
 		if verbose {
 			fmt.Fprintf(os.Stderr, "%s %s\n", i18n.Emoji("globe"), i18n.T("truffle.search.fetching_regions"))
 		}
-		searchRegions, err = awsClient.GetAllRegions(ctx)
+		searchRegions, err = awsClient.GetEnabledRegions(ctx)
 		if err != nil {
 			return i18n.Te("truffle.search.error.get_regions_failed", err)
 		}

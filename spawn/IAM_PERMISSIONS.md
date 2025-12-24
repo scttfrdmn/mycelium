@@ -138,7 +138,8 @@ spawn automatically creates these IAM resources (once per account):
       "Effect": "Allow",
       "Action": [
         "ec2:DescribeTags",
-        "ec2:DescribeInstances"
+        "ec2:DescribeInstances",
+        "ec2:CreateTags"
       ],
       "Resource": "*"
     },

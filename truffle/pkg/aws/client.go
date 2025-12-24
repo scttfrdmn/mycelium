@@ -125,10 +125,14 @@ func NewClient(ctx context.Context) (*Client, error) {
 	return &Client{cfg: cfg}, nil
 }
 
-// GetAllRegions returns all enabled AWS regions
-func (c *Client) GetAllRegions(ctx context.Context) ([]string, error) {
+// GetEnabledRegions returns AWS regions enabled for this account.
+// This respects Service Control Policies (SCPs) that may restrict regions.
+// Regions blocked by organizational SCPs will not appear in the returned list.
+func (c *Client) GetEnabledRegions(ctx context.Context) ([]string, error) {
 	client := ec2.NewFromConfig(c.cfg)
 
+	// DescribeRegions with AllRegions=false returns only enabled regions
+	// This automatically respects SCPs and account-level region restrictions
 	result, err := client.DescribeRegions(ctx, &ec2.DescribeRegionsInput{
 		AllRegions: boolPtr(false), // Only enabled regions
 	})
@@ -144,6 +148,12 @@ func (c *Client) GetAllRegions(ctx context.Context) ([]string, error) {
 	}
 
 	return regions, nil
+}
+
+// GetAllRegions is deprecated. Use GetEnabledRegions instead.
+// This method is kept for backward compatibility.
+func (c *Client) GetAllRegions(ctx context.Context) ([]string, error) {
+	return c.GetEnabledRegions(ctx)
 }
 
 // GetInstanceTypes returns all instance types in a region

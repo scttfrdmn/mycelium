@@ -308,6 +308,12 @@ func (a *Agent) isIdle() bool {
 		return false
 	}
 
+	// Check for active terminals
+	if a.hasActiveTerminals() {
+		log.Printf("Not idle: Active terminals present")
+		return false
+	}
+
 	// Check for logged-in users
 	if a.hasLoggedInUsers() {
 		log.Printf("Not idle: Users logged in")
@@ -501,6 +507,33 @@ func (a *Agent) hasRecentUserActivity() bool {
 	}
 
 	return false
+}
+
+func (a *Agent) hasActiveTerminals() bool {
+	// Check for active pseudo-terminals in /dev/pts/
+	// This detects interactive SSH sessions or other terminal sessions
+	entries, err := os.ReadDir("/dev/pts")
+	if err != nil {
+		return false
+	}
+
+	// Count active PTYs (exclude ptmx which is the multiplexer)
+	activeCount := 0
+	for _, entry := range entries {
+		name := entry.Name()
+		// Skip ptmx (the master pseudo-terminal multiplexer)
+		if name == "ptmx" {
+			continue
+		}
+
+		// Check if it's a number (active PTY)
+		if _, err := strconv.Atoi(name); err == nil {
+			activeCount++
+		}
+	}
+
+	// If there are active PTYs, terminals are present
+	return activeCount > 0
 }
 
 func (a *Agent) checkSpotInterruption(ctx context.Context) bool {
@@ -751,4 +784,82 @@ func (a *Agent) terminate(ctx context.Context, reason string) {
 	} else {
 		log.Printf("Terminate request sent")
 	}
+}
+
+// Reload re-reads configuration from EC2 tags without restarting the daemon
+func (a *Agent) Reload(ctx context.Context) error {
+	log.Printf("Reloading configuration from tags...")
+
+	// Re-read tags
+	newConfig, newDNSName, err := loadConfigFromTags(ctx, a.ec2Client, a.instanceID)
+	if err != nil {
+		return fmt.Errorf("failed to reload config from tags: %w", err)
+	}
+
+	// Log changes
+	if newConfig.TTL != a.config.TTL {
+		log.Printf("TTL changed: %v → %v", a.config.TTL, newConfig.TTL)
+	}
+	if newConfig.IdleTimeout != a.config.IdleTimeout {
+		log.Printf("Idle timeout changed: %v → %v", a.config.IdleTimeout, newConfig.IdleTimeout)
+	}
+	if newConfig.OnComplete != a.config.OnComplete {
+		log.Printf("On-complete changed: %s → %s", a.config.OnComplete, newConfig.OnComplete)
+	}
+	if newConfig.HibernateOnIdle != a.config.HibernateOnIdle {
+		log.Printf("Hibernate-on-idle changed: %v → %v", a.config.HibernateOnIdle, newConfig.HibernateOnIdle)
+	}
+
+	// Update config (but keep startTime - TTL is absolute)
+	a.config = newConfig
+	a.dnsName = newDNSName
+
+	log.Printf("Configuration reloaded successfully")
+	log.Printf("New config: TTL=%v, IdleTimeout=%v, OnComplete=%s, Hibernate=%v",
+		newConfig.TTL, newConfig.IdleTimeout, newConfig.OnComplete, newConfig.HibernateOnIdle)
+
+	return nil
+}
+
+// Public getter methods for status reporting
+
+func (a *Agent) GetConfig() AgentConfig {
+	return a.config
+}
+
+func (a *Agent) GetInstanceInfo() (string, string, string) {
+	return a.instanceID, a.region, a.accountID
+}
+
+func (a *Agent) GetUptime() time.Duration {
+	return time.Since(a.startTime)
+}
+
+func (a *Agent) GetCPUUsage() float64 {
+	return a.getCPUUsage()
+}
+
+func (a *Agent) GetNetworkBytes() int64 {
+	return a.getNetworkBytes()
+}
+
+func (a *Agent) IsIdle() bool {
+	return a.isIdle()
+}
+
+func (a *Agent) GetLastActivityTime() time.Time {
+	return a.lastActivityTime
+}
+
+// UX detection methods
+func (a *Agent) HasActiveTerminals() bool {
+	return a.hasActiveTerminals()
+}
+
+func (a *Agent) HasLoggedInUsers() bool {
+	return a.hasLoggedInUsers()
+}
+
+func (a *Agent) HasRecentUserActivity() bool {
+	return a.hasRecentUserActivity()
 }

@@ -10,6 +10,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/agent"
 )
 
@@ -21,6 +25,15 @@ func main() {
 		switch os.Args[1] {
 		case "version":
 			fmt.Printf("spored version %s\n", Version)
+			os.Exit(0)
+		case "status":
+			handleStatus()
+			os.Exit(0)
+		case "reload":
+			handleReload()
+			os.Exit(0)
+		case "config":
+			handleConfig(os.Args[2:])
 			os.Exit(0)
 		case "complete":
 			handleComplete(os.Args[2:])
@@ -72,6 +85,453 @@ func main() {
 	agent.Cleanup(cleanupCtx)
 
 	log.Printf("spored stopped")
+}
+
+func handleStatus() {
+	// Create agent to get configuration and metrics
+	ctx := context.Background()
+	ag, err := agent.NewAgent(ctx)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: Failed to initialize agent: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Get configuration
+	config := ag.GetConfig()
+
+	// Get instance info
+	instanceID, region, accountID := ag.GetInstanceInfo()
+
+	// Get uptime
+	uptime := ag.GetUptime()
+
+	// Get metrics
+	cpuUsage := ag.GetCPUUsage()
+	networkBytes := ag.GetNetworkBytes()
+	isIdle := ag.IsIdle()
+
+	// Calculate time remaining for TTL
+	var ttlRemaining time.Duration
+	if config.TTL > 0 {
+		ttlRemaining = config.TTL - uptime
+		if ttlRemaining < 0 {
+			ttlRemaining = 0
+		}
+	}
+
+	// Check completion file
+	completionFileExists := false
+	if config.CompletionFile != "" {
+		if _, err := os.Stat(config.CompletionFile); err == nil {
+			completionFileExists = true
+		}
+	}
+
+	// Calculate idle time
+	var idleTime time.Duration
+	if isIdle {
+		idleTime = time.Since(ag.GetLastActivityTime())
+	}
+
+	// Calculate start time
+	startTime := time.Now().Add(-uptime)
+
+	// Print status
+	fmt.Println("┌─────────────────────────────────────────────────────────┐")
+	fmt.Printf("│ spored v%s - Instance %s\n", Version, instanceID)
+	fmt.Printf("│ Region: %s  |  Account: %s\n", region, accountID)
+	fmt.Printf("│ Started: %s\n", startTime.Format("2006-01-02 15:04:05 MST"))
+	fmt.Printf("│ Uptime: %s\n", formatDuration(uptime))
+	fmt.Println("└─────────────────────────────────────────────────────────┘")
+	fmt.Println()
+
+	// Configuration section
+	fmt.Println("Configuration:")
+	if config.TTL > 0 {
+		terminateTime := startTime.Add(config.TTL)
+		fmt.Printf("  TTL:              %s (started: %s)\n", formatDuration(config.TTL), startTime.Format("15:04:05 MST"))
+		fmt.Printf("                    → Terminates: %s (%s remaining)\n", terminateTime.Format("15:04:05 MST"), formatDuration(ttlRemaining))
+	} else {
+		fmt.Println("  TTL:              disabled")
+	}
+
+	if config.IdleTimeout > 0 {
+		status := "active"
+		if isIdle {
+			status = fmt.Sprintf("idle (%s)", formatDuration(idleTime))
+		}
+		fmt.Printf("  Idle Timeout:     %s (currently %s)\n", formatDuration(config.IdleTimeout), status)
+	} else {
+		fmt.Println("  Idle Timeout:     disabled")
+	}
+
+	if config.OnComplete != "" {
+		fmt.Printf("  On Complete:      %s\n", config.OnComplete)
+		fileStatus := "not present"
+		if completionFileExists {
+			fileStatus = "✓ PRESENT"
+		}
+		fmt.Printf("  Completion File:  %s (%s)\n", config.CompletionFile, fileStatus)
+		fmt.Printf("  Completion Delay: %s\n", formatDuration(config.CompletionDelay))
+	} else {
+		fmt.Println("  On Complete:      disabled")
+	}
+
+	if config.HibernateOnIdle {
+		fmt.Println("  Hibernate:        enabled")
+	} else {
+		fmt.Println("  Hibernate:        disabled")
+	}
+
+	fmt.Println()
+
+	// Monitoring section
+	fmt.Println("Monitoring Status:")
+	fmt.Printf("  CPU (5min avg):   %.1f%% (threshold: %.0f%%)\n", cpuUsage, config.IdleCPUPercent)
+	fmt.Printf("  Network:          %s/min (threshold: 10KB/min)\n", formatBytes(networkBytes))
+	if isIdle {
+		fmt.Printf("  Idle Time:        %s", formatDuration(idleTime))
+		if config.IdleTimeout > 0 {
+			fmt.Printf(" (trigger at: %s)", formatDuration(config.IdleTimeout))
+		}
+		fmt.Println()
+	} else {
+		fmt.Println("  Idle Time:        0s (currently active)")
+	}
+
+	// UX detection
+	hasTerminals := ag.HasActiveTerminals()
+	hasUsers := ag.HasLoggedInUsers()
+	hasActivity := ag.HasRecentUserActivity()
+
+	if hasTerminals {
+		fmt.Println("  Terminals:        ✓ Active sessions detected")
+	} else {
+		fmt.Println("  Terminals:        - No active sessions")
+	}
+
+	if hasUsers {
+		fmt.Println("  Users:            ✓ Logged in")
+	} else {
+		fmt.Println("  Users:            - None logged in")
+	}
+
+	if hasActivity {
+		fmt.Println("  Recent Activity:  ✓ Detected (last 5 min)")
+	} else {
+		fmt.Println("  Recent Activity:  - None (last 5 min)")
+	}
+
+	fmt.Println()
+	fmt.Println("Priority Order:     Spot → Completion → TTL → Idle")
+	fmt.Println()
+
+	// Checks section
+	fmt.Println("Checks:")
+	fmt.Println("  ✓ Spot interruption    - No warning")
+
+	if config.OnComplete != "" {
+		if completionFileExists {
+			fmt.Println("  ⚠ Completion signal    - File present (will terminate on next check)")
+		} else {
+			fmt.Println("  ✓ Completion signal    - File not present")
+		}
+	} else {
+		fmt.Println("  - Completion signal    - Disabled")
+	}
+
+	if config.TTL > 0 {
+		if ttlRemaining > 0 {
+			fmt.Printf("  ✓ TTL expiration       - %s remaining\n", formatDuration(ttlRemaining))
+		} else {
+			fmt.Println("  ⚠ TTL expiration       - Expired (will terminate on next check)")
+		}
+	} else {
+		fmt.Println("  - TTL expiration       - Disabled")
+	}
+
+	if config.IdleTimeout > 0 {
+		if isIdle && idleTime >= config.IdleTimeout {
+			fmt.Println("  ⚠ Idle timeout         - Threshold reached (will terminate on next check)")
+		} else if isIdle {
+			remaining := config.IdleTimeout - idleTime
+			fmt.Printf("  ✓ Idle timeout         - %s until trigger\n", formatDuration(remaining))
+		} else {
+			fmt.Println("  ✓ Idle timeout         - Currently active")
+		}
+	} else {
+		fmt.Println("  - Idle timeout         - Disabled")
+	}
+}
+
+func handleReload() {
+	ctx := context.Background()
+	ag, err := agent.NewAgent(ctx)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: Failed to initialize agent: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Println("Reloading configuration from EC2 tags...")
+
+	if err := ag.Reload(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: Failed to reload configuration: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Println("✓ Configuration reloaded successfully")
+
+	// Show new config
+	config := ag.GetConfig()
+	fmt.Println("\nCurrent configuration:")
+	fmt.Printf("  TTL:              %v\n", config.TTL)
+	fmt.Printf("  Idle Timeout:     %v\n", config.IdleTimeout)
+	fmt.Printf("  On Complete:      %s\n", config.OnComplete)
+	fmt.Printf("  Hibernate:        %v\n", config.HibernateOnIdle)
+}
+
+func handleConfig(args []string) {
+	if len(args) == 0 {
+		fmt.Fprintf(os.Stderr, "Error: config subcommand requires an action (get, set, list)\n")
+		fmt.Fprintf(os.Stderr, "Usage:\n")
+		fmt.Fprintf(os.Stderr, "  spored config get <key>\n")
+		fmt.Fprintf(os.Stderr, "  spored config set <key> <value>\n")
+		fmt.Fprintf(os.Stderr, "  spored config list\n")
+		os.Exit(1)
+	}
+
+	action := args[0]
+	switch action {
+	case "get":
+		if len(args) < 2 {
+			fmt.Fprintf(os.Stderr, "Error: config get requires a key\n")
+			fmt.Fprintf(os.Stderr, "Usage: spored config get <key>\n")
+			fmt.Fprintf(os.Stderr, "Keys: ttl, idle-timeout, on-complete, hibernate, completion-file, completion-delay\n")
+			os.Exit(1)
+		}
+		handleConfigGet(args[1])
+
+	case "set":
+		if len(args) < 3 {
+			fmt.Fprintf(os.Stderr, "Error: config set requires a key and value\n")
+			fmt.Fprintf(os.Stderr, "Usage: spored config set <key> <value>\n")
+			os.Exit(1)
+		}
+		handleConfigSet(args[1], args[2])
+
+	case "list":
+		handleConfigList()
+
+	default:
+		fmt.Fprintf(os.Stderr, "Error: unknown config action: %s\n", action)
+		fmt.Fprintf(os.Stderr, "Valid actions: get, set, list\n")
+		os.Exit(1)
+	}
+}
+
+func handleConfigGet(key string) {
+	ctx := context.Background()
+	ag, err := agent.NewAgent(ctx)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: Failed to initialize agent: %v\n", err)
+		os.Exit(1)
+	}
+
+	config := ag.GetConfig()
+
+	switch key {
+	case "ttl":
+		if config.TTL > 0 {
+			fmt.Println(formatDuration(config.TTL))
+		} else {
+			fmt.Println("disabled")
+		}
+	case "idle-timeout":
+		if config.IdleTimeout > 0 {
+			fmt.Println(formatDuration(config.IdleTimeout))
+		} else {
+			fmt.Println("disabled")
+		}
+	case "on-complete":
+		if config.OnComplete != "" {
+			fmt.Println(config.OnComplete)
+		} else {
+			fmt.Println("disabled")
+		}
+	case "hibernate":
+		fmt.Println(config.HibernateOnIdle)
+	case "completion-file":
+		if config.CompletionFile != "" {
+			fmt.Println(config.CompletionFile)
+		} else {
+			fmt.Println("not set")
+		}
+	case "completion-delay":
+		if config.CompletionDelay > 0 {
+			fmt.Println(formatDuration(config.CompletionDelay))
+		} else {
+			fmt.Println("0s")
+		}
+	default:
+		fmt.Fprintf(os.Stderr, "Error: unknown config key: %s\n", key)
+		fmt.Fprintf(os.Stderr, "Valid keys: ttl, idle-timeout, on-complete, hibernate, completion-file, completion-delay\n")
+		os.Exit(1)
+	}
+}
+
+func handleConfigSet(key, value string) {
+	ctx := context.Background()
+	ag, err := agent.NewAgent(ctx)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: Failed to initialize agent: %v\n", err)
+		os.Exit(1)
+	}
+
+	instanceID, region, _ := ag.GetInstanceInfo()
+
+	// Map key to tag name
+	tagKey := ""
+	switch key {
+	case "ttl":
+		// Validate duration
+		if _, err := time.ParseDuration(value); err != nil && value != "0" {
+			fmt.Fprintf(os.Stderr, "Error: invalid duration: %s\n", value)
+			os.Exit(1)
+		}
+		tagKey = "spawn:ttl"
+	case "idle-timeout":
+		if _, err := time.ParseDuration(value); err != nil && value != "0" {
+			fmt.Fprintf(os.Stderr, "Error: invalid duration: %s\n", value)
+			os.Exit(1)
+		}
+		tagKey = "spawn:idle-timeout"
+	case "on-complete":
+		if value != "terminate" && value != "stop" && value != "hibernate" && value != "" {
+			fmt.Fprintf(os.Stderr, "Error: on-complete must be: terminate, stop, hibernate, or empty to disable\n")
+			os.Exit(1)
+		}
+		tagKey = "spawn:on-complete"
+	case "hibernate":
+		if value != "true" && value != "false" {
+			fmt.Fprintf(os.Stderr, "Error: hibernate must be: true or false\n")
+			os.Exit(1)
+		}
+		tagKey = "spawn:hibernate-on-idle"
+	case "completion-file":
+		tagKey = "spawn:completion-file"
+	case "completion-delay":
+		if _, err := time.ParseDuration(value); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: invalid duration: %s\n", value)
+			os.Exit(1)
+		}
+		tagKey = "spawn:completion-delay"
+	default:
+		fmt.Fprintf(os.Stderr, "Error: unknown config key: %s\n", key)
+		os.Exit(1)
+	}
+
+	// Get EC2 client
+	cfg, err := config.LoadDefaultConfig(ctx)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: Failed to load AWS config: %v\n", err)
+		os.Exit(1)
+	}
+	cfg.Region = region
+	ec2Client := ec2.NewFromConfig(cfg)
+
+	// Update tag
+	fmt.Printf("Updating %s to %s...\n", key, value)
+	_, err = ec2Client.CreateTags(ctx, &ec2.CreateTagsInput{
+		Resources: []string{instanceID},
+		Tags: []types.Tag{
+			{Key: aws.String(tagKey), Value: aws.String(value)},
+		},
+	})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: Failed to update tag: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Reload configuration
+	fmt.Println("Reloading configuration...")
+	if err := ag.Reload(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: Failed to reload configuration: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("✓ Configuration updated: %s = %s\n", key, value)
+}
+
+func handleConfigList() {
+	ctx := context.Background()
+	ag, err := agent.NewAgent(ctx)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: Failed to initialize agent: %v\n", err)
+		os.Exit(1)
+	}
+
+	config := ag.GetConfig()
+
+	fmt.Println("Current configuration:")
+	fmt.Println()
+
+	if config.TTL > 0 {
+		fmt.Printf("  ttl:              %s\n", formatDuration(config.TTL))
+	} else {
+		fmt.Println("  ttl:              disabled")
+	}
+
+	if config.IdleTimeout > 0 {
+		fmt.Printf("  idle-timeout:     %s\n", formatDuration(config.IdleTimeout))
+	} else {
+		fmt.Println("  idle-timeout:     disabled")
+	}
+
+	if config.OnComplete != "" {
+		fmt.Printf("  on-complete:      %s\n", config.OnComplete)
+	} else {
+		fmt.Println("  on-complete:      disabled")
+	}
+
+	fmt.Printf("  hibernate:        %v\n", config.HibernateOnIdle)
+
+	if config.CompletionFile != "" {
+		fmt.Printf("  completion-file:  %s\n", config.CompletionFile)
+	}
+
+	if config.CompletionDelay > 0 {
+		fmt.Printf("  completion-delay: %s\n", formatDuration(config.CompletionDelay))
+	}
+}
+
+func formatDuration(d time.Duration) string {
+	if d == 0 {
+		return "0s"
+	}
+
+	hours := int(d.Hours())
+	minutes := int(d.Minutes()) % 60
+	seconds := int(d.Seconds()) % 60
+
+	if hours > 0 {
+		return fmt.Sprintf("%dh %dm", hours, minutes)
+	} else if minutes > 0 {
+		return fmt.Sprintf("%dm %ds", minutes, seconds)
+	}
+	return fmt.Sprintf("%ds", seconds)
+}
+
+func formatBytes(bytes int64) string {
+	const unit = 1024
+	if bytes < unit {
+		return fmt.Sprintf("%d B", bytes)
+	}
+	div, exp := int64(unit), 0
+	for n := bytes / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }
 
 func handleComplete(args []string) {
@@ -156,9 +616,25 @@ func printHelp() {
 	fmt.Printf("spored v%s - Spawn EC2 instance agent\n\n", Version)
 	fmt.Println("Usage:")
 	fmt.Println("  spored                Run as daemon (monitors instance lifecycle)")
+	fmt.Println("  spored status         Show configuration and monitoring status")
+	fmt.Println("  spored reload         Reload configuration from EC2 tags")
+	fmt.Println("  spored config         Manage configuration settings")
 	fmt.Println("  spored complete       Signal completion to trigger on-complete action")
 	fmt.Println("  spored version        Show version")
 	fmt.Println("  spored help           Show this help")
+	fmt.Println()
+	fmt.Println("Config Commands:")
+	fmt.Println("  spored config get <key>         Get a configuration value")
+	fmt.Println("  spored config set <key> <value> Set a configuration value")
+	fmt.Println("  spored config list              List all configuration")
+	fmt.Println()
+	fmt.Println("Config Keys:")
+	fmt.Println("  ttl               Time-to-live (e.g., 24h, 2h30m)")
+	fmt.Println("  idle-timeout      Idle timeout duration")
+	fmt.Println("  on-complete       Action on completion (terminate|stop|hibernate)")
+	fmt.Println("  hibernate         Hibernate on idle (true|false)")
+	fmt.Println("  completion-file   Path to completion signal file")
+	fmt.Println("  completion-delay  Grace period before action")
 	fmt.Println()
 	fmt.Println("Daemon Mode:")
 	fmt.Println("  Runs as a systemd service and monitors:")

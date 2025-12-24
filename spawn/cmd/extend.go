@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
@@ -64,7 +65,16 @@ func runExtend(cmd *cobra.Command, args []string) error {
 	fmt.Fprintf(os.Stdout, "   Instance: %s\n", instance.InstanceID)
 	fmt.Fprintf(os.Stdout, "   Old TTL:  %s\n", instance.TTL)
 	fmt.Fprintf(os.Stdout, "   New TTL:  %s\n", newTTL)
-	fmt.Fprintf(os.Stdout, "\nThe spored daemon will automatically detect the new TTL and adjust its schedule.\n")
+
+	// Trigger reload on instance
+	fmt.Fprintf(os.Stderr, "\nTriggering configuration reload on instance...\n")
+	if err := triggerReload(instance); err != nil {
+		fmt.Fprintf(os.Stderr, "⚠️  Warning: Failed to trigger reload: %v\n", err)
+		fmt.Fprintf(os.Stderr, "   You may need to manually run: ssh ec2-user@%s 'sudo spored reload'\n",
+			instance.PublicIP)
+	} else {
+		fmt.Fprintf(os.Stdout, "✓ Configuration reloaded on instance\n")
+	}
 
 	return nil
 }
@@ -143,4 +153,30 @@ func formatTTLDuration(ttl string) string {
 	}
 
 	return strings.Join(parts, " ")
+}
+
+func triggerReload(instance *aws.InstanceInfo) error {
+	// Find SSH key
+	keyPath, err := findSSHKey(instance.KeyName)
+	if err != nil {
+		return fmt.Errorf("failed to find SSH key: %w", err)
+	}
+
+	// Run spored reload via SSH
+	sshArgs := []string{
+		"-i", keyPath,
+		"-o", "StrictHostKeyChecking=no",
+		"-o", "UserKnownHostsFile=/dev/null",
+		"-o", "ConnectTimeout=10",
+		"-o", "LogLevel=ERROR",
+		fmt.Sprintf("ec2-user@%s", instance.PublicIP),
+		"sudo /usr/local/bin/spored reload",
+	}
+
+	cmd := exec.Command("ssh", sshArgs...)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("%w: %s", err, string(output))
+	}
+
+	return nil
 }

@@ -199,7 +199,7 @@ other = "Sélectionné : {{.InstanceType}} (accéléré par GPU)"
 other = "Étape 2 sur 6 : Choisissez la région"
 
 [spawn.wizard.step2.prompt]
-other = "Région AWS [us-east-1] : "
+other = "Région AWS [{{.DefaultRegion}}] : "
 
 [spawn.wizard.step2.common_regions]
 other = "Régions courantes :"
@@ -500,6 +500,18 @@ other = "IP publique"
 
 [spawn.progress.success.label.status]
 other = "État"
+
+[spawn.progress.success.monitoring.title]
+description = "Monitoring section title"
+other = "Surveillance Automatique Activée :"
+
+[spawn.progress.success.monitoring.ttl]
+description = "TTL monitoring message"
+other = "TTL: Se terminera après {{.TTL}}"
+
+[spawn.progress.success.monitoring.idle]
+description = "Idle monitoring message"
+other = "Inactif: Se terminera si inactif pendant {{.Idle}}"
 
 [spawn.progress.success.monitoring.agent_active]
 other = "l'agent spawn est actif et surveille l'utilisation"

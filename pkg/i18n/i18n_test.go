@@ -24,7 +24,8 @@ func TestNormalizeLanguage(t *testing.T) {
 		{"Japanese UTF-8", "ja_JP.UTF-8", "ja"},
 		{"Uppercase", "EN_US", "en"},
 		{"Already normalized", "en", "en"},
-		{"Unsupported", "pt_BR", "en"}, // Portuguese falls back to English
+		{"Portuguese Brazil", "pt_BR", "pt"}, // Portuguese now supported
+		{"Unsupported", "zh_CN", "en"},        // Chinese falls back to English
 	}
 
 	for _, tt := range tests {
@@ -128,7 +129,7 @@ func TestIsSupported(t *testing.T) {
 		{"fr", true},
 		{"de", true},
 		{"ja", true},
-		{"pt", false},
+		{"pt", true},
 		{"zh", false},
 		{"", false},
 	}
@@ -379,7 +380,7 @@ func TestGlobalFunctionsWithoutInit(t *testing.T) {
 
 func TestSupportedLanguages(t *testing.T) {
 	langs := SupportedLanguages()
-	expected := []string{"en", "es", "fr", "de", "ja"}
+	expected := []string{"en", "es", "fr", "de", "ja", "pt"}
 
 	if len(langs) != len(expected) {
 		t.Fatalf("SupportedLanguages() returned %d languages, want %d", len(langs), len(expected))

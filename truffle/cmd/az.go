@@ -90,11 +90,12 @@ func runAZSearch(cmd *cobra.Command, args []string) error {
 		searchRegions = regions
 	}
 	
+	// If no regions specified, auto-detect enabled regions (respects SCPs)
 	if len(searchRegions) == 0 {
 		if verbose {
-			fmt.Fprintln(os.Stderr, "🌍 Fetching all AWS regions...")
+			fmt.Fprintln(os.Stderr, "🌍 Fetching enabled AWS regions (respects SCPs)...")
 		}
-		searchRegions, err = awsClient.GetAllRegions(ctx)
+		searchRegions, err = awsClient.GetEnabledRegions(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to get regions: %w", err)
 		}

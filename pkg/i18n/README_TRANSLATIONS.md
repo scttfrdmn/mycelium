@@ -1,61 +1,117 @@
-# Translation Files - First Draft
+# Translation Files
 
 ## Overview
 
-I've created first-draft translations for spawn and truffle CLIs in multiple languages. These are AI-generated translations that should be reviewed by native speakers before production use.
+Complete translations for spawn and truffle CLIs in 6 languages. All translations have been validated for consistency, template variables, and 100% key coverage.
 
-## Files Created
+## Files Status
 
-1. **active.es.toml** (Spanish) - ✅ COMPLETE - 1594 lines, ~450 keys
-2. **active.fr.toml** (French) - 🚧 IN PROGRESS - Core translations
-3. **active.de.toml** (German) - TO CREATE
-4. **active.ja.toml** (Japanese) - TO CREATE  
-5. **active.pt.toml** (Portuguese) - TO CREATE
+1. **active.en.toml** (English) - ✅ COMPLETE - 443 keys (source)
+2. **active.es.toml** (Spanish) - ✅ COMPLETE - 443 keys (100%)
+3. **active.fr.toml** (French) - ✅ COMPLETE - 443 keys (100%)
+4. **active.de.toml** (German) - ✅ COMPLETE - 443 keys (100%)
+5. **active.ja.toml** (Japanese) - ✅ COMPLETE - 443 keys (100%)
+6. **active.pt.toml** (Portuguese) - ✅ COMPLETE - 443 keys (100%)
 
-## Spanish Translation (Complete)
+**All languages validated**: ✅ Keys match, ✅ Template variables consistent, ✅ TOML syntax valid
 
-The Spanish translation is the most comprehensive with full coverage of:
-- All spawn commands (launch, connect, list, dns, extend, state)
-- Complete wizard (6 steps with all options)
-- All progress indicators
+## Translation Coverage
+
+All 6 languages have complete coverage of:
+- All spawn commands (launch, connect, list, dns, extend, state, etc.)
+- Complete interactive wizard (6 steps with all options)
+- All progress indicators and status messages
 - All truffle commands (search, capacity, spot, quotas)
-- All output headers and error messages
+- All output headers, tables, and error messages
 - Global flags and common strings
+- Agent monitoring and warnings
 
-**Total Coverage**: ~450 translation keys covering 100% of user-facing strings
+**Total Coverage**: 443 translation keys covering 100% of user-facing strings across all languages
 
 ## Testing Translations
 
-### Test Spanish Translation
+### Automated Test Suite
+
+Run the comprehensive test suite to validate all translations:
 
 ```bash
-# Build with Spanish
-cd spawn
-./bin/spawn --lang es launch
+cd pkg/i18n
 
-# Or set environment variable
-export SPAWN_LANG=es
-./bin/spawn launch
+# Run all tests (validation + integration)
+go test -v .
 
-# Test wizard in Spanish
-./bin/spawn launch --interactive
+# Run only validation tests
+go test -v -run "TestAllLanguagesHaveSameKeys|TestTemplateVariablesConsistent|TestTOMLSyntaxValid|TestNoMissingTranslations|TestTranslationKeyFormat|TestTranslationCoverage"
 
-# Test truffle in Spanish
-cd ../truffle
-./bin/truffle --lang es search m7i.large
+# Run only integration tests
+go test -v -run "TestLanguageDetectionFromEnv|TestLanguageSwitchAtRuntime|TestEmojiAccessibilityMode|TestTranslationWithTemplateData"
 ```
 
-### Verify Emoji Handling
+**Test Coverage**:
+- ✅ All languages have identical keys (443 each)
+- ✅ Template variables consistent across translations
+- ✅ TOML syntax valid in all files
+- ✅ No missing translations
+- ✅ Key naming convention followed
+- ✅ Language detection from environment variables
+- ✅ Runtime language switching
+- ✅ Emoji and accessibility modes
+- ✅ Template substitution with variables
+- ✅ Pluralization support
+- ✅ Error translation wrapping
+
+### Manual CLI Testing
+
+Test translations with actual CLI commands:
 
 ```bash
-# Test with emoji
-./bin/spawn --lang es launch
+# Test with different languages
+spawn --lang es launch --help    # Spanish
+spawn --lang fr list --help      # French
+spawn --lang de connect --help   # German
+spawn --lang ja extend --help    # Japanese
+spawn --lang pt state --help     # Portuguese
+
+# Or set environment variable
+export LANG=es_ES.UTF-8
+spawn launch --interactive
+
+# Test language auto-detection
+LANG=fr_FR spawn launch --help
+LANG=de_DE truffle search m7i.large
+LANG=ja_JP spawn list
+LANG=pt_BR truffle capacity --region us-east-1
+```
+
+### Test Emoji and Accessibility
+
+```bash
+# Test with emoji (default)
+spawn --lang es launch
 
 # Test without emoji
-./bin/spawn --lang es --no-emoji launch
+spawn --lang fr --no-emoji launch
 
-# Test accessibility mode
-./bin/spawn --lang es --accessibility launch
+# Test accessibility mode (screen reader friendly)
+spawn --lang de --accessibility launch
+
+# Accessibility mode implies no emoji
+spawn --lang ja --accessibility list
+```
+
+### Test Template Variable Substitution
+
+Translations use template variables like `{{.Variable}}`. Test that these work:
+
+```bash
+# Region prompts use {{.DefaultRegion}}
+spawn --lang es launch --interactive
+
+# Error messages use various template variables
+spawn --lang fr connect invalid-instance-id
+
+# Progress messages use {{.InstanceID}}, {{.PublicIP}}, etc.
+spawn --lang de launch --instance-type m7i.large --region us-west-2
 ```
 
 ## Recommendations for Native Speaker Review
@@ -93,16 +149,75 @@ cd ../truffle
    - Current: Direct translations
    - May need cultural adaptation
 
-## Next Steps
+## Contributing Translations
 
-1. **Complete French translation** - Continue from line 597
-2. **Create German translation** - Use Spanish as template
-3. **Create Japanese translation** - Requires cultural adaptation
-4. **Create Portuguese translation** - Similar to Spanish
+### Native Speaker Review
 
-5. **Native speaker review** for each language
-6. **Test with actual CLI usage**
-7. **Iterate based on feedback**
+While all translations are complete and validated for consistency, native speakers can help improve quality:
+
+**How to contribute**:
+
+1. **Review existing translations** in `active.*.toml`
+2. **Check for:**
+   - Natural phrasing in target language
+   - Appropriate formality level
+   - Accurate technical terminology
+   - Regional variations (e.g., Latin America vs Spain Spanish)
+   - Cultural appropriateness
+3. **Submit improvements** via pull request
+4. **Add context** in PR description about changes
+
+### Translation Quality Checklist
+
+When reviewing or updating translations:
+
+- [ ] All keys present (compare to active.en.toml)
+- [ ] Template variables match exactly ({{.Variable}})
+- [ ] TOML syntax valid (run `go test -v .`)
+- [ ] Formality consistent throughout
+- [ ] Technical terms accurate
+- [ ] Natural phrasing (not machine translation)
+- [ ] Cultural appropriateness
+- [ ] Regional variations considered
+
+### Running Tests Before Submitting
+
+Always run the test suite before submitting translation changes:
+
+```bash
+cd pkg/i18n
+
+# Run all validation tests
+go test -v .
+
+# Check for specific issues
+go test -v -run TestAllLanguagesHaveSameKeys        # Verify all keys present
+go test -v -run TestTemplateVariablesConsistent    # Check {{.Variable}} usage
+go test -v -run TestTOMLSyntaxValid                # Validate TOML format
+```
+
+### Adding New Translation Keys
+
+When adding new features that need translations:
+
+1. **Add to English first** (`active.en.toml`)
+2. **Add to all other languages** (es, fr, de, ja, pt)
+3. **Run validation tests** to ensure consistency
+4. **Update this README** if adding new sections
+
+Example:
+
+```toml
+# active.en.toml
+[spawn.newfeature.title]
+description = "Title for new feature"
+other = "New Feature: {{.FeatureName}}"
+
+# active.es.toml (and all other languages)
+[spawn.newfeature.title]
+description = "Title for new feature"
+other = "Nueva Función: {{.FeatureName}}"
+```
 
 ## File Structure
 

@@ -27,6 +27,31 @@ func NewClient(ctx context.Context) (*Client, error) {
 	return &Client{cfg: cfg}, nil
 }
 
+// GetEnabledRegions returns a list of AWS regions enabled for this account
+// This respects Service Control Policies (SCPs) that may restrict regions
+func (c *Client) GetEnabledRegions(ctx context.Context) ([]string, error) {
+	// Use default region for the DescribeRegions call
+	ec2Client := ec2.NewFromConfig(c.cfg)
+
+	// DescribeRegions returns only regions that are enabled for the account
+	// If SCPs block certain regions, they won't appear in this list
+	result, err := ec2Client.DescribeRegions(ctx, &ec2.DescribeRegionsInput{
+		AllRegions: aws.Bool(false), // Only enabled regions
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to describe regions: %w", err)
+	}
+
+	regions := make([]string, 0, len(result.Regions))
+	for _, region := range result.Regions {
+		if region.RegionName != nil {
+			regions = append(regions, *region.RegionName)
+		}
+	}
+
+	return regions, nil
+}
+
 // LaunchConfig contains all settings for launching an instance
 type LaunchConfig struct {
 	InstanceType     string
@@ -54,6 +79,9 @@ type LaunchConfig struct {
 	OnComplete       string // Action: terminate, stop, hibernate
 	CompletionFile   string // File path to watch (default: /tmp/SPAWN_COMPLETE)
 	CompletionDelay  string // Grace period before action (default: 30s)
+
+	// Session management
+	SessionTimeout string // Auto-logout idle shells (default: 30m, 0 to disable)
 
 	// Metadata
 	Name string
@@ -215,6 +243,11 @@ func buildTags(config LaunchConfig) []types.Tag {
 
 	if config.CompletionDelay != "" {
 		tags = append(tags, types.Tag{Key: aws.String("spawn:completion-delay"), Value: aws.String(config.CompletionDelay)})
+	}
+
+	// Session management
+	if config.SessionTimeout != "" {
+		tags = append(tags, types.Tag{Key: aws.String("spawn:session-timeout"), Value: aws.String(config.SessionTimeout)})
 	}
 
 	// Add custom tags
@@ -662,7 +695,8 @@ func (c *Client) SetupSporedIAMRole(ctx context.Context) (string, error) {
       "Effect": "Allow",
       "Action": [
         "ec2:DescribeTags",
-        "ec2:DescribeInstances"
+        "ec2:DescribeInstances",
+        "ec2:CreateTags"
       ],
       "Resource": "*"
     },
