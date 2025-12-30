@@ -3,7 +3,7 @@ package aws
 import (
 	"context"
 	"fmt"
-	"strings"
+	"strconv"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 )
 
 type Client struct {
@@ -103,9 +104,15 @@ func (c *Client) Launch(ctx context.Context, launchConfig LaunchConfig) (*Launch
 	cfg := c.cfg.Copy()
 	cfg.Region = launchConfig.Region
 	ec2Client := ec2.NewFromConfig(cfg)
-	
-	// Build tags
-	tags := buildTags(launchConfig)
+
+	// Get AWS account ID for account-level tagging
+	accountID, err := c.GetAccountID(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get account ID: %w", err)
+	}
+
+	// Build tags (including account tags)
+	tags := buildTags(launchConfig, accountID)
 	
 	// Build block device mappings
 	blockDevices := buildBlockDevices(launchConfig)
@@ -204,12 +211,17 @@ func (c *Client) Launch(ctx context.Context, launchConfig LaunchConfig) (*Launch
 	return launchResult, nil
 }
 
-func buildTags(config LaunchConfig) []types.Tag {
+func buildTags(config LaunchConfig, accountID string) []types.Tag {
+	// Convert account ID to base36 for DNS namespace
+	accountBase36 := intToBase36(accountID)
+
 	tags := []types.Tag{
 		{Key: aws.String("spawn:managed"), Value: aws.String("true")},
 		{Key: aws.String("spawn:root"), Value: aws.String("true")},
 		{Key: aws.String("spawn:created-by"), Value: aws.String("spawn")},
 		{Key: aws.String("spawn:version"), Value: aws.String("0.1.0")},
+		{Key: aws.String("spawn:account-id"), Value: aws.String(accountID)},
+		{Key: aws.String("spawn:account-base36"), Value: aws.String(accountBase36)},
 	}
 	
 	if config.Name != "" {
@@ -763,21 +775,30 @@ func (c *Client) SetupSporedIAMRole(ctx context.Context) (string, error) {
 
 // GetAccountID returns the AWS account ID of the current credentials
 func (c *Client) GetAccountID(ctx context.Context) (string, error) {
-	// We need to import STS service
-	// For now, use a workaround by getting it from EC2 instance metadata if available
-	// Or from IAM GetUser
-	
-	// Try IAM GetUser first
-	iamClient := iam.NewFromConfig(c.cfg)
-	userOutput, err := iamClient.GetUser(ctx, &iam.GetUserInput{})
-	if err == nil && userOutput.User != nil && userOutput.User.Arn != nil {
-		// Extract account ID from ARN: arn:aws:iam::123456789012:user/username
-		arn := *userOutput.User.Arn
-		parts := strings.Split(arn, ":")
-		if len(parts) >= 5 {
-			return parts[4], nil
-		}
+	// Use STS GetCallerIdentity - most reliable method
+	stsClient := sts.NewFromConfig(c.cfg)
+	identity, err := stsClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+	if err != nil {
+		return "", fmt.Errorf("failed to get caller identity: %w", err)
 	}
-	
-	return "", fmt.Errorf("unable to determine account ID")
+
+	if identity.Account == nil {
+		return "", fmt.Errorf("account ID not returned by STS")
+	}
+
+	return *identity.Account, nil
+}
+
+// intToBase36 converts a numeric string (AWS account ID) to base36
+// Example: "942542972736" -> "c0zxr0ao"
+func intToBase36(accountID string) string {
+	// Parse account ID as integer
+	num, err := strconv.ParseUint(accountID, 10, 64)
+	if err != nil {
+		// Fallback: return account ID as-is if parsing fails
+		return accountID
+	}
+
+	// Convert to base36 (lowercase)
+	return strconv.FormatUint(num, 36)
 }
