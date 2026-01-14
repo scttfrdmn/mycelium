@@ -59,6 +59,7 @@ spawn --instance-type m7i.large --region us-east-1 --ttl 8h
 - **🔧 Laptop-Independent**: Works even when laptop is off
 - **♿ Accessibility**: Screen reader support with --accessibility flag
 - **🔢 Job Arrays**: Launch coordinated instance groups for MPI, distributed training, parameter sweeps ([docs](JOB_ARRAYS.md))
+- **💾 AMI Management**: Create and manage custom AMIs for reusable software stacks ([docs](AMI_MANAGEMENT.md))
 
 ## 📦 Installation
 
@@ -917,6 +918,37 @@ EOF
 
 See [JOB_ARRAYS.md](JOB_ARRAYS.md) for complete documentation.
 
+### Custom AMI - Reusable Software Stack
+
+```bash
+# Step 1: Launch instance and install software
+spawn launch --instance-type g5.xlarge --name pytorch-builder --ttl 2h
+spawn connect pytorch-builder
+
+# Install PyTorch + dependencies
+pip3 install torch torchvision torchaudio transformers accelerate
+# ... more installation ...
+exit
+
+# Step 2: Create AMI
+spawn create-ami pytorch-builder \
+  --name pytorch-2.2-cuda12-$(date +%Y%m%d) \
+  --tag stack=pytorch \
+  --tag version=2.2 \
+  --tag cuda-version=12.1
+
+# Step 3: List AMIs
+spawn list-amis --stack pytorch
+
+# Step 4: Launch from custom AMI (instant, no installation wait!)
+AMI=$(spawn list-amis --stack pytorch --json | jq -r '.[0].ami_id')
+spawn launch --instance-type g5.xlarge --ami $AMI --name training-job
+
+# Launch time: 30 seconds vs 15+ minutes with user-data!
+```
+
+See [AMI_MANAGEMENT.md](AMI_MANAGEMENT.md) for complete documentation.
+
 ## 🛠️ Development
 
 ### Building
@@ -1074,6 +1106,7 @@ spawn reads this and launches accordingly!
 ## 📚 Documentation
 
 - **[JOB_ARRAYS.md](JOB_ARRAYS.md)** - Job arrays for coordinated instance groups
+- **[AMI_MANAGEMENT.md](AMI_MANAGEMENT.md)** - Create and manage custom AMIs
 - **[IAM_PERMISSIONS.md](IAM_PERMISSIONS.md)** - Required AWS permissions
 - **[DNS_SETUP.md](DNS_SETUP.md)** - Custom DNS configuration
 - **[MONITORING.md](MONITORING.md)** - Monitoring and observability

@@ -898,3 +898,15 @@ func intToBase36(accountID string) string {
 	// Convert to base36 (lowercase)
 	return strconv.FormatUint(num, 36)
 }
+
+// GetConfig returns the AWS config
+func (c *Client) GetConfig(ctx context.Context) (aws.Config, error) {
+	return c.cfg, nil
+}
+
+// getRegionalConfig returns an AWS config for a specific region
+func (c *Client) getRegionalConfig(ctx context.Context, region string) (aws.Config, error) {
+	cfg := c.cfg.Copy()
+	cfg.Region = region
+	return cfg, nil
+}
