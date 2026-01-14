@@ -1,14 +1,14 @@
 #!/bin/bash
 set -e
 
-# Upload spawnd binaries to S3 with SHA256 checksums
+# Upload spored binaries to S3 with SHA256 checksums
 # Usage: ./upload_spawnd.sh [aws-profile] [regions...]
 #
 # Examples:
 #   ./upload_spawnd.sh my-spawn-account us-east-1 us-west-2
 #   ./upload_spawnd.sh my-spawn-account all  # All regions
 
-PROFILE=${1:-default}
+PROFILE=${1:-mycelium-infra}
 shift
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -16,8 +16,8 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SPAWN_BIN_DIR="$PROJECT_ROOT/spawn/bin"
 
 # Check if binaries exist
-if [ ! -f "$SPAWN_BIN_DIR/spawnd-linux-amd64" ]; then
-    echo "❌ Error: spawnd binaries not found in $SPAWN_BIN_DIR"
+if [ ! -f "$SPAWN_BIN_DIR/spored-linux-amd64" ]; then
+    echo "❌ Error: spored binaries not found in $SPAWN_BIN_DIR"
     echo "Run 'make build-all' first to build binaries"
     exit 1
 fi
@@ -50,7 +50,7 @@ else
 fi
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  Uploading spawnd binaries to S3"
+echo "  Uploading spored binaries to S3"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "Profile: $PROFILE"
 echo "Regions: ${REGIONS[*]}"
@@ -58,8 +58,8 @@ echo ""
 
 # Binaries to upload
 BINARIES=(
-    "spawnd-linux-amd64"
-    "spawnd-linux-arm64"
+    "spored-linux-amd64"
+    "spored-linux-arm64"
 )
 
 # Generate SHA256 checksums
@@ -127,9 +127,9 @@ echo "  ✅ Upload complete!"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 echo "Test download and verification:"
-echo "  curl -O https://spawn-binaries-us-east-1.s3.amazonaws.com/spawnd-linux-amd64"
-echo "  curl -O https://spawn-binaries-us-east-1.s3.amazonaws.com/spawnd-linux-amd64.sha256"
-echo "  echo \"\$(cat spawnd-linux-amd64.sha256)  spawnd-linux-amd64\" | sha256sum --check"
+echo "  curl -O https://spawn-binaries-us-east-1.s3.amazonaws.com/spored-linux-amd64"
+echo "  curl -O https://spawn-binaries-us-east-1.s3.amazonaws.com/spored-linux-amd64.sha256"
+echo "  echo \"\$(cat spored-linux-amd64.sha256)  spored-linux-amd64\" | sha256sum --check"
 echo ""
 
 # Display checksums for reference
