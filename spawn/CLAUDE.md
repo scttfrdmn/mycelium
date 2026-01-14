@@ -2,44 +2,59 @@
 
 ## AWS Account Configuration
 
-**CRITICAL**: Resources are split across two AWS accounts:
+**CRITICAL**: Resources are organized in an AWS Organization with separate accounts:
 
-- **`default` profile** (Account: 752123829273)
-  - S3 buckets (spawn-binaries-*)
+- **`management` profile** (Account: 752123829273)
+  - Organization administration ONLY
+  - IAM user: scott-admin
+  - **NO application workloads**
+
+- **`mycelium-infra` profile** (Account: 966362334030)
+  - S3 buckets (spawn-binaries-*, spore-host-website)
   - Lambda functions (spawn-dns-updater)
   - Route53 DNS (spore.host hosted zone)
-  - Infrastructure resources
+  - CloudFront distribution
+  - Cognito Identity Pool
+  - **Production infrastructure**
   - **NO EC2 instances**
 
-- **`aws` profile** (Account: 942542972736)
+- **`mycelium-dev` profile** (Account: 435415984226)
   - **ALL EC2 instance provisioning**
   - Test instances
   - Development/testing instances
   - **NO infrastructure resources**
 
+- **DEPRECATED: `default` profile** - DO NOT USE (being phased out)
+- **DEPRECATED: `aws` profile** - DO NOT USE (Account 942542972736 no longer used)
+
 **Cross-Account Requirements**:
-- EC2 instances in 'aws' account need access to:
-  - S3 bucket in 'default' account (for spored binary downloads)
-  - Lambda DNS API in 'default' account (for DNS registration)
+- EC2 instances in mycelium-dev account need access to:
+  - S3 bucket in mycelium-infra account (for spored binary downloads)
+  - Lambda DNS API in mycelium-infra account (for DNS registration)
 
 **Usage Examples**:
 ```bash
-# Upload spored binary to S3 (use default profile)
-aws s3 cp bin/spored s3://spawn-binaries-us-east-1/spored-linux-amd64
+# Upload spored binary to S3 (use mycelium-infra profile)
+AWS_PROFILE=mycelium-infra aws s3 cp bin/spored s3://spawn-binaries-us-east-1/spored-linux-amd64
 
-# Launch instances (use aws profile ONLY)
-AWS_PROFILE=aws ./bin/spawn launch --instance-type t3.micro ...
+# Launch instances (use mycelium-dev profile ONLY)
+AWS_PROFILE=mycelium-dev ./bin/spawn launch --instance-type t3.micro ...
 
-# Deploy Lambda function (use default profile)
-aws lambda update-function-code --function-name spawn-dns-updater ...
+# Deploy Lambda function (use mycelium-infra profile)
+AWS_PROFILE=mycelium-infra aws lambda update-function-code --function-name spawn-dns-updater ...
+
+# Deploy website (use mycelium-infra profile)
+cd web && AWS_PROFILE=mycelium-infra ./deploy.sh
 ```
 
 ## DNS Implementation
 
 DNS uses base36-encoded account IDs for subdomain isolation:
 - Format: `<name>.<account-base36>.spore.host`
-- Account 752123829273 → Base36: `c0zxr0ao`
-- Example: `test-base36.c0zxr0ao.spore.host`
+- Management Account 752123829273 → Base36: `c0zxr0ao` (DEPRECATED)
+- Infrastructure Account 966362334030 → Base36: TBD (calculate when needed)
+- Development Account 435415984226 → Base36: TBD (calculate when needed)
+- Example: `test-base36.c0zxr0ao.spore.host` (uses old account base36)
 
 ## Spored Agent
 
