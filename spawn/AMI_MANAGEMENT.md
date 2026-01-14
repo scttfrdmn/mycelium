@@ -172,27 +172,43 @@ spawn automatically tracks AMI health and warns about outdated AMIs.
 
 ### Base AMI Tracking
 
-When you create an AMI, spawn automatically tracks:
-- **Base AMI ID**: The AMI that the source instance was launched from
-- **Creation date**: When the custom AMI was created
+When you create an AMI, spawn automatically:
+1. **Records the base AMI ID** - The AMI that the source instance was launched from
+2. **Stores it in tags** - `spawn:base-ami` tag on your custom AMI
 
-This enables health checks to detect:
-- Base AMI is outdated (new security patches available)
-- AMI should be rebuilt with latest base
+### How the Health Check Works
+
+When you run `spawn list-amis`, spawn:
+1. **Reads your base AMI** - From the `spawn:base-ami` tag
+2. **Gets current recommended AMI** - Queries AWS for latest AL2023 AMI
+3. **Compares them** - If different, a newer base AMI is available
+4. **Checks age** - Calculates how old your base AMI is
+5. **Generates warnings** - Based on severity
+
+**Key insight**: spawn checks if AWS has released a NEWER base AMI, not just if yours is old. If your AMI uses the current base, no warning appears even if it's 60 days old.
 
 ### Health Check Display
 
 ```bash
 $ spawn list-amis
 
-NAME                  AMI ID                 STACK  VERSION  ARCH    SIZE  AGE   STATUS
-pytorch-old           ami-abc123             pytorch 2.1    x86_64  30GB  45d   GPU ⚠️
-pytorch-current       ami-def456             pytorch 2.2    x86_64  30GB  5d    GPU
+NAME                  AMI ID                 STACK    VERSION  ARCH    SIZE  AGE   STATUS
+pytorch-old           ami-abc123             pytorch  2.1      x86_64  30GB  95d   GPU ⚠️
+pytorch-medium        ami-def456             pytorch  2.2      x86_64  30GB  45d   GPU ⚠️
+pytorch-current       ami-ghi789             pytorch  2.3      x86_64  30GB  5d    GPU
 
 Warnings:
   pytorch-old:
-    - base AMI is 45 days old (rebuild recommended)
+    - newer base AMI available (current: ami-xyz789, yours: ami-old123, age: 95d) - rebuild recommended
+  pytorch-medium:
+    - newer base AMI available (current: ami-xyz789, yours: ami-old456, age: 45d)
 ```
+
+**What the warning shows:**
+- **Current**: The latest recommended AL2023 AMI
+- **Yours**: The base AMI your custom AMI was built from
+- **Age**: How old your base AMI is
+- **Action**: "rebuild recommended" for critical (>90 days)
 
 ### Warning Levels
 

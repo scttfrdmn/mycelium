@@ -10,9 +10,11 @@ import (
 
 // AMIHealthCheck represents the health status of an AMI
 type AMIHealthCheck struct {
-	BaseAMIOutdated bool
-	BaseAMIAge      time.Duration
-	Warnings        []string
+	BaseAMIOutdated   bool
+	BaseAMIAge        time.Duration
+	CurrentBaseAMI    string // Current recommended base AMI
+	OldBaseAMI        string // Base AMI used in this custom AMI
+	Warnings          []string
 }
 
 // CheckAMIHealth checks if an AMI has an outdated base AMI
@@ -28,7 +30,9 @@ func (c *Client) CheckAMIHealth(ctx context.Context, ami AMIInfo, region string)
 		return check, nil
 	}
 
-	baseAMIAge, outdated, err := c.checkBaseAMI(ctx, region, baseAMIID, ami.Architecture, ami.GPU)
+	check.OldBaseAMI = baseAMIID
+
+	baseAMIAge, outdated, currentAMI, err := c.checkBaseAMI(ctx, region, baseAMIID, ami.Architecture, ami.GPU)
 	if err != nil {
 		// Can't check - don't warn
 		return check, nil
@@ -36,13 +40,22 @@ func (c *Client) CheckAMIHealth(ctx context.Context, ami AMIInfo, region string)
 
 	check.BaseAMIAge = baseAMIAge
 	check.BaseAMIOutdated = outdated
+	check.CurrentBaseAMI = currentAMI
 
 	if outdated {
 		days := int(baseAMIAge.Hours() / 24)
 		if days > 90 {
-			check.Warnings = append(check.Warnings, fmt.Sprintf("base AMI is %d days old (rebuild recommended)", days))
+			check.Warnings = append(check.Warnings,
+				fmt.Sprintf("newer base AMI available (current: %s, yours: %s, age: %dd) - rebuild recommended",
+					currentAMI, baseAMIID, days))
 		} else if days > 30 {
-			check.Warnings = append(check.Warnings, fmt.Sprintf("base AMI is %d days old", days))
+			check.Warnings = append(check.Warnings,
+				fmt.Sprintf("newer base AMI available (current: %s, yours: %s, age: %dd)",
+					currentAMI, baseAMIID, days))
+		} else {
+			// Less than 30 days but still outdated - minor update available
+			check.Warnings = append(check.Warnings,
+				fmt.Sprintf("newer base AMI available (current: %s)", currentAMI))
 		}
 	}
 
@@ -50,11 +63,12 @@ func (c *Client) CheckAMIHealth(ctx context.Context, ami AMIInfo, region string)
 }
 
 // checkBaseAMI checks if the base AMI used to create this AMI is outdated
-func (c *Client) checkBaseAMI(ctx context.Context, region string, baseAMIID string, arch string, gpu bool) (time.Duration, bool, error) {
+// Returns: age, outdated, currentAMI, error
+func (c *Client) checkBaseAMI(ctx context.Context, region string, baseAMIID string, arch string, gpu bool) (time.Duration, bool, string, error) {
 	// Get the base AMI creation date
 	cfg, err := c.getRegionalConfig(ctx, region)
 	if err != nil {
-		return 0, false, fmt.Errorf("failed to get regional config: %w", err)
+		return 0, false, "", fmt.Errorf("failed to get regional config: %w", err)
 	}
 
 	ec2Client := ec2.NewFromConfig(cfg)
@@ -64,19 +78,29 @@ func (c *Client) checkBaseAMI(ctx context.Context, region string, baseAMIID stri
 		ImageIds: []string{baseAMIID},
 	})
 	if err != nil || len(baseResult.Images) == 0 {
-		return 0, false, fmt.Errorf("failed to get base AMI details: %w", err)
+		return 0, false, "", fmt.Errorf("failed to get base AMI details: %w", err)
 	}
 
 	baseImage := baseResult.Images[0]
 	baseCreationDate, err := time.Parse(time.RFC3339, *baseImage.CreationDate)
 	if err != nil {
-		return 0, false, fmt.Errorf("failed to parse base AMI creation date: %w", err)
+		return 0, false, "", fmt.Errorf("failed to parse base AMI creation date: %w", err)
 	}
 
-	// Get current recommended AMI
-	currentAMI, err := c.GetRecommendedAMI(ctx, region, "")
+	// Get current recommended AMI for this architecture/GPU combination
+	// We need to pass the architecture to get the right AMI
+	instanceType := ""
+	if arch == "arm64" {
+		instanceType = "m7g.large" // Graviton instance for arm64
+	} else if gpu {
+		instanceType = "g5.xlarge" // GPU instance for x86_64 GPU
+	} else {
+		instanceType = "m7i.large" // Regular x86_64 instance
+	}
+
+	currentAMI, err := c.GetRecommendedAMI(ctx, region, instanceType)
 	if err != nil {
-		return 0, false, fmt.Errorf("failed to get current recommended AMI: %w", err)
+		return 0, false, "", fmt.Errorf("failed to get current recommended AMI: %w", err)
 	}
 
 	// If different, the base is outdated
@@ -85,5 +109,5 @@ func (c *Client) checkBaseAMI(ctx context.Context, region string, baseAMIID stri
 	// Calculate age
 	age := time.Since(baseCreationDate)
 
-	return age, outdated, nil
+	return age, outdated, currentAMI, nil
 }
