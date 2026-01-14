@@ -149,6 +149,111 @@ func runListAMIs(cmd *cobra.Command, args []string) error {
 }
 
 func outputAMIsTable(amis []aws.AMIInfo) error {
+	ctx := context.Background()
+
+	// Create AWS client for health checks
+	client, err := aws.NewClient(ctx)
+	if err != nil {
+		// If we can't create client, just list without health checks
+		return outputAMIsTableSimple(amis)
+	}
+
+	// Get region from first AMI
+	region := ""
+	if len(amis) > 0 {
+		region = amis[0].Tags["spawn:source-region"]
+	}
+	if region == "" {
+		cfg, err := client.GetConfig(ctx)
+		if err == nil {
+			region = cfg.Region
+		}
+	}
+
+	fmt.Println() // Blank line
+
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	defer w.Flush()
+
+	// Header
+	fmt.Fprintf(w, "NAME\tAMI ID\tSTACK\tVERSION\tARCH\tSIZE\tAGE\tSTATUS\n")
+
+	hasWarnings := false
+
+	for _, ami := range amis {
+		// Format age
+		age := formatDuration(time.Since(ami.CreationDate))
+
+		// Format size
+		size := fmt.Sprintf("%dGB", ami.Size)
+
+		// Stack and version
+		stack := ami.Stack
+		if stack == "" {
+			stack = "-"
+		}
+		version := ami.Version
+		if version == "" {
+			version = "-"
+		}
+
+		// Status
+		status := ""
+		if ami.GPU {
+			status = "GPU"
+		}
+		if ami.Deprecated {
+			if status != "" {
+				status += " "
+			}
+			status += "[deprecated]"
+		}
+
+		// Health check
+		if region != "" {
+			health, err := client.CheckAMIHealth(ctx, ami, region)
+			if err == nil && len(health.Warnings) > 0 {
+				if status != "" {
+					status += " "
+				}
+				status += "⚠️"
+				hasWarnings = true
+			}
+		}
+
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+			ami.Name,
+			ami.AMIID,
+			stack,
+			version,
+			ami.Architecture,
+			size,
+			age,
+			status,
+		)
+	}
+
+	w.Flush()
+
+	// Show warnings in detail after table
+	if hasWarnings && region != "" {
+		fmt.Println()
+		fmt.Println("Warnings:")
+		for _, ami := range amis {
+			health, err := client.CheckAMIHealth(ctx, ami, region)
+			if err == nil && len(health.Warnings) > 0 {
+				fmt.Printf("  %s:\n", ami.Name)
+				for _, warning := range health.Warnings {
+					fmt.Printf("    - %s\n", warning)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func outputAMIsTableSimple(amis []aws.AMIInfo) error {
 	fmt.Println() // Blank line
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)

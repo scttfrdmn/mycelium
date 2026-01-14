@@ -116,6 +116,13 @@ func runCreateAMI(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Get base AMI ID from instance (for tracking base AMI age)
+	baseAMI, err := client.GetInstanceAMI(ctx, instance.Region, instance.InstanceID)
+	if err == nil && baseAMI != "" {
+		tags["spawn:base-ami"] = baseAMI
+		fmt.Fprintf(os.Stderr, "Tracking base AMI: %s\n", baseAMI)
+	}
+
 	// Default description
 	description := createAMIDescription
 	if description == "" {

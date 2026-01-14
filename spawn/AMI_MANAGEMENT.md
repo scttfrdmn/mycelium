@@ -166,20 +166,91 @@ sudo cloud-init clean --logs
 
 ---
 
-## 2. Tagging Conventions
+## 2. AMI Health Checks
 
-### Recommended Tags
+spawn automatically tracks AMI health and warns about outdated AMIs.
+
+### Base AMI Tracking
+
+When you create an AMI, spawn automatically tracks:
+- **Base AMI ID**: The AMI that the source instance was launched from
+- **Creation date**: When the custom AMI was created
+
+This enables health checks to detect:
+- Base AMI is outdated (new security patches available)
+- AMI should be rebuilt with latest base
+
+### Health Check Display
+
+```bash
+$ spawn list-amis
+
+NAME                  AMI ID                 STACK  VERSION  ARCH    SIZE  AGE   STATUS
+pytorch-old           ami-abc123             pytorch 2.1    x86_64  30GB  45d   GPU ⚠️
+pytorch-current       ami-def456             pytorch 2.2    x86_64  30GB  5d    GPU
+
+Warnings:
+  pytorch-old:
+    - base AMI is 45 days old (rebuild recommended)
+```
+
+### Warning Levels
+
+- **30-90 days**: Warning - base AMI is aging, consider rebuild
+- **>90 days**: Critical - base AMI is very old, security patches missing
+
+### Automatic spored Updates
+
+**Good news**: The spored agent auto-updates on every launch!
+
+spawn's user-data script downloads the latest spored binary from S3 during instance startup. This means:
+- ✅ AMIs always boot with the latest spored agent
+- ✅ No need to rebuild AMIs for spored updates
+- ✅ Security fixes and features automatically deployed
+
+**Only base AMI changes require rebuilding the AMI.**
+
+### When to Rebuild
+
+Rebuild your AMI when:
+1. **Base AMI is >90 days old** - Security patches and kernel updates
+2. **Software stack updates** - New PyTorch version, library updates, etc.
+3. **Configuration changes** - System-level settings, kernel parameters
+4. **Security vulnerabilities** - CVEs in installed packages
+
+**Don't rebuild for:**
+- spored agent updates (auto-updated on launch)
+- Environment variable changes (use user-data)
+- Temporary configuration (use user-data)
+
+## 3. Tagging Conventions
+
+### Automatic Tags (Added by spawn)
 
 ```
-spawn:stack         = "pytorch" | "tensorflow" | "mpi" | "genomics"
-spawn:version       = "2.2" | "1.0.0" | semver
-spawn:arch          = "x86_64" | "arm64"
-spawn:created       = "2026-01-14T10:30:00Z" (ISO 8601)
-spawn:base          = "al2023" | "ubuntu22" | "rhel9"
-spawn:gpu           = "true" | "false"
-spawn:cuda-version  = "12.1" | "11.8" (if GPU)
-spawn:owner         = "team-ml" | "john.doe@company.com"
-spawn:env           = "dev" | "staging" | "prod"
+spawn:managed       = "true"                          # spawn-managed AMI
+spawn:created       = "2026-01-14T10:30:00Z"          # ISO 8601 timestamp
+spawn:created-from  = "i-abc123"                      # Source instance ID
+spawn:source-region = "us-east-1"                     # Region where created
+spawn:arch          = "x86_64" | "arm64"              # CPU architecture
+spawn:gpu           = "true" | "false"                # GPU support
+spawn:base-ami      = "ami-xyz789"                    # Base AMI used (for health checks)
+```
+
+### Recommended User Tags
+
+```
+stack               = "pytorch" | "tensorflow" | "mpi" | "genomics"
+version             = "2.2" | "1.0.0" | semver
+base                = "al2023" | "ubuntu22" | "rhel9"
+cuda-version        = "12.1" | "11.8" (if GPU)
+owner               = "team-ml" | "john.doe@company.com"
+env                 = "dev" | "staging" | "prod"
+```
+
+### Lifecycle Tags (Added later)
+
+```
 spawn:deprecated    = "true" (when deprecating)
 ```
 
