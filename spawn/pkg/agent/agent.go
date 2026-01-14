@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -26,6 +27,8 @@ type Agent struct {
 	accountID        string
 	publicIP         string
 	dnsName          string
+	jobArrayID       string // Empty if not part of job array
+	jobArrayName     string // Empty if not part of job array
 	dnsClient        *dns.Client
 	ec2Client        *ec2.Client
 	imdsClient       *imds.Client
@@ -81,7 +84,7 @@ func NewAgent(ctx context.Context) (*Agent, error) {
 	ec2Client := ec2.NewFromConfig(cfg)
 
 	// Get instance tags to read configuration
-	agentConfig, dnsName, err := loadConfigFromTags(ctx, ec2Client, instanceID)
+	agentConfig, dnsName, jobArrayID, jobArrayName, err := loadConfigFromTags(ctx, ec2Client, instanceID)
 	if err != nil {
 		log.Printf("Warning: Could not load config from tags: %v", err)
 		agentConfig = AgentConfig{
@@ -95,6 +98,8 @@ func NewAgent(ctx context.Context) (*Agent, error) {
 		accountID:        accountID,
 		publicIP:         publicIP,
 		dnsName:          dnsName,
+		jobArrayID:       jobArrayID,
+		jobArrayName:     jobArrayName,
 		ec2Client:        ec2Client,
 		imdsClient:       imdsClient,
 		config:           agentConfig,
@@ -114,24 +119,45 @@ func NewAgent(ctx context.Context) (*Agent, error) {
 		} else {
 			agent.dnsClient = dnsClient
 
-			// Register DNS
-			log.Printf("Registering DNS: %s -> %s", dnsName, publicIP)
-			resp, err := dnsClient.RegisterDNS(ctx, dnsName, publicIP)
-			if err != nil {
-				log.Printf("Warning: Failed to register DNS: %v", err)
+			// Register DNS (use job array method if part of a job array)
+			if jobArrayID != "" && jobArrayName != "" {
+				log.Printf("Registering job array DNS: %s -> %s (array: %s)", dnsName, publicIP, jobArrayName)
+				resp, err := dnsClient.RegisterJobArrayDNS(ctx, dnsName, publicIP, jobArrayID, jobArrayName)
+				if err != nil {
+					log.Printf("Warning: Failed to register job array DNS: %v", err)
+				} else {
+					fqdn := dns.GetFullDNSName(dnsName, accountID, "spore.host")
+					log.Printf("✓ Job array DNS registered: %s -> %s (change: %s)", fqdn, publicIP, resp.ChangeID)
+					if resp.Message != "" {
+						log.Printf("  %s", resp.Message)
+					}
+				}
 			} else {
-				fqdn := dns.GetFullDNSName(dnsName, accountID, "spore.host")
-				log.Printf("✓ DNS registered: %s -> %s (change: %s)", fqdn, publicIP, resp.ChangeID)
+				log.Printf("Registering DNS: %s -> %s", dnsName, publicIP)
+				resp, err := dnsClient.RegisterDNS(ctx, dnsName, publicIP)
+				if err != nil {
+					log.Printf("Warning: Failed to register DNS: %v", err)
+				} else {
+					fqdn := dns.GetFullDNSName(dnsName, accountID, "spore.host")
+					log.Printf("✓ DNS registered: %s -> %s (change: %s)", fqdn, publicIP, resp.ChangeID)
+				}
 			}
 		}
 	} else if dnsName != "" {
 		log.Printf("Warning: DNS name configured (%s) but no public IP available", dnsName)
 	}
 
+	// Load job array peer information if part of a job array
+	err = agent.loadJobArrayPeers(ctx)
+	if err != nil {
+		log.Printf("Warning: Failed to load job array peers: %v", err)
+		// Non-fatal: continue without peer information
+	}
+
 	return agent, nil
 }
 
-func loadConfigFromTags(ctx context.Context, client *ec2.Client, instanceID string) (AgentConfig, string, error) {
+func loadConfigFromTags(ctx context.Context, client *ec2.Client, instanceID string) (AgentConfig, string, string, string, error) {
 	output, err := client.DescribeTags(ctx, &ec2.DescribeTagsInput{
 		Filters: []types.Filter{
 			{
@@ -141,13 +167,13 @@ func loadConfigFromTags(ctx context.Context, client *ec2.Client, instanceID stri
 		},
 	})
 	if err != nil {
-		return AgentConfig{}, "", err
+		return AgentConfig{}, "", "", "", err
 	}
 
 	config := AgentConfig{
 		IdleCPUPercent: 5.0, // Default
 	}
-	var dnsName string
+	var dnsName, jobArrayID, jobArrayName string
 
 	for _, tag := range output.Tags {
 		if tag.Key == nil || tag.Value == nil {
@@ -183,6 +209,10 @@ func loadConfigFromTags(ctx context.Context, client *ec2.Client, instanceID stri
 			if duration, err := time.ParseDuration(*tag.Value); err == nil {
 				config.CompletionDelay = duration
 			}
+		case "spawn:job-array-id":
+			jobArrayID = *tag.Value
+		case "spawn:job-array-name":
+			jobArrayName = *tag.Value
 		}
 	}
 
@@ -196,7 +226,132 @@ func loadConfigFromTags(ctx context.Context, client *ec2.Client, instanceID stri
 		config.CompletionDelay = 30 * time.Second
 	}
 
-	return config, dnsName, nil
+	return config, dnsName, jobArrayID, jobArrayName, nil
+}
+
+// PeerInfo represents information about a peer instance in a job array
+type PeerInfo struct {
+	Index      int    `json:"index"`
+	InstanceID string `json:"instance_id"`
+	IP         string `json:"ip"`
+	DNS        string `json:"dns"`
+}
+
+// loadJobArrayPeers discovers peer instances and writes peer information to /etc/spawn/job-array-peers.json
+func (a *Agent) loadJobArrayPeers(ctx context.Context) error {
+	// Get this instance's job array ID tag
+	output, err := a.ec2Client.DescribeTags(ctx, &ec2.DescribeTagsInput{
+		Filters: []types.Filter{
+			{
+				Name:   aws.String("resource-id"),
+				Values: []string{a.instanceID},
+			},
+			{
+				Name:   aws.String("key"),
+				Values: []string{"spawn:job-array-id"},
+			},
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to describe tags: %w", err)
+	}
+
+	// If no job-array-id tag, not part of a job array
+	if len(output.Tags) == 0 {
+		return nil
+	}
+
+	jobArrayID := *output.Tags[0].Value
+	log.Printf("Instance is part of job array: %s", jobArrayID)
+
+	// Query for all instances with the same job-array-id
+	instances, err := a.ec2Client.DescribeInstances(ctx, &ec2.DescribeInstancesInput{
+		Filters: []types.Filter{
+			{
+				Name:   aws.String("tag:spawn:job-array-id"),
+				Values: []string{jobArrayID},
+			},
+			{
+				Name:   aws.String("instance-state-name"),
+				Values: []string{"pending", "running"},
+			},
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to query job array instances: %w", err)
+	}
+
+	// Build peer list
+	var peers []PeerInfo
+	accountBase36 := intToBase36(a.accountID)
+
+	for _, reservation := range instances.Reservations {
+		for _, instance := range reservation.Instances {
+			// Extract job array index from tags
+			var index int
+			var name string
+			for _, tag := range instance.Tags {
+				if *tag.Key == "spawn:job-array-index" {
+					index, _ = strconv.Atoi(*tag.Value)
+				}
+				if *tag.Key == "Name" {
+					name = *tag.Value
+				}
+			}
+
+			publicIP := ""
+			if instance.PublicIpAddress != nil {
+				publicIP = *instance.PublicIpAddress
+			}
+
+			// Generate DNS name: {name}.{account-base36}.spore.host
+			dnsName := fmt.Sprintf("%s.%s.spore.host", name, accountBase36)
+
+			peer := PeerInfo{
+				Index:      index,
+				InstanceID: *instance.InstanceId,
+				IP:         publicIP,
+				DNS:        dnsName,
+			}
+			peers = append(peers, peer)
+		}
+	}
+
+	// Sort by index
+	sort.Slice(peers, func(i, j int) bool {
+		return peers[i].Index < peers[j].Index
+	})
+
+	// Create /etc/spawn directory if it doesn't exist
+	err = os.MkdirAll("/etc/spawn", 0755)
+	if err != nil {
+		return fmt.Errorf("failed to create /etc/spawn directory: %w", err)
+	}
+
+	// Marshal to JSON and write to file
+	peersJSON, err := json.MarshalIndent(peers, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal peers: %w", err)
+	}
+
+	peersFile := "/etc/spawn/job-array-peers.json"
+	err = os.WriteFile(peersFile, peersJSON, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write peers file: %w", err)
+	}
+
+	log.Printf("✓ Job array peer information written to %s (%d peers)", peersFile, len(peers))
+
+	return nil
+}
+
+// intToBase36 converts an AWS account ID to base36
+func intToBase36(accountID string) string {
+	num, err := strconv.ParseUint(accountID, 10, 64)
+	if err != nil {
+		return accountID
+	}
+	return strconv.FormatUint(num, 36)
 }
 
 func (a *Agent) Monitor(ctx context.Context) {
@@ -748,16 +903,31 @@ func (a *Agent) Cleanup(ctx context.Context) {
 
 	// Clean up DNS
 	if a.dnsClient != nil && a.dnsName != "" && a.publicIP != "" {
-		log.Printf("Deleting DNS record: %s", a.dnsName)
 		cleanupCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 
-		_, err := a.dnsClient.DeleteDNS(cleanupCtx, a.dnsName, a.publicIP)
-		if err != nil {
-			log.Printf("Warning: Failed to delete DNS: %v", err)
+		// Use job array DNS deletion if part of a job array
+		if a.jobArrayID != "" && a.jobArrayName != "" {
+			log.Printf("Deleting job array DNS record: %s (array: %s)", a.dnsName, a.jobArrayName)
+			resp, err := a.dnsClient.DeleteJobArrayDNS(cleanupCtx, a.dnsName, a.publicIP, a.jobArrayID, a.jobArrayName)
+			if err != nil {
+				log.Printf("Warning: Failed to delete job array DNS: %v", err)
+			} else {
+				fqdn := dns.GetFullDNSName(a.dnsName, a.accountID, "spore.host")
+				log.Printf("✓ Job array DNS deleted: %s", fqdn)
+				if resp.Message != "" {
+					log.Printf("  %s", resp.Message)
+				}
+			}
 		} else {
-			fqdn := dns.GetFullDNSName(a.dnsName, a.accountID, "spore.host")
-			log.Printf("✓ DNS deleted: %s", fqdn)
+			log.Printf("Deleting DNS record: %s", a.dnsName)
+			_, err := a.dnsClient.DeleteDNS(cleanupCtx, a.dnsName, a.publicIP)
+			if err != nil {
+				log.Printf("Warning: Failed to delete DNS: %v", err)
+			} else {
+				fqdn := dns.GetFullDNSName(a.dnsName, a.accountID, "spore.host")
+				log.Printf("✓ DNS deleted: %s", fqdn)
+			}
 		}
 	}
 
@@ -791,10 +961,14 @@ func (a *Agent) Reload(ctx context.Context) error {
 	log.Printf("Reloading configuration from tags...")
 
 	// Re-read tags
-	newConfig, newDNSName, err := loadConfigFromTags(ctx, a.ec2Client, a.instanceID)
+	newConfig, newDNSName, newJobArrayID, newJobArrayName, err := loadConfigFromTags(ctx, a.ec2Client, a.instanceID)
 	if err != nil {
 		return fmt.Errorf("failed to reload config from tags: %w", err)
 	}
+
+	// Update job array fields (they shouldn't change after launch, but update anyway)
+	a.jobArrayID = newJobArrayID
+	a.jobArrayName = newJobArrayName
 
 	// Log changes
 	if newConfig.TTL != a.config.TTL {

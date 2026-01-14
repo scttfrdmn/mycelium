@@ -12,28 +12,37 @@ import (
 	"github.com/scttfrdmn/mycelium/spawn/pkg/aws"
 )
 
+var (
+	stopJobArrayID       string
+	stopJobArrayName     string
+	hibernateJobArrayID  string
+	hibernateJobArrayName string
+	startJobArrayID      string
+	startJobArrayName    string
+)
+
 // stop command
 var stopCmd = &cobra.Command{
-	Use:  "stop <instance-id-or-name>",
+	Use:  "stop [instance-id-or-name]",
 	RunE: runStop,
-	Args: cobra.ExactArgs(1),
+	Args: cobra.RangeArgs(0, 1),
 	// Short and Long will be set after i18n initialization
 }
 
 // hibernate command
 var hibernateCmd = &cobra.Command{
-	Use:     "hibernate <instance-id-or-name>",
+	Use:     "hibernate [instance-id-or-name]",
 	RunE:    runHibernate,
 	Aliases: []string{"sleep"},
-	Args:    cobra.ExactArgs(1),
+	Args:    cobra.RangeArgs(0, 1),
 	// Short and Long will be set after i18n initialization
 }
 
 // start command
 var startCmd = &cobra.Command{
-	Use:  "start <instance-id-or-name>",
+	Use:  "start [instance-id-or-name]",
 	RunE: runStart,
-	Args: cobra.ExactArgs(1),
+	Args: cobra.RangeArgs(0, 1),
 	// Short and Long will be set after i18n initialization
 }
 
@@ -47,13 +56,51 @@ func init() {
 	stopCmd.ValidArgsFunction = completeInstanceID
 	hibernateCmd.ValidArgsFunction = completeInstanceID
 	startCmd.ValidArgsFunction = completeInstanceID
+
+	// Add job array flags
+	stopCmd.Flags().StringVar(&stopJobArrayID, "job-array-id", "", "Stop all instances in job array by ID")
+	stopCmd.Flags().StringVar(&stopJobArrayName, "job-array-name", "", "Stop all instances in job array by name")
+	hibernateCmd.Flags().StringVar(&hibernateJobArrayID, "job-array-id", "", "Hibernate all instances in job array by ID")
+	hibernateCmd.Flags().StringVar(&hibernateJobArrayName, "job-array-name", "", "Hibernate all instances in job array by name")
+	startCmd.Flags().StringVar(&startJobArrayID, "job-array-id", "", "Start all instances in job array by ID")
+	startCmd.Flags().StringVar(&startJobArrayName, "job-array-name", "", "Start all instances in job array by name")
 }
 
 func runStop(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
+
+	// Determine if stopping job array or single instance
+	if stopJobArrayID != "" || stopJobArrayName != "" {
+		// Job array mode
+		if len(args) != 0 {
+			return fmt.Errorf("job array mode does not accept instance ID argument")
+		}
+		return stopOrHibernateJobArray(ctx, false)
+	}
+
+	// Single instance mode
+	if len(args) != 1 {
+		return fmt.Errorf("single instance mode requires 1 argument: <instance-id-or-name>")
+	}
 	return stopOrHibernate(args[0], false)
 }
 
 func runHibernate(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
+
+	// Determine if hibernating job array or single instance
+	if hibernateJobArrayID != "" || hibernateJobArrayName != "" {
+		// Job array mode
+		if len(args) != 0 {
+			return fmt.Errorf("job array mode does not accept instance ID argument")
+		}
+		return stopOrHibernateJobArray(ctx, true)
+	}
+
+	// Single instance mode
+	if len(args) != 1 {
+		return fmt.Errorf("single instance mode requires 1 argument: <instance-id-or-name>")
+	}
 	return stopOrHibernate(args[0], true)
 }
 
@@ -145,9 +192,146 @@ func stopOrHibernate(identifier string, hibernate bool) error {
 	return nil
 }
 
+func stopOrHibernateJobArray(ctx context.Context, hibernate bool) error {
+	action := "stop"
+	if hibernate {
+		action = "hibernate"
+	}
+
+	// Create AWS client
+	client, err := aws.NewClient(ctx)
+	if err != nil {
+		return i18n.Te("error.aws_client_init", err)
+	}
+
+	// List all instances
+	instances, err := client.ListInstances(ctx, "", "")
+	if err != nil {
+		return fmt.Errorf("failed to list instances: %w", err)
+	}
+
+	// Filter instances by job array
+	var jobArrayInstances []aws.InstanceInfo
+	jobArrayID := stopJobArrayID
+	jobArrayName := stopJobArrayName
+	if hibernate {
+		jobArrayID = hibernateJobArrayID
+		jobArrayName = hibernateJobArrayName
+	}
+
+	for _, inst := range instances {
+		if jobArrayID != "" && inst.JobArrayID == jobArrayID {
+			jobArrayInstances = append(jobArrayInstances, inst)
+		} else if jobArrayName != "" && inst.JobArrayName == jobArrayName {
+			jobArrayInstances = append(jobArrayInstances, inst)
+		}
+	}
+
+	if len(jobArrayInstances) == 0 {
+		if jobArrayID != "" {
+			return fmt.Errorf("no instances found with job-array-id: %s", jobArrayID)
+		}
+		return fmt.Errorf("no instances found with job-array-name: %s", jobArrayName)
+	}
+
+	// Display summary
+	arrayName := jobArrayInstances[0].JobArrayName
+	if arrayName == "" {
+		arrayName = "unnamed"
+	}
+	arrayIDVal := jobArrayInstances[0].JobArrayID
+
+	fmt.Fprintf(os.Stderr, "Found job array: %s (%d instances)\n", arrayName, len(jobArrayInstances))
+	fmt.Fprintf(os.Stderr, "Array ID: %s\n", arrayIDVal)
+	fmt.Fprintf(os.Stderr, "\n%s all instances...\n", action)
+
+	// Process each instance
+	successCount := 0
+	failedInstances := []string{}
+
+	for _, inst := range jobArrayInstances {
+		// Skip already stopped instances
+		if inst.State == "stopped" || inst.State == "stopping" {
+			fmt.Fprintf(os.Stderr, "⏭  Skipping %s (already %s)\n", inst.InstanceID, inst.State)
+			continue
+		}
+
+		if inst.State != "running" {
+			fmt.Fprintf(os.Stderr, "⏭  Skipping %s (state: %s)\n", inst.InstanceID, inst.State)
+			continue
+		}
+
+		// Calculate remaining TTL if set
+		remainingTTL := ""
+		if inst.TTL != "" {
+			ttlDuration, err := parseDuration(inst.TTL)
+			if err == nil {
+				uptime := time.Since(inst.LaunchTime)
+				remaining := ttlDuration - uptime
+				if remaining > 0 {
+					remainingTTL = formatDurationForTTL(remaining)
+				}
+			}
+		}
+
+		// Stop/hibernate the instance
+		err := client.StopInstance(ctx, inst.Region, inst.InstanceID, hibernate)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "⚠️  Failed to %s %s: %v\n", action, inst.InstanceID, err)
+			failedInstances = append(failedInstances, inst.InstanceID)
+			continue
+		}
+
+		// Tag the instance
+		stopReason := "user-stopped"
+		if hibernate {
+			stopReason = "user-hibernated"
+		}
+		tags := map[string]string{
+			"spawn:last-stop-reason": stopReason,
+			"spawn:last-stop-time":   time.Now().UTC().Format(time.RFC3339),
+		}
+		if remainingTTL != "" {
+			tags["spawn:ttl-remaining"] = remainingTTL
+		}
+		client.UpdateInstanceTags(ctx, inst.Region, inst.InstanceID, tags)
+
+		successCount++
+		fmt.Fprintf(os.Stderr, "✓ %s %s\n", action, inst.InstanceID)
+	}
+
+	// Display results
+	fmt.Fprintf(os.Stdout, "\n✅ Job array %s request sent!\n", action)
+	fmt.Fprintf(os.Stdout, "   Array:     %s\n", arrayName)
+	fmt.Fprintf(os.Stdout, "   Processed: %d/%d instances\n", successCount, len(jobArrayInstances))
+
+	if len(failedInstances) > 0 {
+		fmt.Fprintf(os.Stderr, "\n⚠️  Failed to %s %d instances:\n", action, len(failedInstances))
+		for _, id := range failedInstances {
+			fmt.Fprintf(os.Stderr, "   - %s\n", id)
+		}
+	}
+
+	return nil
+}
+
 func runStart(cmd *cobra.Command, args []string) error {
-	identifier := args[0]
 	ctx := context.Background()
+
+	// Determine if starting job array or single instance
+	if startJobArrayID != "" || startJobArrayName != "" {
+		// Job array mode
+		if len(args) != 0 {
+			return fmt.Errorf("job array mode does not accept instance ID argument")
+		}
+		return startJobArray(ctx)
+	}
+
+	// Single instance mode
+	if len(args) != 1 {
+		return fmt.Errorf("single instance mode requires 1 argument: <instance-id-or-name>")
+	}
+	identifier := args[0]
 
 	// Create AWS client
 	client, err := aws.NewClient(ctx)
@@ -228,6 +412,102 @@ func runStart(cmd *cobra.Command, args []string) error {
 
 	fmt.Fprintf(os.Stderr, " (taking longer than expected)\n")
 	fmt.Fprintf(os.Stdout, "\nUse 'spawn list' to check the current state.\n")
+
+	return nil
+}
+
+func startJobArray(ctx context.Context) error {
+	// Create AWS client
+	client, err := aws.NewClient(ctx)
+	if err != nil {
+		return i18n.Te("error.aws_client_init", err)
+	}
+
+	// List all instances
+	instances, err := client.ListInstances(ctx, "", "")
+	if err != nil {
+		return fmt.Errorf("failed to list instances: %w", err)
+	}
+
+	// Filter instances by job array
+	var jobArrayInstances []aws.InstanceInfo
+	for _, inst := range instances {
+		if startJobArrayID != "" && inst.JobArrayID == startJobArrayID {
+			jobArrayInstances = append(jobArrayInstances, inst)
+		} else if startJobArrayName != "" && inst.JobArrayName == startJobArrayName {
+			jobArrayInstances = append(jobArrayInstances, inst)
+		}
+	}
+
+	if len(jobArrayInstances) == 0 {
+		if startJobArrayID != "" {
+			return fmt.Errorf("no instances found with job-array-id: %s", startJobArrayID)
+		}
+		return fmt.Errorf("no instances found with job-array-name: %s", startJobArrayName)
+	}
+
+	// Display summary
+	arrayName := jobArrayInstances[0].JobArrayName
+	if arrayName == "" {
+		arrayName = "unnamed"
+	}
+	arrayID := jobArrayInstances[0].JobArrayID
+
+	fmt.Fprintf(os.Stderr, "Found job array: %s (%d instances)\n", arrayName, len(jobArrayInstances))
+	fmt.Fprintf(os.Stderr, "Array ID: %s\n", arrayID)
+	fmt.Fprintf(os.Stderr, "\nStarting all instances...\n")
+
+	// Process each instance
+	successCount := 0
+	failedInstances := []string{}
+
+	for _, inst := range jobArrayInstances {
+		// Skip already running instances
+		if inst.State == "running" {
+			fmt.Fprintf(os.Stderr, "⏭  Skipping %s (already running)\n", inst.InstanceID)
+			continue
+		}
+
+		if inst.State != "stopped" {
+			fmt.Fprintf(os.Stderr, "⏭  Skipping %s (state: %s)\n", inst.InstanceID, inst.State)
+			continue
+		}
+
+		// Start the instance
+		err := client.StartInstance(ctx, inst.Region, inst.InstanceID)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "⚠️  Failed to start %s: %v\n", inst.InstanceID, err)
+			failedInstances = append(failedInstances, inst.InstanceID)
+			continue
+		}
+
+		// Tag the instance with start time and restore TTL if available
+		tags := map[string]string{
+			"spawn:last-start-time": time.Now().UTC().Format(time.RFC3339),
+		}
+		if ttlRemaining, exists := inst.Tags["spawn:ttl-remaining"]; exists && ttlRemaining != "" {
+			tags["spawn:ttl"] = ttlRemaining
+		}
+		client.UpdateInstanceTags(ctx, inst.Region, inst.InstanceID, tags)
+
+		successCount++
+		fmt.Fprintf(os.Stderr, "✓ Started %s\n", inst.InstanceID)
+	}
+
+	// Display results
+	fmt.Fprintf(os.Stdout, "\n✅ Job array start request sent!\n")
+	fmt.Fprintf(os.Stdout, "   Array:     %s\n", arrayName)
+	fmt.Fprintf(os.Stdout, "   Started:   %d/%d instances\n", successCount, len(jobArrayInstances))
+
+	if len(failedInstances) > 0 {
+		fmt.Fprintf(os.Stderr, "\n⚠️  Failed to start %d instances:\n", len(failedInstances))
+		for _, id := range failedInstances {
+			fmt.Fprintf(os.Stderr, "   - %s\n", id)
+		}
+	}
+
+	fmt.Fprintf(os.Stdout, "\nInstances are starting up...\n")
+	fmt.Fprintf(os.Stdout, "Use 'spawn list --job-array-name %s' to check status.\n", arrayName)
 
 	return nil
 }

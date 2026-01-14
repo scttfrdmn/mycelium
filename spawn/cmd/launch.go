@@ -10,7 +10,9 @@ import (
 	"os"
 	"os/exec"
 	"sort"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/scttfrdmn/mycelium/pkg/i18n"
@@ -59,6 +61,12 @@ var (
 	dnsName          string
 	dnsDomain        string
 	dnsAPIEndpoint   string
+
+	// Job array
+	count            int
+	jobArrayName     string
+	instanceNames    string
+	command          string
 
 	// Mode
 	interactive      bool
@@ -114,6 +122,12 @@ func init() {
 	launchCmd.Flags().StringVar(&dnsName, "dns", "", "Register DNS name (e.g., my-instance for my-instance.spore.host)")
 	launchCmd.Flags().StringVar(&dnsDomain, "dns-domain", "", "Custom DNS domain (overrides default)")
 	launchCmd.Flags().StringVar(&dnsAPIEndpoint, "dns-api-endpoint", "", "Custom DNS API endpoint (overrides default)")
+
+	// Job array
+	launchCmd.Flags().IntVar(&count, "count", 1, "Number of instances to launch (job array)")
+	launchCmd.Flags().StringVar(&jobArrayName, "job-array-name", "", "Job array group name (required if --count > 1)")
+	launchCmd.Flags().StringVar(&instanceNames, "instance-names", "", "Instance name template (e.g., 'worker-{index}', default: '{job-array-name}-{index}')")
+	launchCmd.Flags().StringVar(&command, "command", "", "Command to run on all instances (executed after spored setup)")
 
 	// Mode
 	launchCmd.Flags().BoolVar(&interactive, "interactive", false, "Force interactive wizard")
@@ -248,11 +262,20 @@ func launchWithProgress(ctx context.Context, awsClient *aws.Client, config *aws.
 	prog.Skip("Creating security group")
 
 	// Step 5: Build user data
-	userDataScript, err := buildUserData(plat)
+	userDataScript, err := buildUserData(plat, config)
 	if err != nil {
 		return fmt.Errorf("failed to build user data: %w", err)
 	}
 	config.UserData = base64.StdEncoding.EncodeToString([]byte(userDataScript))
+
+	// Check if job array mode (count > 1)
+	if count > 1 {
+		// Job array launch path
+		if jobArrayName == "" {
+			return fmt.Errorf("--job-array-name is required when --count > 1")
+		}
+		return launchJobArray(ctx, awsClient, config, plat, prog)
+	}
 
 	// Step 6: Launch instance
 	prog.Start("Launching instance")
@@ -456,7 +479,7 @@ func setupSSHKey(ctx context.Context, awsClient *aws.Client, region string, plat
 	return keyName, nil
 }
 
-func buildUserData(plat *platform.Platform) (string, error) {
+func buildUserData(plat *platform.Platform, config *aws.LaunchConfig) (string, error) {
 	// Get local username and SSH public key
 	username := plat.GetUsername()
 	publicKey, err := plat.ReadPublicKey()
@@ -662,6 +685,41 @@ else
     echo "✅ Session timeouts disabled (set spawn:session-timeout tag to enable)"
 fi
 
+# Setup job array environment variables (if part of a job array)
+JOB_ARRAY_ID=$(aws ec2 describe-tags --region $REGION \
+    --filters "Name=resource-id,Values=$INSTANCE_ID" "Name=key,Values=spawn:job-array-id" \
+    --query 'Tags[0].Value' --output text 2>/dev/null || echo "None")
+
+if [ "$JOB_ARRAY_ID" != "None" ]; then
+    echo "Setting up job array environment..."
+
+    JOB_ARRAY_NAME=$(aws ec2 describe-tags --region $REGION \
+        --filters "Name=resource-id,Values=$INSTANCE_ID" "Name=key,Values=spawn:job-array-name" \
+        --query 'Tags[0].Value' --output text 2>/dev/null || echo "")
+
+    JOB_ARRAY_SIZE=$(aws ec2 describe-tags --region $REGION \
+        --filters "Name=resource-id,Values=$INSTANCE_ID" "Name=key,Values=spawn:job-array-size" \
+        --query 'Tags[0].Value' --output text 2>/dev/null || echo "0")
+
+    JOB_ARRAY_INDEX=$(aws ec2 describe-tags --region $REGION \
+        --filters "Name=resource-id,Values=$INSTANCE_ID" "Name=key,Values=spawn:job-array-index" \
+        --query 'Tags[0].Value' --output text 2>/dev/null || echo "0")
+
+    # Create job array environment file
+    cat > /etc/profile.d/job-array.sh <<EOFJOBARRAY
+# Job Array Environment Variables
+# Available to all shells for coordinated distributed computing
+export JOB_ARRAY_ID="$JOB_ARRAY_ID"
+export JOB_ARRAY_NAME="$JOB_ARRAY_NAME"
+export JOB_ARRAY_SIZE="$JOB_ARRAY_SIZE"
+export JOB_ARRAY_INDEX="$JOB_ARRAY_INDEX"
+EOFJOBARRAY
+
+    chmod 644 /etc/profile.d/job-array.sh
+
+    echo "✅ Job array environment configured (Index: $JOB_ARRAY_INDEX/$JOB_ARRAY_SIZE)"
+fi
+
 # Create login banner (MOTD) with spore configuration
 echo "Creating login banner..."
 
@@ -678,7 +736,41 @@ ON_COMPLETE_TAG=$(aws ec2 describe-tags --region $REGION \
     --filters "Name=resource-id,Values=$INSTANCE_ID" "Name=key,Values=spawn:on-complete" \
     --query 'Tags[0].Value' --output text 2>/dev/null || echo "disabled")
 
-# Create the banner
+# Create the banner with optional job array info
+if [ "$JOB_ARRAY_ID" != "None" ]; then
+cat > /etc/motd <<EOFMOTD
+╔═══════════════════════════════════════════════════════════════╗
+║                  🌱 Welcome to Spore                         ║
+╚═══════════════════════════════════════════════════════════════╝
+
+Instance: $INSTANCE_ID
+Region:   $REGION
+
+Job Array:
+  • Array Name:       $JOB_ARRAY_NAME
+  • Array ID:         $JOB_ARRAY_ID
+  • Instance Index:   $JOB_ARRAY_INDEX / $JOB_ARRAY_SIZE
+
+Spore Agent Configuration:
+  • TTL:              $TTL_TAG
+  • Idle Timeout:     $IDLE_TIMEOUT_TAG
+  • On Complete:      $ON_COMPLETE_TAG
+  • Session Timeout:  $SESSION_TIMEOUT
+
+⚠️  IMPORTANT: This shell will auto-logout after $SESSION_TIMEOUT of inactivity
+⚠️  SSH connections will disconnect if idle for extended periods
+
+To view current status:
+  sudo spored status
+
+To extend TTL:
+  spawn extend <instance-id> <new-ttl>
+
+Documentation: https://github.com/scttfrdmn/mycelium
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+EOFMOTD
+else
 cat > /etc/motd <<EOFMOTD
 ╔═══════════════════════════════════════════════════════════════╗
 ║                  🌱 Welcome to Spore                         ║
@@ -706,6 +798,7 @@ Documentation: https://github.com/scttfrdmn/mycelium
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 EOFMOTD
+fi
 
 chmod 644 /etc/motd
 echo "✅ Login banner created"
@@ -940,4 +1033,300 @@ func matchesContinent(region, continentCode string) bool {
 	}
 
 	return false
+}
+
+// Job Array Helper Functions
+
+// generateJobArrayID creates a unique ID for a job array
+// Format: {name}-{timestamp}-{random}
+// Example: compute-20260113-abc123
+func generateJobArrayID(name string) string {
+	timestamp := time.Now().Format("20060102")
+	// Generate 6-character random suffix (base36: 0-9a-z)
+	random := fmt.Sprintf("%06x", time.Now().UnixNano()%0xFFFFFF)
+	return fmt.Sprintf("%s-%s-%s", name, timestamp, random)
+}
+
+// formatInstanceName applies template substitution for instance names
+// Supported variables: {index}, {job-array-name}
+// Default template: "{job-array-name}-{index}"
+func formatInstanceName(template string, jobArrayName string, index int) string {
+	if template == "" {
+		template = "{job-array-name}-{index}"
+	}
+
+	name := template
+	name = strings.ReplaceAll(name, "{index}", fmt.Sprintf("%d", index))
+	name = strings.ReplaceAll(name, "{job-array-name}", jobArrayName)
+
+	return name
+}
+
+// launchJobArray launches N instances in parallel as a job array
+func launchJobArray(ctx context.Context, awsClient *aws.Client, baseConfig *aws.LaunchConfig, plat *platform.Platform, prog *progress.Progress) error {
+	// Generate unique job array ID
+	jobArrayID := generateJobArrayID(jobArrayName)
+	createdAt := time.Now()
+
+	fmt.Fprintf(os.Stderr, "\n🚀 Launching job array: %s (%d instances)\n", jobArrayName, count)
+	fmt.Fprintf(os.Stderr, "   Job Array ID: %s\n\n", jobArrayID)
+
+	// Phase 1: Launch all instances in parallel
+	prog.Start(fmt.Sprintf("Launching %d instances in parallel", count))
+
+	type launchResult struct {
+		index      int
+		result     *aws.LaunchResult
+		err        error
+	}
+
+	results := make(chan launchResult, count)
+	var wg sync.WaitGroup
+
+	// Launch each instance in a goroutine
+	for i := 0; i < count; i++ {
+		wg.Add(1)
+		go func(index int) {
+			defer wg.Done()
+
+			// Clone config for this instance
+			instanceConfig := *baseConfig
+
+			// Set job array fields
+			instanceConfig.JobArrayID = jobArrayID
+			instanceConfig.JobArrayName = jobArrayName
+			instanceConfig.JobArraySize = count
+			instanceConfig.JobArrayIndex = index
+			instanceConfig.JobArrayCommand = command
+
+			// Set instance name from template
+			instanceConfig.Name = formatInstanceName(instanceNames, jobArrayName, index)
+
+			// Set DNS name with index suffix if DNS is enabled
+			if baseConfig.DNSName != "" {
+				instanceConfig.DNSName = fmt.Sprintf("%s-%d", baseConfig.DNSName, index)
+			}
+
+			// Launch the instance
+			result, err := awsClient.Launch(ctx, instanceConfig)
+			results <- launchResult{
+				index:  index,
+				result: result,
+				err:    err,
+			}
+		}(i)
+	}
+
+	// Wait for all launches to complete
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	// Collect results
+	launchedInstances := make([]*aws.LaunchResult, 0, count)
+	var launchErrors []string
+	successCount := 0
+	failureCount := 0
+
+	for result := range results {
+		if result.err != nil {
+			launchErrors = append(launchErrors, fmt.Sprintf("Instance %d: %v", result.index, result.err))
+			failureCount++
+		} else {
+			launchedInstances = append(launchedInstances, result.result)
+			successCount++
+		}
+	}
+
+	// Handle partial failures
+	if failureCount > 0 {
+		prog.Error(fmt.Sprintf("Launching %d instances", count), fmt.Errorf("%d/%d instances failed to launch", failureCount, count))
+
+		// Terminate successfully launched instances
+		if successCount > 0 {
+			fmt.Fprintf(os.Stderr, "\n⚠️  Cleaning up %d successfully launched instances...\n", successCount)
+			for _, inst := range launchedInstances {
+				_ = awsClient.Terminate(ctx, baseConfig.Region, inst.InstanceID)
+			}
+		}
+
+		// Return detailed error
+		return fmt.Errorf("job array launch failed: %d/%d instances failed:\n  %s",
+			failureCount, count, strings.Join(launchErrors, "\n  "))
+	}
+
+	prog.Complete(fmt.Sprintf("Launching %d instances", count))
+	time.Sleep(300 * time.Millisecond)
+
+	// Sort instances by index for consistent display
+	sort.Slice(launchedInstances, func(i, j int) bool {
+		// Extract index from Name (assumes format: name-{index})
+		getName := func(r *aws.LaunchResult) int {
+			parts := strings.Split(r.Name, "-")
+			if len(parts) > 0 {
+				if idx, err := strconv.Atoi(parts[len(parts)-1]); err == nil {
+					return idx
+				}
+			}
+			return 0
+		}
+		return getName(launchedInstances[i]) < getName(launchedInstances[j])
+	})
+
+	// Phase 2: Wait for all instances to reach "running" state
+	prog.Start("Waiting for all instances to reach running state")
+	maxWaitTime := 2 * time.Minute
+	checkInterval := 5 * time.Second
+	startTime := time.Now()
+
+	allRunning := false
+	for time.Since(startTime) < maxWaitTime {
+		allRunning = true
+		for _, inst := range launchedInstances {
+			state, err := awsClient.GetInstanceState(ctx, baseConfig.Region, inst.InstanceID)
+			if err != nil || state != "running" {
+				allRunning = false
+				break
+			}
+		}
+
+		if allRunning {
+			break
+		}
+
+		time.Sleep(checkInterval)
+	}
+
+	if !allRunning {
+		prog.Error("Waiting for instances", fmt.Errorf("timeout waiting for all instances to reach running state"))
+		return fmt.Errorf("timeout: not all instances reached running state within %v", maxWaitTime)
+	}
+
+	prog.Complete("Waiting for all instances")
+	time.Sleep(300 * time.Millisecond)
+
+	// Phase 3: Get public IPs for all instances
+	prog.Start("Getting public IPs")
+	for _, inst := range launchedInstances {
+		publicIP, err := awsClient.GetInstancePublicIP(ctx, baseConfig.Region, inst.InstanceID)
+		if err != nil {
+			prog.Error("Getting public IP", err)
+			// Non-fatal: continue with other instances
+			fmt.Fprintf(os.Stderr, "\n⚠️  Failed to get IP for %s: %v\n", inst.InstanceID, err)
+		} else {
+			inst.PublicIP = publicIP
+		}
+	}
+	prog.Complete("Getting public IPs")
+	time.Sleep(300 * time.Millisecond)
+
+	// Note: Peer discovery is handled dynamically by spored agent
+	// Each agent queries EC2 for all instances with the same spawn:job-array-id tag
+	// This avoids AWS tag size limitations (256 char max) and scales to any array size
+
+	// Display success for job array
+	fmt.Fprintf(os.Stderr, "\n✅ Job array launched successfully!\n\n")
+	fmt.Fprintf(os.Stderr, "Job Array: %s\n", jobArrayName)
+	fmt.Fprintf(os.Stderr, "Array ID:  %s\n", jobArrayID)
+	fmt.Fprintf(os.Stderr, "Created:   %s\n", createdAt.Format(time.RFC3339))
+	fmt.Fprintf(os.Stderr, "Count:     %d instances\n", count)
+	fmt.Fprintf(os.Stderr, "Region:    %s\n\n", baseConfig.Region)
+
+	// Display table of instances
+	fmt.Fprintf(os.Stderr, "Instances:\n")
+	fmt.Fprintf(os.Stderr, "%-5s %-20s %-19s %-15s\n", "Index", "Instance ID", "Name", "Public IP")
+	fmt.Fprintf(os.Stderr, "%-5s %-20s %-19s %-15s\n", "-----", "--------------------", "-------------------", "---------------")
+
+	for i, inst := range launchedInstances {
+		ipDisplay := inst.PublicIP
+		if ipDisplay == "" {
+			ipDisplay = "(pending)"
+		}
+		fmt.Fprintf(os.Stderr, "%-5d %-20s %-19s %-15s\n", i, inst.InstanceID, inst.Name, ipDisplay)
+	}
+
+	fmt.Fprintf(os.Stderr, "\nManagement:\n")
+	fmt.Fprintf(os.Stderr, "  • List:      spawn list --job-array-name %s\n", jobArrayName)
+	fmt.Fprintf(os.Stderr, "  • Terminate: spawn terminate --job-array-name %s\n", jobArrayName)
+	fmt.Fprintf(os.Stderr, "  • Extend:    spawn extend --job-array-name %s --ttl 4h\n", jobArrayName)
+
+	if launchedInstances[0].PublicIP != "" {
+		fmt.Fprintf(os.Stderr, "\nConnect to instances:\n")
+		for i, inst := range launchedInstances {
+			if inst.PublicIP != "" {
+				sshCmd := plat.GetSSHCommand("ec2-user", inst.PublicIP)
+				fmt.Fprintf(os.Stderr, "  [%d] %s\n", i, sshCmd)
+			}
+		}
+	}
+
+	fmt.Fprintf(os.Stderr, "\n")
+
+	return nil
+}
+
+// PeerInfo represents information about a peer instance in a job array
+type PeerInfo struct {
+	Index      int    `json:"index"`
+	InstanceID string `json:"instance_id"`
+	IP         string `json:"ip"`
+	DNS        string `json:"dns"`
+}
+
+// collectPeerInfo collects peer information for all instances in a job array
+func collectPeerInfo(ctx context.Context, awsClient *aws.Client, instances []*aws.LaunchResult, config *aws.LaunchConfig, jobArrayID string) ([]PeerInfo, error) {
+	peers := make([]PeerInfo, 0, len(instances))
+
+	// Get account ID for DNS namespace
+	accountID, _, err := awsClient.GetCallerIdentityInfo(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get account ID: %w", err)
+	}
+
+	// Convert account ID to base36
+	accountNum, err := strconv.ParseUint(accountID, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse account ID: %w", err)
+	}
+	accountBase36 := strconv.FormatUint(accountNum, 36)
+
+	for i, inst := range instances {
+		// Generate DNS name for this instance
+		// Format: {name}-{index}.{account-base36}.spore.host
+		dnsName := fmt.Sprintf("%s-%d.%s.spore.host", jobArrayName, i, accountBase36)
+
+		peer := PeerInfo{
+			Index:      i,
+			InstanceID: inst.InstanceID,
+			IP:         inst.PublicIP,
+			DNS:        dnsName,
+		}
+		peers = append(peers, peer)
+	}
+
+	return peers, nil
+}
+
+// updatePeerTags updates the spawn:job-array-peers tag on each instance with peer information
+func updatePeerTags(ctx context.Context, awsClient *aws.Client, region string, instances []*aws.LaunchResult, peerInfo []PeerInfo) error {
+	// Marshal peer info to JSON
+	peerJSON, err := json.Marshal(peerInfo)
+	if err != nil {
+		return fmt.Errorf("failed to marshal peer info: %w", err)
+	}
+
+	peerJSONStr := string(peerJSON)
+
+	// Update tag on each instance
+	for _, inst := range instances {
+		err := awsClient.UpdateInstanceTags(ctx, region, inst.InstanceID, map[string]string{
+			"spawn:job-array-peers": peerJSONStr,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to update tags on %s: %w", inst.InstanceID, err)
+		}
+	}
+
+	return nil
 }

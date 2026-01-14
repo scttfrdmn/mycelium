@@ -14,10 +14,15 @@ import (
 	"github.com/scttfrdmn/mycelium/spawn/pkg/aws"
 )
 
+var (
+	extendJobArrayID   string
+	extendJobArrayName string
+)
+
 var extendCmd = &cobra.Command{
-	Use:  "extend <instance-id> <duration>",
+	Use:  "extend <instance-id-or-name> <duration>",
 	RunE: runExtend,
-	Args: cobra.ExactArgs(2),
+	Args: cobra.RangeArgs(0, 2),
 	// Short and Long will be set after i18n initialization
 }
 
@@ -26,12 +31,31 @@ func init() {
 
 	// Register completion for instance ID argument
 	extendCmd.ValidArgsFunction = completeInstanceID
+
+	// Add job array flags
+	extendCmd.Flags().StringVar(&extendJobArrayID, "job-array-id", "", "Extend TTL for all instances in job array by ID")
+	extendCmd.Flags().StringVar(&extendJobArrayName, "job-array-name", "", "Extend TTL for all instances in job array by name")
 }
 
 func runExtend(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
+
+	// Determine if extending job array or single instance
+	if extendJobArrayID != "" || extendJobArrayName != "" {
+		// Job array mode
+		if len(args) != 1 {
+			return fmt.Errorf("job array mode requires exactly 1 argument: <duration>")
+		}
+		return extendJobArray(ctx, args[0])
+	}
+
+	// Single instance mode
+	if len(args) != 2 {
+		return fmt.Errorf("single instance mode requires 2 arguments: <instance-id-or-name> <duration>")
+	}
+
 	instanceIdentifier := args[0]
 	newTTL := args[1]
-	ctx := context.Background()
 
 	// Validate TTL format
 	if err := validateTTL(newTTL); err != nil {
@@ -74,6 +98,86 @@ func runExtend(cmd *cobra.Command, args []string) error {
 			instance.PublicIP)
 	} else {
 		fmt.Fprintf(os.Stdout, "✓ Configuration reloaded on instance\n")
+	}
+
+	return nil
+}
+
+func extendJobArray(ctx context.Context, newTTL string) error {
+	// Validate TTL format
+	if err := validateTTL(newTTL); err != nil {
+		return fmt.Errorf("invalid TTL format: %w", err)
+	}
+
+	// Create AWS client
+	client, err := aws.NewClient(ctx)
+	if err != nil {
+		return i18n.Te("error.aws_client_init", err)
+	}
+
+	// List all instances
+	instances, err := client.ListInstances(ctx, "", "")
+	if err != nil {
+		return fmt.Errorf("failed to list instances: %w", err)
+	}
+
+	// Filter instances by job array
+	var jobArrayInstances []aws.InstanceInfo
+	for _, inst := range instances {
+		if extendJobArrayID != "" && inst.JobArrayID == extendJobArrayID {
+			jobArrayInstances = append(jobArrayInstances, inst)
+		} else if extendJobArrayName != "" && inst.JobArrayName == extendJobArrayName {
+			jobArrayInstances = append(jobArrayInstances, inst)
+		}
+	}
+
+	if len(jobArrayInstances) == 0 {
+		if extendJobArrayID != "" {
+			return fmt.Errorf("no instances found with job-array-id: %s", extendJobArrayID)
+		}
+		return fmt.Errorf("no instances found with job-array-name: %s", extendJobArrayName)
+	}
+
+	// Display summary
+	arrayName := jobArrayInstances[0].JobArrayName
+	if arrayName == "" {
+		arrayName = "unnamed"
+	}
+	arrayID := jobArrayInstances[0].JobArrayID
+
+	fmt.Fprintf(os.Stderr, "Found job array: %s (%d instances)\n", arrayName, len(jobArrayInstances))
+	fmt.Fprintf(os.Stderr, "Array ID: %s\n", arrayID)
+	fmt.Fprintf(os.Stderr, "\nExtending TTL to %s for all instances...\n", newTTL)
+
+	// Update TTL for each instance
+	successCount := 0
+	failedInstances := []string{}
+
+	for _, inst := range jobArrayInstances {
+		err := client.UpdateInstanceTags(ctx, inst.Region, inst.InstanceID, map[string]string{
+			"spawn:ttl": newTTL,
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "⚠️  Failed to update %s: %v\n", inst.InstanceID, err)
+			failedInstances = append(failedInstances, inst.InstanceID)
+		} else {
+			successCount++
+			// Try to trigger reload (non-fatal)
+			triggerReload(&inst)
+		}
+	}
+
+	// Display results
+	fmt.Fprintf(os.Stdout, "\n✅ Job array TTL extended!\n")
+	fmt.Fprintf(os.Stdout, "   Array:     %s\n", arrayName)
+	fmt.Fprintf(os.Stdout, "   New TTL:   %s\n", newTTL)
+	fmt.Fprintf(os.Stdout, "   Updated:   %d/%d instances\n", successCount, len(jobArrayInstances))
+
+	if len(failedInstances) > 0 {
+		fmt.Fprintf(os.Stderr, "\n⚠️  Failed to update %d instances:\n", len(failedInstances))
+		for _, id := range failedInstances {
+			fmt.Fprintf(os.Stderr, "   - %s\n", id)
+		}
 	}
 
 	return nil

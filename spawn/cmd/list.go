@@ -22,6 +22,8 @@ var (
 	listInstanceFamily string
 	listTag            []string
 	listJSON           bool
+	listJobArrayID     string
+	listJobArrayName   string
 )
 
 var listCmd = &cobra.Command{
@@ -41,6 +43,8 @@ func init() {
 	listCmd.Flags().StringVar(&listInstanceFamily, "instance-family", "", "Filter by instance family (e.g., m7i, t3)")
 	listCmd.Flags().StringArrayVar(&listTag, "tag", []string{}, "Filter by tag (key=value format, can be specified multiple times)")
 	listCmd.Flags().BoolVar(&listJSON, "json", false, "Output as JSON")
+	listCmd.Flags().StringVar(&listJobArrayID, "job-array-id", "", "Filter by job array ID")
+	listCmd.Flags().StringVar(&listJobArrayName, "job-array-name", "", "Filter by job array name")
 }
 
 func runList(cmd *cobra.Command, args []string) error {
@@ -95,77 +99,177 @@ func runList(cmd *cobra.Command, args []string) error {
 func outputTable(instances []aws.InstanceInfo) error {
 	fmt.Println() // Blank line after search message
 
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	defer w.Flush()
-
-	// Header
-	fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-		i18n.T("spawn.list.header.instance_id"),
-		i18n.T("spawn.list.header.name"),
-		i18n.T("spawn.list.header.type"),
-		i18n.T("spawn.list.header.state"),
-		i18n.T("spawn.list.header.az"),
-		i18n.T("spawn.list.header.age"),
-		i18n.T("spawn.list.header.ttl"),
-		i18n.T("spawn.list.header.public_ip"),
-		i18n.T("spawn.list.header.spot"),
-	)
+	// Group instances by job array ID
+	jobArrays := make(map[string][]aws.InstanceInfo)
+	standaloneInstances := []aws.InstanceInfo{}
 
 	for _, inst := range instances {
-		// Calculate age
-		age := formatDuration(time.Since(inst.LaunchTime))
+		if inst.JobArrayID != "" {
+			jobArrays[inst.JobArrayID] = append(jobArrays[inst.JobArrayID], inst)
+		} else {
+			standaloneInstances = append(standaloneInstances, inst)
+		}
+	}
 
-		// Format TTL
-		ttl := inst.TTL
-		if ttl == "" {
-			ttl = "none"
+	// Sort job array IDs for consistent output
+	var jobArrayIDs []string
+	for id := range jobArrays {
+		jobArrayIDs = append(jobArrayIDs, id)
+	}
+	sort.Strings(jobArrayIDs)
+
+	// Display job arrays first
+	if len(jobArrays) > 0 {
+		fmt.Println("\033[1mJob Arrays:\033[0m")
+		for _, arrayID := range jobArrayIDs {
+			arrayInstances := jobArrays[arrayID]
+
+			// Sort instances by index within array
+			sort.Slice(arrayInstances, func(i, j int) bool {
+				return arrayInstances[i].JobArrayIndex < arrayInstances[j].JobArrayIndex
+			})
+
+			// Count states
+			runningCount := 0
+			stoppedCount := 0
+			pendingCount := 0
+			for _, inst := range arrayInstances {
+				switch inst.State {
+				case "running":
+					runningCount++
+				case "stopped", "stopping":
+					stoppedCount++
+				case "pending":
+					pendingCount++
+				}
+			}
+
+			// Display job array summary
+			arrayName := arrayInstances[0].JobArrayName
+			if arrayName == "" {
+				arrayName = "unnamed"
+			}
+			fmt.Printf("\n  %s (%d instances", arrayName, len(arrayInstances))
+			if runningCount > 0 {
+				fmt.Printf(", %d running", runningCount)
+			}
+			if pendingCount > 0 {
+				fmt.Printf(", %d pending", pendingCount)
+			}
+			if stoppedCount > 0 {
+				fmt.Printf(", %d stopped", stoppedCount)
+			}
+			fmt.Printf(")\n")
+			fmt.Printf("  Array ID: %s\n", arrayID)
+
+			// Display instances
+			for _, inst := range arrayInstances {
+				displayInstance(inst, "    ")
+			}
+		}
+		fmt.Println()
+	}
+
+	// Display standalone instances
+	if len(standaloneInstances) > 0 {
+		if len(jobArrays) > 0 {
+			fmt.Println("\033[1mStandalone Instances:\033[0m")
 		}
 
-		// Format name
-		name := inst.Name
-		if name == "" {
-			name = "-"
-		}
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+		defer w.Flush()
 
-		// Spot indicator
-		spotIndicator := ""
-		if inst.SpotInstance {
-			spotIndicator = "✓"
-		}
-
-		// Color state
-		state := inst.State
-		switch state {
-		case "running":
-			state = "\033[32m" + state + "\033[0m" // Green
-		case "stopped":
-			state = "\033[33m" + state + "\033[0m" // Yellow
-		case "stopping":
-			state = "\033[33m" + state + "\033[0m" // Yellow
-		case "pending":
-			state = "\033[36m" + state + "\033[0m" // Cyan
-		}
-
-		// Public IP
-		publicIP := inst.PublicIP
-		if publicIP == "" {
-			publicIP = "-"
-		}
-
+		// Header
 		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-			inst.InstanceID,
-			name,
-			inst.InstanceType,
-			state,
-			inst.AvailabilityZone,
-			age,
-			ttl,
-			publicIP,
-			spotIndicator,
+			i18n.T("spawn.list.header.instance_id"),
+			i18n.T("spawn.list.header.name"),
+			i18n.T("spawn.list.header.type"),
+			i18n.T("spawn.list.header.state"),
+			i18n.T("spawn.list.header.az"),
+			i18n.T("spawn.list.header.age"),
+			i18n.T("spawn.list.header.ttl"),
+			i18n.T("spawn.list.header.public_ip"),
+			i18n.T("spawn.list.header.spot"),
 		)
+
+		for _, inst := range standaloneInstances {
+			age := formatDuration(time.Since(inst.LaunchTime))
+			ttl := inst.TTL
+			if ttl == "" {
+				ttl = "none"
+			}
+			name := inst.Name
+			if name == "" {
+				name = "-"
+			}
+			spotIndicator := ""
+			if inst.SpotInstance {
+				spotIndicator = "✓"
+			}
+			state := colorizeState(inst.State)
+			publicIP := inst.PublicIP
+			if publicIP == "" {
+				publicIP = "-"
+			}
+
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+				inst.InstanceID,
+				name,
+				inst.InstanceType,
+				state,
+				inst.AvailabilityZone,
+				age,
+				ttl,
+				publicIP,
+				spotIndicator,
+			)
+		}
 	}
 
 	return nil
+}
+
+func displayInstance(inst aws.InstanceInfo, prefix string) {
+	state := colorizeState(inst.State)
+	publicIP := inst.PublicIP
+	if publicIP == "" {
+		publicIP = "-"
+	}
+	name := inst.Name
+	if name == "" {
+		name = "-"
+	}
+	spotIndicator := ""
+	if inst.SpotInstance {
+		spotIndicator = " (spot)"
+	}
+
+	fmt.Printf("%s[%s] %s  %s  %s  %s  %s  %s%s\n",
+		prefix,
+		inst.JobArrayIndex,
+		name,
+		inst.InstanceID,
+		inst.InstanceType,
+		state,
+		inst.AvailabilityZone,
+		publicIP,
+		spotIndicator,
+	)
+}
+
+func colorizeState(state string) string {
+	switch state {
+	case "running":
+		return "\033[32m" + state + "\033[0m" // Green
+	case "stopped":
+		return "\033[33m" + state + "\033[0m" // Yellow
+	case "stopping":
+		return "\033[33m" + state + "\033[0m" // Yellow
+	case "pending":
+		return "\033[36m" + state + "\033[0m" // Cyan
+	default:
+		return state
+	}
 }
 
 func outputJSON(instances []aws.InstanceInfo) error {
@@ -258,6 +362,16 @@ func filterInstances(instances []aws.InstanceInfo) []aws.InstanceInfo {
 			if len(parts) == 0 || parts[0] != listInstanceFamily {
 				continue
 			}
+		}
+
+		// Filter by job array ID
+		if listJobArrayID != "" && inst.JobArrayID != listJobArrayID {
+			continue
+		}
+
+		// Filter by job array name
+		if listJobArrayName != "" && inst.JobArrayName != listJobArrayName {
+			continue
 		}
 
 		// Filter by tags

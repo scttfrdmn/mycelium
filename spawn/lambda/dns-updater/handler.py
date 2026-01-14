@@ -25,7 +25,7 @@ route53 = boto3.client('route53')
 ec2 = boto3.client('ec2')
 
 # Constants
-HOSTED_ZONE_ID = 'Z048907324UNXKEK9KX93'
+HOSTED_ZONE_ID = 'Z0341053304H0DQXF6U4X'  # Infrastructure account hosted zone
 DOMAIN = 'spore.host'
 DEFAULT_TTL = 60
 
@@ -39,6 +39,21 @@ AWS_PUBLIC_CERT_URLS = {
 }
 
 
+def base36_encode(number: int) -> str:
+    """Convert a number to base36 string."""
+    if number == 0:
+        return '0'
+
+    alphabet = '0123456789abcdefghijklmnopqrstuvwxyz'
+    result = []
+
+    while number:
+        number, remainder = divmod(number, 36)
+        result.append(alphabet[remainder])
+
+    return ''.join(reversed(result))
+
+
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     Main Lambda handler for DNS update requests.
@@ -49,7 +64,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         "instance_identity_signature": "base64-encoded-signature",
         "record_name": "my-instance",
         "ip_address": "1.2.3.4",
-        "action": "UPSERT"  // or "DELETE"
+        "action": "UPSERT",  // or "DELETE"
+        "job_array_id": "compute-20260113-abc123",  // optional, for group DNS
+        "job_array_name": "compute"  // optional, for group DNS record name
     }
     """
     try:
@@ -61,6 +78,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         record_name = body.get('record_name', '').lower().strip()
         ip_address = body.get('ip_address', '').strip()
         action = body.get('action', 'UPSERT').upper()
+        job_array_id = body.get('job_array_id', '').strip()
+        job_array_name = body.get('job_array_name', '').strip()
 
         # Validate required fields
         if not all([identity_doc_b64, signature_b64, record_name]):
@@ -96,13 +115,27 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # For now, we'll rely on instance validation via AWS API
         # TODO: Add proper signature verification in production
 
-        # Validate instance exists and has spawn:managed tag
-        valid, error_msg = validate_instance(instance_id, region, ip_address, action)
-        if not valid:
-            return error_response(403, error_msg)
+        # Get Lambda's own account ID
+        import boto3
+        sts = boto3.client('sts')
+        lambda_account_id = sts.get_caller_identity()['Account']
 
-        # Build full DNS name
-        fqdn = f"{record_name}.{DOMAIN}"
+        # Only validate instance if it's in the same account
+        # For cross-account requests, trust the cryptographically signed instance identity document
+        if account_id == lambda_account_id:
+            # Same account: validate instance exists and has spawn:managed tag
+            valid, error_msg = validate_instance(instance_id, region, ip_address, action)
+            if not valid:
+                return error_response(403, error_msg)
+        else:
+            # Cross-account: skip EC2 validation, trust instance identity document
+            # In production, should verify the cryptographic signature
+            pass
+
+        # Build full DNS name with account subdomain
+        # Convert account ID to base36 for subdomain isolation
+        account_base36 = base36_encode(int(account_id))
+        fqdn = f"{record_name}.{account_base36}.{DOMAIN}"
 
         # Update DNS record
         try:
@@ -113,19 +146,45 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 change_id = delete_dns_record(fqdn, ip_address)
                 message = f"DNS record deleted: {fqdn}"
 
+            # If part of a job array, also update group DNS
+            group_change_id = None
+            if job_array_id and job_array_name:
+                try:
+                    # Build group DNS name: job-array-name.account-base36.spore.host
+                    group_fqdn = f"{job_array_name}.{account_base36}.{DOMAIN}"
+
+                    # Only update group DNS if instance is in same account as Lambda
+                    if account_id == lambda_account_id:
+                        if action == 'UPSERT':
+                            group_change_id = upsert_job_array_dns(group_fqdn, job_array_id, region)
+                            message += f" | Group DNS updated: {group_fqdn}"
+                        else:  # DELETE
+                            group_change_id = update_job_array_dns_on_delete(group_fqdn, job_array_id, region, ip_address)
+                            message += f" | Group DNS updated: {group_fqdn}"
+                    else:
+                        message += f" | Group DNS skipped (cross-account)"
+                except Exception as e:
+                    # Non-fatal: log but continue
+                    message += f" | Warning: Group DNS update failed: {str(e)}"
+
+            response_data = {
+                'success': True,
+                'message': message,
+                'record': fqdn,
+                'change_id': change_id,
+                'timestamp': datetime.utcnow().isoformat(),
+            }
+
+            if group_change_id:
+                response_data['group_change_id'] = group_change_id
+
             return {
                 'statusCode': 200,
                 'headers': {
                     'Content-Type': 'application/json',
                     'Access-Control-Allow-Origin': '*',
                 },
-                'body': json.dumps({
-                    'success': True,
-                    'message': message,
-                    'record': fqdn,
-                    'change_id': change_id,
-                    'timestamp': datetime.utcnow().isoformat(),
-                })
+                'body': json.dumps(response_data)
             }
         except Exception as e:
             return error_response(500, f'Failed to update DNS: {str(e)}')
@@ -244,6 +303,155 @@ def delete_dns_record(fqdn: str, ip_address: str) -> str:
 
     except route53.exceptions.InvalidChangeBatch:
         raise Exception(f"Failed to delete record {fqdn}")
+
+
+def upsert_job_array_dns(fqdn: str, job_array_id: str, region: str) -> str:
+    """
+    Create or update job array group DNS record with all instance IPs.
+    Queries all running instances with the same job_array_id and creates
+    a multi-value A record.
+    """
+    # Create regional EC2 client
+    ec2_client = boto3.client('ec2', region_name=region)
+
+    # Query for all instances with this job_array_id
+    response = ec2_client.describe_instances(
+        Filters=[
+            {
+                'Name': 'tag:spawn:job-array-id',
+                'Values': [job_array_id]
+            },
+            {
+                'Name': 'instance-state-name',
+                'Values': ['running']
+            }
+        ]
+    )
+
+    # Collect all public IPs
+    ip_addresses = []
+    for reservation in response['Reservations']:
+        for instance in reservation['Instances']:
+            public_ip = instance.get('PublicIpAddress')
+            if public_ip:
+                ip_addresses.append(public_ip)
+
+    if not ip_addresses:
+        raise Exception(f"No running instances found for job array {job_array_id}")
+
+    # Sort for consistency
+    ip_addresses.sort()
+
+    # Create multi-value A record
+    resource_records = [{'Value': ip} for ip in ip_addresses]
+
+    dns_response = route53.change_resource_record_sets(
+        HostedZoneId=HOSTED_ZONE_ID,
+        ChangeBatch={
+            'Comment': f'Job array group DNS for {job_array_id} at {datetime.utcnow().isoformat()}',
+            'Changes': [
+                {
+                    'Action': 'UPSERT',
+                    'ResourceRecordSet': {
+                        'Name': fqdn,
+                        'Type': 'A',
+                        'TTL': DEFAULT_TTL,
+                        'ResourceRecords': resource_records
+                    }
+                }
+            ]
+        }
+    )
+    return dns_response['ChangeInfo']['Id']
+
+
+def update_job_array_dns_on_delete(fqdn: str, job_array_id: str, region: str, deleted_ip: str) -> str:
+    """
+    Update job array group DNS when an instance is deleted.
+    Removes the deleted instance's IP from the multi-value record.
+    If this was the last instance, deletes the group DNS record entirely.
+    """
+    # Create regional EC2 client
+    ec2_client = boto3.client('ec2', region_name=region)
+
+    # Query for remaining instances with this job_array_id
+    response = ec2_client.describe_instances(
+        Filters=[
+            {
+                'Name': 'tag:spawn:job-array-id',
+                'Values': [job_array_id]
+            },
+            {
+                'Name': 'instance-state-name',
+                'Values': ['running', 'pending']
+            }
+        ]
+    )
+
+    # Collect remaining public IPs (excluding the deleted one)
+    remaining_ips = []
+    for reservation in response['Reservations']:
+        for instance in reservation['Instances']:
+            public_ip = instance.get('PublicIpAddress')
+            if public_ip and public_ip != deleted_ip:
+                remaining_ips.append(public_ip)
+
+    # If no instances remain, delete the group DNS record
+    if not remaining_ips:
+        try:
+            # Get the existing record
+            list_response = route53.list_resource_record_sets(
+                HostedZoneId=HOSTED_ZONE_ID,
+                StartRecordName=fqdn,
+                StartRecordType='A',
+                MaxItems='1'
+            )
+
+            for record_set in list_response['ResourceRecordSets']:
+                if record_set['Name'].rstrip('.') == fqdn and record_set['Type'] == 'A':
+                    # Delete the record
+                    delete_response = route53.change_resource_record_sets(
+                        HostedZoneId=HOSTED_ZONE_ID,
+                        ChangeBatch={
+                            'Comment': f'Deleted job array group DNS for {job_array_id} (last instance)',
+                            'Changes': [
+                                {
+                                    'Action': 'DELETE',
+                                    'ResourceRecordSet': record_set
+                                }
+                            ]
+                        }
+                    )
+                    return delete_response['ChangeInfo']['Id']
+
+            return "no-record-found"
+
+        except Exception as e:
+            # Non-fatal: record may not exist
+            return f"delete-failed: {str(e)}"
+
+    # Otherwise, update with remaining IPs
+    remaining_ips.sort()
+    resource_records = [{'Value': ip} for ip in remaining_ips]
+
+    dns_response = route53.change_resource_record_sets(
+        HostedZoneId=HOSTED_ZONE_ID,
+        ChangeBatch={
+            'Comment': f'Updated job array group DNS for {job_array_id} (instance removed)',
+            'Changes': [
+                {
+                    'Action': 'UPSERT',
+                    'ResourceRecordSet': {
+                        'Name': fqdn,
+                        'Type': 'A',
+                        'TTL': DEFAULT_TTL,
+                        'ResourceRecords': resource_records
+                    }
+                }
+            ]
+        }
+    )
+    return dns_response['ChangeInfo']['Id']
 
 
 def error_response(status_code: int, message: str) -> Dict[str, Any]:

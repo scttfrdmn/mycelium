@@ -84,6 +84,13 @@ type LaunchConfig struct {
 	// Session management
 	SessionTimeout string // Auto-logout idle shells (default: 30m, 0 to disable)
 
+	// Job array settings
+	JobArrayID      string // Unique job array ID (e.g., "compute-20260113-abc123")
+	JobArrayName    string // User-friendly job array name (e.g., "compute")
+	JobArraySize    int    // Total number of instances in the array
+	JobArrayIndex   int    // This instance's index (0..N-1)
+	JobArrayCommand string // Command to run on all instances (optional)
+
 	// Metadata
 	Name string
 	Tags map[string]string
@@ -92,6 +99,7 @@ type LaunchConfig struct {
 // LaunchResult contains information about the launched instance
 type LaunchResult struct {
 	InstanceID       string
+	Name             string
 	PublicIP         string
 	PrivateIP        string
 	AvailabilityZone string
@@ -105,14 +113,14 @@ func (c *Client) Launch(ctx context.Context, launchConfig LaunchConfig) (*Launch
 	cfg.Region = launchConfig.Region
 	ec2Client := ec2.NewFromConfig(cfg)
 
-	// Get AWS account ID for account-level tagging
-	accountID, err := c.GetAccountID(ctx)
+	// Get caller identity for per-user isolation tagging
+	accountID, userARN, err := c.GetCallerIdentityInfo(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get account ID: %w", err)
+		return nil, fmt.Errorf("failed to get caller identity: %w", err)
 	}
 
-	// Build tags (including account tags)
-	tags := buildTags(launchConfig, accountID)
+	// Build tags (including account and user tags for per-user isolation)
+	tags := buildTags(launchConfig, accountID, userARN)
 	
 	// Build block device mappings
 	blockDevices := buildBlockDevices(launchConfig)
@@ -201,6 +209,7 @@ func (c *Client) Launch(ctx context.Context, launchConfig LaunchConfig) (*Launch
 	
 	launchResult := &LaunchResult{
 		InstanceID:       *instance.InstanceId,
+		Name:             launchConfig.Name,
 		PrivateIP:        valueOrEmpty(instance.PrivateIpAddress),
 		PublicIP:         valueOrEmpty(instance.PublicIpAddress),
 		AvailabilityZone: valueOrEmpty(instance.Placement.AvailabilityZone),
@@ -211,7 +220,7 @@ func (c *Client) Launch(ctx context.Context, launchConfig LaunchConfig) (*Launch
 	return launchResult, nil
 }
 
-func buildTags(config LaunchConfig, accountID string) []types.Tag {
+func buildTags(config LaunchConfig, accountID string, userARN string) []types.Tag {
 	// Convert account ID to base36 for DNS namespace
 	accountBase36 := intToBase36(accountID)
 
@@ -222,6 +231,7 @@ func buildTags(config LaunchConfig, accountID string) []types.Tag {
 		{Key: aws.String("spawn:version"), Value: aws.String("0.1.0")},
 		{Key: aws.String("spawn:account-id"), Value: aws.String(accountID)},
 		{Key: aws.String("spawn:account-base36"), Value: aws.String(accountBase36)},
+		{Key: aws.String("spawn:iam-user"), Value: aws.String(userARN)}, // Per-user isolation
 	}
 	
 	if config.Name != "" {
@@ -260,6 +270,15 @@ func buildTags(config LaunchConfig, accountID string) []types.Tag {
 	// Session management
 	if config.SessionTimeout != "" {
 		tags = append(tags, types.Tag{Key: aws.String("spawn:session-timeout"), Value: aws.String(config.SessionTimeout)})
+	}
+
+	// Job array tags
+	if config.JobArrayID != "" {
+		tags = append(tags, types.Tag{Key: aws.String("spawn:job-array-id"), Value: aws.String(config.JobArrayID)})
+		tags = append(tags, types.Tag{Key: aws.String("spawn:job-array-name"), Value: aws.String(config.JobArrayName)})
+		tags = append(tags, types.Tag{Key: aws.String("spawn:job-array-size"), Value: aws.String(fmt.Sprintf("%d", config.JobArraySize))})
+		tags = append(tags, types.Tag{Key: aws.String("spawn:job-array-index"), Value: aws.String(fmt.Sprintf("%d", config.JobArrayIndex))})
+		tags = append(tags, types.Tag{Key: aws.String("spawn:job-array-created"), Value: aws.String(time.Now().Format(time.RFC3339))})
 	}
 
 	// Add custom tags
@@ -403,6 +422,79 @@ func (c *Client) GetInstancePublicIP(ctx context.Context, region, instanceID str
 	return valueOrEmpty(instance.PublicIpAddress), nil
 }
 
+// GetInstanceState returns the current state of an instance (e.g., "pending", "running", "stopping", "stopped", "terminated")
+func (c *Client) GetInstanceState(ctx context.Context, region, instanceID string) (string, error) {
+	cfg := c.cfg
+	cfg.Region = region
+	ec2Client := ec2.NewFromConfig(cfg)
+
+	input := &ec2.DescribeInstancesInput{
+		InstanceIds: []string{instanceID},
+	}
+
+	result, err := ec2Client.DescribeInstances(ctx, input)
+	if err != nil {
+		return "", fmt.Errorf("failed to describe instance: %w", err)
+	}
+
+	if len(result.Reservations) == 0 || len(result.Reservations[0].Instances) == 0 {
+		return "", fmt.Errorf("instance not found")
+	}
+
+	instance := result.Reservations[0].Instances[0]
+	if instance.State == nil || instance.State.Name == "" {
+		return "", fmt.Errorf("instance state unavailable")
+	}
+
+	return string(instance.State.Name), nil
+}
+
+// Terminate terminates an EC2 instance
+func (c *Client) Terminate(ctx context.Context, region, instanceID string) error {
+	cfg := c.cfg
+	cfg.Region = region
+	ec2Client := ec2.NewFromConfig(cfg)
+
+	input := &ec2.TerminateInstancesInput{
+		InstanceIds: []string{instanceID},
+	}
+
+	_, err := ec2Client.TerminateInstances(ctx, input)
+	if err != nil {
+		return fmt.Errorf("failed to terminate instance: %w", err)
+	}
+
+	return nil
+}
+
+// UpdateInstanceTags adds or updates tags on an EC2 instance
+func (c *Client) UpdateInstanceTags(ctx context.Context, region, instanceID string, tags map[string]string) error {
+	cfg := c.cfg
+	cfg.Region = region
+	ec2Client := ec2.NewFromConfig(cfg)
+
+	// Convert map to EC2 tag format
+	ec2Tags := make([]types.Tag, 0, len(tags))
+	for key, value := range tags {
+		ec2Tags = append(ec2Tags, types.Tag{
+			Key:   aws.String(key),
+			Value: aws.String(value),
+		})
+	}
+
+	input := &ec2.CreateTagsInput{
+		Resources: []string{instanceID},
+		Tags:      ec2Tags,
+	}
+
+	_, err := ec2Client.CreateTags(ctx, input)
+	if err != nil {
+		return fmt.Errorf("failed to update tags: %w", err)
+	}
+
+	return nil
+}
+
 // FindKeyPairByFingerprint searches for a key pair matching the given fingerprint
 // Returns the key name if found, empty string if not found
 func (c *Client) FindKeyPairByFingerprint(ctx context.Context, region, fingerprint string) (string, error) {
@@ -445,6 +537,12 @@ type InstanceInfo struct {
 	KeyName          string
 	SpotInstance     bool
 	Tags             map[string]string
+
+	// Job array fields
+	JobArrayID    string
+	JobArrayName  string
+	JobArrayIndex string
+	JobArraySize  string
 }
 
 // ListInstances returns all spawn-managed instances, optionally filtered by region and state
@@ -550,6 +648,14 @@ func (c *Client) listInstancesInRegion(ctx context.Context, region string, state
 							info.TTL = value
 						case "spawn:idle-timeout":
 							info.IdleTimeout = value
+						case "spawn:job-array-id":
+							info.JobArrayID = value
+						case "spawn:job-array-name":
+							info.JobArrayName = value
+						case "spawn:job-array-index":
+							info.JobArrayIndex = value
+						case "spawn:job-array-size":
+							info.JobArraySize = value
 						default:
 							info.Tags[key] = value
 						}
@@ -619,35 +725,6 @@ func (c *Client) StartInstance(ctx context.Context, region, instanceID string) e
 	_, err := ec2Client.StartInstances(ctx, input)
 	if err != nil {
 		return fmt.Errorf("failed to start instance: %w", err)
-	}
-
-	return nil
-}
-
-// UpdateInstanceTags updates tags on an EC2 instance
-func (c *Client) UpdateInstanceTags(ctx context.Context, region, instanceID string, tags map[string]string) error {
-	cfg := c.cfg.Copy()
-	cfg.Region = region
-	ec2Client := ec2.NewFromConfig(cfg)
-
-	// Convert tags to AWS format
-	awsTags := make([]types.Tag, 0, len(tags))
-	for k, v := range tags {
-		awsTags = append(awsTags, types.Tag{
-			Key:   aws.String(k),
-			Value: aws.String(v),
-		})
-	}
-
-	// Create or update tags
-	input := &ec2.CreateTagsInput{
-		Resources: []string{instanceID},
-		Tags:      awsTags,
-	}
-
-	_, err := ec2Client.CreateTags(ctx, input)
-	if err != nil {
-		return fmt.Errorf("failed to update tags: %w", err)
 	}
 
 	return nil
@@ -787,6 +864,25 @@ func (c *Client) GetAccountID(ctx context.Context) (string, error) {
 	}
 
 	return *identity.Account, nil
+}
+
+// GetCallerIdentityInfo returns account ID and user ARN for per-user isolation
+func (c *Client) GetCallerIdentityInfo(ctx context.Context) (accountID string, userARN string, err error) {
+	stsClient := sts.NewFromConfig(c.cfg)
+	identity, err := stsClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+	if err != nil {
+		return "", "", fmt.Errorf("failed to get caller identity: %w", err)
+	}
+
+	if identity.Account == nil {
+		return "", "", fmt.Errorf("account ID not returned by STS")
+	}
+
+	if identity.Arn == nil {
+		return "", "", fmt.Errorf("user ARN not returned by STS")
+	}
+
+	return *identity.Account, *identity.Arn, nil
 }
 
 // intToBase36 converts a numeric string (AWS account ID) to base36

@@ -18,7 +18,7 @@ import (
 
 const (
 	// Default DNS configuration
-	defaultAPIEndpoint = "https://f4gm19tl70.execute-api.us-east-1.amazonaws.com/prod/update-dns"
+	defaultAPIEndpoint = "https://zqonqra6blwh7342ujuxv3bwei0wnpyq.lambda-url.us-east-1.on.aws/"
 	defaultDomain      = "spore.host"
 )
 
@@ -29,6 +29,8 @@ type DNSUpdateRequest struct {
 	RecordName                string `json:"record_name"`
 	IPAddress                 string `json:"ip_address"`
 	Action                    string `json:"action"`
+	JobArrayID                string `json:"job_array_id,omitempty"`   // Optional: for group DNS
+	JobArrayName              string `json:"job_array_name,omitempty"` // Optional: for group DNS
 }
 
 // DNSUpdateResponse represents the response from the DNS API
@@ -118,6 +120,94 @@ func (c *Client) RegisterDNS(ctx context.Context, recordName, ipAddress string) 
 		RecordName:                recordName,
 		IPAddress:                 ipAddress,
 		Action:                    "UPSERT",
+	}
+
+	return c.callAPI(ctx, req)
+}
+
+// RegisterJobArrayDNS registers both per-instance and group DNS for a job array member
+func (c *Client) RegisterJobArrayDNS(ctx context.Context, recordName, ipAddress, jobArrayID, jobArrayName string) (*DNSUpdateResponse, error) {
+	// Validate record name
+	recordName = strings.ToLower(strings.TrimSpace(recordName))
+	validName := regexp.MustCompile(`^[a-z0-9.-]+$`)
+	if !validName.MatchString(recordName) {
+		return nil, fmt.Errorf("invalid DNS name: %s (must be alphanumeric, hyphens, and dots only)", recordName)
+	}
+
+	// Get instance identity document
+	identityDoc, err := c.imdsClient.GetInstanceIdentityDocument(ctx, &imds.GetInstanceIdentityDocumentInput{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get instance identity document: %w", err)
+	}
+
+	// Marshal identity document to JSON
+	identityDocJSON, err := json.Marshal(identityDoc)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal identity document: %w", err)
+	}
+
+	// Get instance identity signature
+	sigResp, err := c.imdsClient.GetDynamicData(ctx, &imds.GetDynamicDataInput{
+		Path: "instance-identity/signature",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get identity signature: %w", err)
+	}
+	defer sigResp.Content.Close()
+
+	signatureBytes, err := io.ReadAll(sigResp.Content)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read signature: %w", err)
+	}
+
+	// Build request with job array fields
+	req := DNSUpdateRequest{
+		InstanceIdentityDocument:  base64.StdEncoding.EncodeToString(identityDocJSON),
+		InstanceIdentitySignature: strings.TrimSpace(string(signatureBytes)),
+		RecordName:                recordName,
+		IPAddress:                 ipAddress,
+		Action:                    "UPSERT",
+		JobArrayID:                jobArrayID,
+		JobArrayName:              jobArrayName,
+	}
+
+	return c.callAPI(ctx, req)
+}
+
+// DeleteJobArrayDNS deletes both per-instance and group DNS for a job array member
+func (c *Client) DeleteJobArrayDNS(ctx context.Context, recordName, ipAddress, jobArrayID, jobArrayName string) (*DNSUpdateResponse, error) {
+	// Get instance identity
+	identityDoc, err := c.imdsClient.GetInstanceIdentityDocument(ctx, &imds.GetInstanceIdentityDocumentInput{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get instance identity document: %w", err)
+	}
+
+	identityDocJSON, err := json.Marshal(identityDoc)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal identity document: %w", err)
+	}
+
+	sigResp, err := c.imdsClient.GetDynamicData(ctx, &imds.GetDynamicDataInput{
+		Path: "instance-identity/signature",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get identity signature: %w", err)
+	}
+	defer sigResp.Content.Close()
+
+	signatureBytes, err := io.ReadAll(sigResp.Content)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read signature: %w", err)
+	}
+
+	req := DNSUpdateRequest{
+		InstanceIdentityDocument:  base64.StdEncoding.EncodeToString(identityDocJSON),
+		InstanceIdentitySignature: strings.TrimSpace(string(signatureBytes)),
+		RecordName:                recordName,
+		IPAddress:                 ipAddress,
+		Action:                    "DELETE",
+		JobArrayID:                jobArrayID,
+		JobArrayName:              jobArrayName,
 	}
 
 	return c.callAPI(ctx, req)

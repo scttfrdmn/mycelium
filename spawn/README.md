@@ -58,6 +58,7 @@ spawn --instance-type m7i.large --region us-east-1 --ttl 8h
 - **📡 spored Agent**: Self-monitoring (systemd service)
 - **🔧 Laptop-Independent**: Works even when laptop is off
 - **♿ Accessibility**: Screen reader support with --accessibility flag
+- **🔢 Job Arrays**: Launch coordinated instance groups for MPI, distributed training, parameter sweeps ([docs](JOB_ARRAYS.md))
 
 ## 📦 Installation
 
@@ -856,6 +857,66 @@ EOF
 # Works even if your laptop is off
 ```
 
+### Job Array - Parameter Sweep
+
+```bash
+# Launch 100 instances for hyperparameter tuning
+spawn launch \
+  --count 100 \
+  --job-array-name hyperparam-sweep \
+  --instance-type t3.small \
+  --ttl 2h \
+  --command "python train.py --param-id \$JOB_ARRAY_INDEX"
+
+# Each instance:
+# - Gets unique index (0-99)
+# - Knows total size (100)
+# - Runs independently (no coordination needed)
+# - Auto-terminates after 2h
+
+# Monitor progress
+spawn list --job-array-name hyperparam-sweep
+
+# Extend if needed
+spawn extend --job-array-name hyperparam-sweep 1h
+```
+
+### Job Array - MPI Cluster
+
+```bash
+# Launch 8-node MPI cluster
+spawn launch \
+  --count 8 \
+  --job-array-name mpi-job \
+  --instance-type c7i.4xlarge \
+  --ttl 4h \
+  --user-data @mpi-setup.sh
+
+# mpi-setup.sh:
+cat > mpi-setup.sh <<'EOF'
+#!/bin/bash
+# Install MPI
+sudo yum install -y openmpi openmpi-devel
+
+# Wait for all peers (barrier)
+while [ ! -f /etc/spawn/job-array-peers.json ]; do sleep 1; done
+
+# Generate hostfile
+jq -r '.[] | .dns' /etc/spawn/job-array-peers.json > /tmp/hostfile
+
+# Run MPI job (leader only)
+if [ "$JOB_ARRAY_INDEX" -eq 0 ]; then
+    mpirun -np $JOB_ARRAY_SIZE -hostfile /tmp/hostfile ./my-mpi-app
+fi
+EOF
+
+# All instances coordinate automatically
+# Peer discovery built-in
+# Group DNS: mpi-job.account.spore.host → all IPs
+```
+
+See [JOB_ARRAYS.md](JOB_ARRAYS.md) for complete documentation.
+
 ## 🛠️ Development
 
 ### Building
@@ -1007,3 +1068,14 @@ spawn reads this and launches accordingly!
 **Companion Tools:**
 - [truffle](../truffle) - Find the right instance type
 - [spawn](.) - Launch it effortlessly
+
+---
+
+## 📚 Documentation
+
+- **[JOB_ARRAYS.md](JOB_ARRAYS.md)** - Job arrays for coordinated instance groups
+- **[IAM_PERMISSIONS.md](IAM_PERMISSIONS.md)** - Required AWS permissions
+- **[DNS_SETUP.md](DNS_SETUP.md)** - Custom DNS configuration
+- **[MONITORING.md](MONITORING.md)** - Monitoring and observability
+- **[SHELL_COMPLETION.md](SHELL_COMPLETION.md)** - Shell completion setup
+- **[SECURITY.md](SECURITY.md)** - Security considerations
