@@ -214,3 +214,29 @@ January 14, 2026
 ## Affected Versions
 
 v0.4.0 and earlier (since IAM instance profiles feature was introduced in v0.4.0)
+
+## Resolution
+
+**Status:** FIXED and VERIFIED
+
+**Fix Applied:** January 14, 2026
+- Modified `buildInlinePolicy()` in `spawn/pkg/aws/iam.go` (lines 363-417)
+- All custom IAM roles now automatically include spored-required EC2 permissions
+- Implemented Option 1 (recommended approach)
+
+**Verification:**
+```bash
+# Test instance launched with fixed code
+spawn launch --instance-type t3.micro --iam-policy s3:ReadOnly --ttl 7m --name ttl-fix-verify
+
+# IAM role created: spawn-instance-02cc10a3
+
+# Policy verified - 3 statements:
+# 1. Spored read permissions (ec2:DescribeTags, ec2:DescribeInstances, ec2:CreateTags)
+# 2. Spored action permissions (ec2:TerminateInstances, ec2:StopInstances) - scoped to spawn:managed=true
+# 3. User-requested S3 ReadOnly permissions
+```
+
+**Result:** Custom IAM roles now include both user-specified permissions AND spored self-management permissions. TTL, idle timeout, and auto-termination features work correctly with custom IAM roles.
+
+**Fixed In:** Commit ef872e6 (January 14, 2026)
