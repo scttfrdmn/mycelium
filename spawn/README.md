@@ -60,6 +60,7 @@ spawn --instance-type m7i.large --region us-east-1 --ttl 8h
 - **♿ Accessibility**: Screen reader support with --accessibility flag
 - **🔢 Job Arrays**: Launch coordinated instance groups for MPI, distributed training, parameter sweeps ([docs](JOB_ARRAYS.md))
 - **💾 AMI Management**: Create and manage custom AMIs for reusable software stacks ([docs](AMI_MANAGEMENT.md))
+- **🔐 IAM Instance Profiles**: Secure AWS service access without credentials, 13 built-in policy templates ([docs](IAM_INSTANCE_PROFILES_STATUS.md))
 
 ## 📦 Installation
 
@@ -116,16 +117,32 @@ spawn requires specific IAM permissions to launch instances and manage resources
 
 **What spawn needs:**
 - **EC2**: Launch instances, manage SSH keys, query instance types
-- **IAM**: Create `spored-instance-role` (auto-created once per account)
+- **IAM**: Create instance profiles and roles (see below)
 - **SSM**: Query latest Amazon Linux 2023 AMI IDs
 
-The IAM role (`spored-instance-role`) is automatically created the first time you launch an instance. This role allows the spored agent to:
-- Read its own EC2 tags (for TTL/idle configuration)
-- Terminate itself when TTL/idle limits are reached
+**IAM Roles - Two Types:**
 
-**Security Note:** The spored role can only terminate instances tagged with `spawn:managed=true`.
+1. **spored-instance-role** (Default, auto-created once per account)
+   - Allows spored agent to read EC2 tags and self-terminate
+   - Minimal permissions for self-monitoring
+   - Can only terminate instances tagged `spawn:managed=true`
 
-For detailed information, see [IAM_PERMISSIONS.md](IAM_PERMISSIONS.md).
+2. **Custom IAM roles** (Optional, via `--iam-policy` flags)
+   - Grant instances access to AWS services (S3, DynamoDB, etc.)
+   - Use built-in policy templates or custom policies
+   - Automatically created/reused with hash-based naming
+   - See [IAM_INSTANCE_PROFILES_STATUS.md](IAM_INSTANCE_PROFILES_STATUS.md)
+
+**Example:**
+```bash
+# Uses default spored-instance-role
+spawn launch --instance-type t3.micro
+
+# Uses custom IAM role with S3 access
+spawn launch --instance-type t3.micro --iam-policy s3:ReadOnly
+```
+
+For detailed spawn IAM permissions, see [IAM_PERMISSIONS.md](IAM_PERMISSIONS.md).
 
 ## 🌍 Internationalization
 
@@ -538,6 +555,42 @@ spawn launch --on-complete terminate --completion-file /app/done
 spawn launch --on-complete terminate --completion-delay 1m
 ```
 
+### With IAM Instance Profiles
+
+Grant instances secure access to AWS services without embedded credentials:
+
+```bash
+# S3 access for data processing
+spawn launch --instance-type m7i.large --iam-policy s3:ReadOnly
+
+# Multiple services
+spawn launch --instance-type t3.medium \
+  --iam-policy s3:ReadOnly,dynamodb:WriteOnly,logs:WriteOnly
+
+# Custom policy from file
+spawn launch --instance-type t3.large --iam-policy-file ./my-policy.json
+
+# AWS managed policies
+spawn launch --instance-type m7i.xlarge \
+  --iam-managed-policies arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+
+# Named role (reusable across instances)
+spawn launch --instance-type t3.large \
+  --iam-role my-app-role \
+  --iam-policy s3:FullAccess,dynamodb:FullAccess
+```
+
+**Built-in policy templates:**
+- S3: `s3:FullAccess`, `s3:ReadOnly`, `s3:WriteOnly`
+- DynamoDB: `dynamodb:FullAccess`, `dynamodb:ReadOnly`, `dynamodb:WriteOnly`
+- SQS: `sqs:FullAccess`, `sqs:ReadOnly`, `sqs:WriteOnly`
+- Logs: `logs:WriteOnly`
+- ECR: `ecr:ReadOnly`
+- Secrets Manager: `secretsmanager:ReadOnly`
+- SSM Parameter Store: `ssm:ReadOnly`
+
+See [IAM_INSTANCE_PROFILES_STATUS.md](IAM_INSTANCE_PROFILES_STATUS.md) for complete documentation.
+
 ### Spot Instances
 
 ```bash
@@ -949,6 +1002,96 @@ spawn launch --instance-type g5.xlarge --ami $AMI --name training-job
 
 See [AMI_MANAGEMENT.md](AMI_MANAGEMENT.md) for complete documentation.
 
+### S3 Data Processing with IAM
+
+```bash
+# Launch instance with S3 read access
+spawn launch \
+  --instance-type m7i.large \
+  --iam-policy s3:ReadOnly \
+  --ttl 4h \
+  --name data-processor
+
+# Connect and process data (no AWS credentials needed!)
+spawn connect data-processor
+
+# On instance - IAM role provides credentials automatically
+aws s3 cp s3://my-bucket/data.csv /tmp/
+python process.py /tmp/data.csv
+```
+
+### ML Training with S3 Dataset Access
+
+```bash
+# GPU instance for training with S3 access
+spawn launch \
+  --instance-type g5.xlarge \
+  --iam-policy s3:ReadOnly,s3:WriteOnly,logs:WriteOnly \
+  --ttl 12h \
+  --name ml-training \
+  --user-data @train.sh
+
+# train.sh - no credentials needed, uses IAM role
+cat > train.sh <<'EOF'
+#!/bin/bash
+# Download dataset from S3
+aws s3 sync s3://ml-datasets/cifar10 /data
+
+# Train model
+python train.py --data /data --epochs 100
+
+# Upload trained model
+aws s3 cp model.pth s3://ml-models/$(date +%Y%m%d)/
+
+# Write logs to CloudWatch
+echo "Training complete" | aws logs put-log-events \
+  --log-group-name ml-training \
+  --log-stream-name $(hostname)
+EOF
+```
+
+### Secrets Management with IAM
+
+```bash
+# Application server with secrets access
+spawn launch \
+  --instance-type t3.medium \
+  --iam-policy secretsmanager:ReadOnly,ssm:ReadOnly,dynamodb:FullAccess \
+  --ttl 24h \
+  --name app-server
+
+# On instance - fetch secrets securely
+DB_PASSWORD=$(aws secretsmanager get-secret-value \
+  --secret-id prod/db/password \
+  --query SecretString --output text)
+
+API_KEY=$(aws ssm get-parameter \
+  --name /prod/api-key \
+  --with-decryption \
+  --query Parameter.Value --output text)
+
+# Start app with secrets (never stored in code!)
+export DB_PASSWORD API_KEY
+./start-app.sh
+```
+
+### Job Array with Shared IAM Role
+
+```bash
+# Launch 16 workers with DynamoDB + S3 access
+spawn launch \
+  --count 16 \
+  --job-array-name workers \
+  --instance-type m7i.large \
+  --iam-policy s3:ReadOnly,dynamodb:WriteOnly \
+  --ttl 4h \
+  --command "python worker.py --rank \$JOB_ARRAY_INDEX"
+
+# All 16 instances automatically share the same IAM role
+# No credential management needed across the cluster
+# Each worker processes its partition of data
+```
+
 ## 🛠️ Development
 
 ### Building
@@ -1107,7 +1250,8 @@ spawn reads this and launches accordingly!
 
 - **[JOB_ARRAYS.md](JOB_ARRAYS.md)** - Job arrays for coordinated instance groups
 - **[AMI_MANAGEMENT.md](AMI_MANAGEMENT.md)** - Create and manage custom AMIs
-- **[IAM_PERMISSIONS.md](IAM_PERMISSIONS.md)** - Required AWS permissions
+- **[IAM_INSTANCE_PROFILES_STATUS.md](IAM_INSTANCE_PROFILES_STATUS.md)** - IAM instance profiles for secure AWS service access
+- **[IAM_PERMISSIONS.md](IAM_PERMISSIONS.md)** - Required AWS permissions for spawn CLI
 - **[DNS_SETUP.md](DNS_SETUP.md)** - Custom DNS configuration
 - **[MONITORING.md](MONITORING.md)** - Monitoring and observability
 - **[SHELL_COMPLETION.md](SHELL_COMPLETION.md)** - Shell completion setup
