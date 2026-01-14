@@ -180,11 +180,12 @@ func outputTable(instances []aws.InstanceInfo) error {
 		defer w.Flush()
 
 		// Header
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 			i18n.T("spawn.list.header.instance_id"),
 			i18n.T("spawn.list.header.name"),
 			i18n.T("spawn.list.header.type"),
 			i18n.T("spawn.list.header.state"),
+			i18n.T("spawn.list.header.iam_role"),
 			i18n.T("spawn.list.header.az"),
 			i18n.T("spawn.list.header.age"),
 			i18n.T("spawn.list.header.ttl"),
@@ -211,12 +212,17 @@ func outputTable(instances []aws.InstanceInfo) error {
 			if publicIP == "" {
 				publicIP = "-"
 			}
+			iamRole := inst.IAMRole
+			if iamRole == "" {
+				iamRole = "-"
+			}
 
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 				inst.InstanceID,
 				name,
 				inst.InstanceType,
 				state,
+				iamRole,
 				inst.AvailabilityZone,
 				age,
 				ttl,
@@ -243,14 +249,19 @@ func displayInstance(inst aws.InstanceInfo, prefix string) {
 	if inst.SpotInstance {
 		spotIndicator = " (spot)"
 	}
+	iamRole := inst.IAMRole
+	if iamRole == "" {
+		iamRole = "-"
+	}
 
-	fmt.Printf("%s[%s] %s  %s  %s  %s  %s  %s%s\n",
+	fmt.Printf("%s[%s] %s  %s  %s  %s  %s  %s  %s%s\n",
 		prefix,
 		inst.JobArrayIndex,
 		name,
 		inst.InstanceID,
 		inst.InstanceType,
 		state,
+		iamRole,
 		inst.AvailabilityZone,
 		publicIP,
 		spotIndicator,
@@ -294,7 +305,8 @@ func outputJSON(instances []aws.InstanceInfo) error {
     "ttl": "%s",
     "idle_timeout": "%s",
     "key_name": "%s",
-    "spot": %t
+    "spot": %t,
+    "iam_role": "%s"
   }%s
 `,
 			inst.InstanceID,
@@ -310,6 +322,7 @@ func outputJSON(instances []aws.InstanceInfo) error {
 			inst.IdleTimeout,
 			inst.KeyName,
 			inst.SpotInstance,
+			inst.IAMRole,
 			comma,
 		)
 	}

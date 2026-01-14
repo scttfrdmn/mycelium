@@ -68,6 +68,14 @@ var (
 	instanceNames    string
 	command          string
 
+	// IAM
+	iamRole            string
+	iamPolicy          []string
+	iamManagedPolicies []string
+	iamPolicyFile      string
+	iamTrustServices   []string
+	iamRoleTags        []string
+
 	// Mode
 	interactive      bool
 	quiet            bool
@@ -128,6 +136,14 @@ func init() {
 	launchCmd.Flags().StringVar(&jobArrayName, "job-array-name", "", "Job array group name (required if --count > 1)")
 	launchCmd.Flags().StringVar(&instanceNames, "instance-names", "", "Instance name template (e.g., 'worker-{index}', default: '{job-array-name}-{index}')")
 	launchCmd.Flags().StringVar(&command, "command", "", "Command to run on all instances (executed after spored setup)")
+
+	// IAM
+	launchCmd.Flags().StringVar(&iamRole, "iam-role", "", "IAM role name (creates if doesn't exist)")
+	launchCmd.Flags().StringSliceVar(&iamPolicy, "iam-policy", []string{}, "Service-level policies (e.g., s3:ReadOnly,dynamodb:WriteOnly)")
+	launchCmd.Flags().StringSliceVar(&iamManagedPolicies, "iam-managed-policies", []string{}, "AWS managed policy ARNs")
+	launchCmd.Flags().StringVar(&iamPolicyFile, "iam-policy-file", "", "Custom IAM policy JSON file")
+	launchCmd.Flags().StringSliceVar(&iamTrustServices, "iam-trust-services", []string{"ec2"}, "Services that can assume role")
+	launchCmd.Flags().StringSliceVar(&iamRoleTags, "iam-role-tags", []string{}, "Tags for IAM role (key=value format)")
 
 	// Mode
 	launchCmd.Flags().BoolVar(&interactive, "interactive", false, "Force interactive wizard")
@@ -248,12 +264,33 @@ func launchWithProgress(ctx context.Context, awsClient *aws.Client, config *aws.
 	// Step 3: Setup IAM instance profile
 	prog.Start("Setting up IAM role")
 	if config.IamInstanceProfile == "" {
-		instanceProfile, err := awsClient.SetupSporedIAMRole(ctx)
-		if err != nil {
-			prog.Error("Setting up IAM role", err)
-			return err
+		// Check if user specified custom IAM configuration
+		if iamRole != "" || len(iamPolicy) > 0 || len(iamManagedPolicies) > 0 || iamPolicyFile != "" {
+			// User-specified IAM configuration
+			iamConfig := aws.IAMRoleConfig{
+				RoleName:        iamRole,
+				Policies:        iamPolicy,
+				ManagedPolicies: iamManagedPolicies,
+				PolicyFile:      iamPolicyFile,
+				TrustServices:   iamTrustServices,
+				Tags:            parseIAMRoleTags(iamRoleTags),
+			}
+
+			instanceProfile, err := awsClient.CreateOrGetInstanceProfile(ctx, iamConfig)
+			if err != nil {
+				prog.Error("Setting up IAM role", err)
+				return fmt.Errorf("failed to create IAM instance profile: %w", err)
+			}
+			config.IamInstanceProfile = instanceProfile
+		} else {
+			// Default: use spored IAM role
+			instanceProfile, err := awsClient.SetupSporedIAMRole(ctx)
+			if err != nil {
+				prog.Error("Setting up IAM role", err)
+				return err
+			}
+			config.IamInstanceProfile = instanceProfile
 		}
-		config.IamInstanceProfile = instanceProfile
 	}
 	prog.Complete("Setting up IAM role")
 	time.Sleep(300 * time.Millisecond)
@@ -1329,4 +1366,16 @@ func updatePeerTags(ctx context.Context, awsClient *aws.Client, region string, i
 	}
 
 	return nil
+}
+
+// parseIAMRoleTags parses IAM role tags from key=value format
+func parseIAMRoleTags(tags []string) map[string]string {
+	result := make(map[string]string)
+	for _, tagStr := range tags {
+		parts := strings.SplitN(tagStr, "=", 2)
+		if len(parts) == 2 {
+			result[parts[0]] = parts[1]
+		}
+	}
+	return result
 }

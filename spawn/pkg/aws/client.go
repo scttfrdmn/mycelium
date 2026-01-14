@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -149,7 +150,7 @@ func (c *Client) Launch(ctx context.Context, launchConfig LaunchConfig) (*Launch
 	// Add IAM instance profile if specified
 	if launchConfig.IamInstanceProfile != "" {
 		input.IamInstanceProfile = &types.IamInstanceProfileSpecification{
-			Name: aws.String(launchConfig.IamInstanceProfile),
+			Arn: aws.String(launchConfig.IamInstanceProfile),
 		}
 	}
 	
@@ -537,6 +538,7 @@ type InstanceInfo struct {
 	KeyName          string
 	SpotInstance     bool
 	Tags             map[string]string
+	IAMRole          string // IAM instance profile/role name
 
 	// Job array fields
 	JobArrayID    string
@@ -633,6 +635,16 @@ func (c *Client) listInstancesInRegion(ctx context.Context, region string, state
 
 				if instance.LaunchTime != nil {
 					info.LaunchTime = *instance.LaunchTime
+				}
+
+				// Extract IAM instance profile
+				if instance.IamInstanceProfile != nil && instance.IamInstanceProfile.Arn != nil {
+					// Extract role name from ARN (format: arn:aws:iam::account:instance-profile/RoleName)
+					arn := *instance.IamInstanceProfile.Arn
+					parts := strings.Split(arn, "/")
+					if len(parts) > 0 {
+						info.IAMRole = parts[len(parts)-1]
+					}
 				}
 
 				// Extract tags
