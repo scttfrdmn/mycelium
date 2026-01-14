@@ -360,6 +360,38 @@ func (c *Client) buildTrustPolicy(services []string) map[string]interface{} {
 func (c *Client) buildInlinePolicy(policies []string) map[string]interface{} {
 	statements := []interface{}{}
 
+	// ALWAYS include spored-required EC2 permissions for self-management
+	// This allows spored agent to:
+	// - Read its own tags (TTL, idle timeout, etc.)
+	// - Terminate/stop itself when conditions are met
+	// These permissions are scoped to spawn:managed=true instances only
+	sporedReadPermissions := map[string]interface{}{
+		"Effect": "Allow",
+		"Action": []interface{}{
+			"ec2:DescribeTags",
+			"ec2:DescribeInstances",
+			"ec2:CreateTags",
+		},
+		"Resource": "*",
+	}
+	statements = append(statements, sporedReadPermissions)
+
+	sporedActionPermissions := map[string]interface{}{
+		"Effect": "Allow",
+		"Action": []interface{}{
+			"ec2:TerminateInstances",
+			"ec2:StopInstances",
+		},
+		"Resource": "*",
+		"Condition": map[string]interface{}{
+			"StringEquals": map[string]interface{}{
+				"ec2:ResourceTag/spawn:managed": "true",
+			},
+		},
+	}
+	statements = append(statements, sporedActionPermissions)
+
+	// Add user-specified policy templates
 	for _, policyStr := range policies {
 		// Get template
 		template, ok := PolicyTemplates[policyStr]
