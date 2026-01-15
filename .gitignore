@@ -42,3 +42,6 @@ Thumbs.db
 *.tar.gz
 *.zip
 checksums.txt
+
+# Configuration (credentials)
+/config/
