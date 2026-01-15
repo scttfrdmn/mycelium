@@ -70,6 +70,25 @@ body::before {
     filter: drop-shadow(0 0 20px var(--glow-blue));
 }
 
+/* Adaptive logo for light/dark mode */
+.logo-dark {
+    display: none;
+}
+
+.logo-light {
+    display: block;
+}
+
+@media (prefers-color-scheme: dark) {
+    .logo-dark {
+        display: block;
+    }
+
+    .logo-light {
+        display: none;
+    }
+}
+
 h1 {
     font-size: 4rem;
     font-weight: 700;

@@ -1,7 +1,7 @@
 // Mycelium Landing Page - Interactive Features
 
 // Tab Switching for Install Instructions
-function showTab(tabName) {
+function showTab(tabName, event) {
     const contents = document.querySelectorAll('.tab-content');
     contents.forEach(content => {
         content.classList.remove('active');
@@ -18,7 +18,7 @@ function showTab(tabName) {
     }
 
     const clickedButton = event?.target;
-    if (clickedButton) {
+    if (clickedButton && clickedButton.classList) {
         clickedButton.classList.add('active');
     }
 }
