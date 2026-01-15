@@ -358,6 +358,254 @@ footer {
     text-decoration: none;
 }
 
+/* Dashboard Section */
+.dashboard {
+    margin: 6rem 0;
+}
+
+.dashboard-subtitle {
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    margin-bottom: 2rem;
+}
+
+.table-container {
+    overflow-x: auto;
+    background: var(--bg-card);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    margin: 2rem 0;
+}
+
+.instances-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+}
+
+.instances-table thead {
+    background: rgba(79, 195, 247, 0.1);
+    border-bottom: 2px solid var(--border);
+}
+
+.instances-table th {
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: var(--accent-blue);
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.instances-table th:nth-child(1) { width: 20%; } /* Name */
+.instances-table th:nth-child(2) { width: 12%; } /* Type */
+.instances-table th:nth-child(3) { width: 10%; } /* State */
+.instances-table th:nth-child(4) { width: 12%; } /* Region */
+.instances-table th:nth-child(5) { width: 15%; } /* Public IP */
+.instances-table th:nth-child(6) { width: 20%; } /* DNS Name */
+.instances-table th:nth-child(7) { width: 11%; } /* Age */
+
+.instances-table tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.2s ease;
+}
+
+.instances-table tbody tr:last-child {
+    border-bottom: none;
+}
+
+.instances-table tbody tr:hover {
+    background: rgba(79, 195, 247, 0.05);
+}
+
+.instances-table td {
+    padding: 1rem;
+    color: var(--text-primary);
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+.instances-table code {
+    background: rgba(79, 195, 247, 0.1);
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+}
+
+/* Badge Variants */
+.badge-success {
+    background: rgba(102, 187, 106, 0.2);
+    color: var(--accent-green);
+}
+
+.badge-warning {
+    background: rgba(255, 193, 7, 0.2);
+    color: #ffc107;
+}
+
+.badge-danger {
+    background: rgba(244, 67, 54, 0.2);
+    color: #f44336;
+}
+
+.badge-info {
+    background: rgba(79, 195, 247, 0.2);
+    color: var(--accent-blue);
+}
+
+.badge-default {
+    background: rgba(158, 158, 158, 0.2);
+    color: var(--text-secondary);
+}
+
+/* Text Muted */
+:root {
+    --text-muted: #6c757d;
+    --accent-red: #f44336;
+}
+
+/* Login Section */
+.login-section {
+    margin: 6rem auto;
+    max-width: 600px;
+    text-align: center;
+}
+
+.login-subtitle {
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    margin-bottom: 3rem;
+}
+
+.login-providers {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    margin: 2rem 0;
+}
+
+.login-btn {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 1.5rem 2rem;
+    background: var(--bg-card);
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: left;
+    font-size: 1rem;
+}
+
+.login-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.login-btn-globus:hover {
+    border-color: #4caf50;
+    background: rgba(76, 175, 80, 0.05);
+}
+
+.login-btn-google:hover {
+    border-color: #4285f4;
+    background: rgba(66, 133, 244, 0.05);
+}
+
+.login-btn-github:hover {
+    border-color: #6e5494;
+    background: rgba(110, 84, 148, 0.05);
+}
+
+.login-icon {
+    font-size: 2.5rem;
+    filter: drop-shadow(0 0 10px var(--glow-blue));
+}
+
+.login-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.login-text strong {
+    color: var(--text-primary);
+    font-size: 1.1rem;
+}
+
+.login-text small {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.login-info {
+    margin-top: 3rem;
+    padding: 2rem;
+    background: rgba(79, 195, 247, 0.05);
+    border: 1px solid rgba(79, 195, 247, 0.2);
+    border-radius: 12px;
+    text-align: left;
+}
+
+.login-info p {
+    color: var(--accent-blue);
+    margin-bottom: 1rem;
+}
+
+.login-info ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.login-info li {
+    color: var(--text-secondary);
+    padding: 0.5rem 0;
+    font-size: 0.95rem;
+}
+
+.login-info a {
+    color: var(--accent-blue);
+    text-decoration: none;
+}
+
+.login-info a:hover {
+    text-decoration: underline;
+}
+
+/* User Display */
+.user-display {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    margin-bottom: 2rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.user-display strong {
+    color: var(--accent-blue);
+}
+
+.btn-logout {
+    padding: 0.5rem 1rem;
+    background: transparent;
+    border: 1px solid var(--accent-red);
+    border-radius: 6px;
+    color: var(--accent-red);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 0.9rem;
+}
+
+.btn-logout:hover {
+    background: rgba(244, 67, 54, 0.1);
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     h1 {
@@ -387,5 +635,18 @@ footer {
     .btn {
         width: 100%;
         max-width: 300px;
+    }
+
+    .instances-table {
+        font-size: 0.85rem;
+    }
+
+    .instances-table th,
+    .instances-table td {
+        padding: 0.75rem 0.5rem;
+    }
+
+    .table-container {
+        border-radius: 8px;
     }
 }
