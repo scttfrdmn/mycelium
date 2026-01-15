@@ -9,7 +9,7 @@ const AUTH_CONFIG = {
     providers: {
         globus: {
             name: 'Globus Auth',
-            clientId: null, // Not configured yet
+            clientId: '8b578341-b7b5-4e0b-b29f-14a8b3d9011a',
             authEndpoint: 'https://auth.globus.org/v2/oauth2/authorize',
             scope: 'openid profile email',
             cognitoKey: 'auth.globus.org'
@@ -23,10 +23,11 @@ const AUTH_CONFIG = {
         },
         github: {
             name: 'GitHub',
-            clientId: null, // Not configured yet
+            clientId: 'Ov23liOPNcrWFpDvtWrX',
             authEndpoint: 'https://github.com/login/oauth/authorize',
             scope: 'read:user user:email',
-            cognitoKey: null // GitHub requires custom handling
+            cognitoKey: null, // GitHub OAuth 2.0 (not OIDC) - requires backend Lambda
+            disabled: true // Coming soon - requires additional backend infrastructure
         }
     }
 };
@@ -65,6 +66,11 @@ class AuthManager {
         const config = AUTH_CONFIG.providers[provider];
         if (!config) {
             throw new Error(`Unknown provider: ${provider}`);
+        }
+
+        if (config.disabled) {
+            alert(`${config.name} is coming soon! It requires additional backend infrastructure (OAuth 2.0 → OIDC token exchange). For now, please use Google or Globus Auth.`);
+            return;
         }
 
         if (!config.clientId) {
