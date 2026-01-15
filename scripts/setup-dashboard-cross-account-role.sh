@@ -54,7 +54,7 @@ fi
 echo -e "  ${GREEN}✓${NC} Identity Pool: $IDENTITY_POOL_ID"
 echo ""
 
-# Create trust policy that allows Cognito authenticated users from infra account
+# Create trust policy that allows Cognito authenticated IAM role from infra account
 echo "→ Creating IAM role trust policy..."
 
 cat > /tmp/dashboard-cross-account-trust-policy.json <<EOF
@@ -64,17 +64,9 @@ cat > /tmp/dashboard-cross-account-trust-policy.json <<EOF
     {
       "Effect": "Allow",
       "Principal": {
-        "Federated": "cognito-identity.amazonaws.com"
+        "AWS": "arn:aws:iam::$INFRA_ACCOUNT_ID:role/Cognito_SpawnDashboard_Auth_Role"
       },
-      "Action": "sts:AssumeRoleWithWebIdentity",
-      "Condition": {
-        "StringEquals": {
-          "cognito-identity.amazonaws.com:aud": "$IDENTITY_POOL_ID"
-        },
-        "ForAnyValue:StringLike": {
-          "cognito-identity.amazonaws.com:amr": "authenticated"
-        }
-      }
+      "Action": "sts:AssumeRole"
     }
   ]
 }
