@@ -92,6 +92,13 @@ type LaunchConfig struct {
 	JobArrayIndex   int    // This instance's index (0..N-1)
 	JobArrayCommand string // Command to run on all instances (optional)
 
+	// Parameter sweep settings
+	SweepID     string            // Unique sweep ID (e.g., "hyperparam-20260115-abc123")
+	SweepName   string            // User-friendly sweep name (e.g., "hyperparam")
+	SweepIndex  int               // This instance's index in the sweep (0..N-1)
+	SweepSize   int               // Total number of parameter sets in the sweep
+	Parameters  map[string]string // Parameter key-value pairs for PARAM_* env vars and tags
+
 	// Metadata
 	Name string
 	Tags map[string]string
@@ -150,7 +157,7 @@ func (c *Client) Launch(ctx context.Context, launchConfig LaunchConfig) (*Launch
 	// Add IAM instance profile if specified
 	if launchConfig.IamInstanceProfile != "" {
 		input.IamInstanceProfile = &types.IamInstanceProfileSpecification{
-			Arn: aws.String(launchConfig.IamInstanceProfile),
+			Name: aws.String(launchConfig.IamInstanceProfile),
 		}
 	}
 	
@@ -280,6 +287,24 @@ func buildTags(config LaunchConfig, accountID string, userARN string) []types.Ta
 		tags = append(tags, types.Tag{Key: aws.String("spawn:job-array-size"), Value: aws.String(fmt.Sprintf("%d", config.JobArraySize))})
 		tags = append(tags, types.Tag{Key: aws.String("spawn:job-array-index"), Value: aws.String(fmt.Sprintf("%d", config.JobArrayIndex))})
 		tags = append(tags, types.Tag{Key: aws.String("spawn:job-array-created"), Value: aws.String(time.Now().Format(time.RFC3339))})
+	}
+
+	// Parameter sweep tags
+	if config.SweepID != "" {
+		tags = append(tags, types.Tag{Key: aws.String("spawn:sweep-id"), Value: aws.String(config.SweepID)})
+		tags = append(tags, types.Tag{Key: aws.String("spawn:sweep-name"), Value: aws.String(config.SweepName)})
+		tags = append(tags, types.Tag{Key: aws.String("spawn:sweep-size"), Value: aws.String(fmt.Sprintf("%d", config.SweepSize))})
+		tags = append(tags, types.Tag{Key: aws.String("spawn:sweep-index"), Value: aws.String(fmt.Sprintf("%d", config.SweepIndex))})
+
+		// Add parameter tags (up to 35 to stay under AWS 50-tag limit)
+		paramCount := 0
+		for k, v := range config.Parameters {
+			if paramCount >= 35 {
+				break
+			}
+			tags = append(tags, types.Tag{Key: aws.String("spawn:param:" + k), Value: aws.String(v)})
+			paramCount++
+		}
 	}
 
 	// Add custom tags

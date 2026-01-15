@@ -68,6 +68,15 @@ var (
 	instanceNames    string
 	command          string
 
+	// Parameter sweep
+	paramFile        string
+	params           string
+	cartesian        bool
+	maxConcurrent    int
+	launchDelay      string
+	detach           bool
+	sweepName        string
+
 	// IAM
 	iamRole            string
 	iamPolicy          []string
@@ -136,6 +145,15 @@ func init() {
 	launchCmd.Flags().StringVar(&jobArrayName, "job-array-name", "", "Job array group name (required if --count > 1)")
 	launchCmd.Flags().StringVar(&instanceNames, "instance-names", "", "Instance name template (e.g., 'worker-{index}', default: '{job-array-name}-{index}')")
 	launchCmd.Flags().StringVar(&command, "command", "", "Command to run on all instances (executed after spored setup)")
+
+	// Parameter sweep
+	launchCmd.Flags().StringVar(&paramFile, "param-file", "", "Path to parameter sweep file (JSON/YAML/CSV)")
+	launchCmd.Flags().StringVar(&params, "params", "", "Inline JSON parameters for sweep")
+	launchCmd.Flags().BoolVar(&cartesian, "cartesian", false, "Generate cartesian product of parameter lists")
+	launchCmd.Flags().IntVar(&maxConcurrent, "max-concurrent", 0, "Max instances running simultaneously (0 = unlimited)")
+	launchCmd.Flags().StringVar(&launchDelay, "launch-delay", "0s", "Delay between instance launches (e.g., 5s)")
+	launchCmd.Flags().BoolVar(&detach, "detach", false, "Run sweep orchestration in Lambda (survives disconnect)")
+	launchCmd.Flags().StringVar(&sweepName, "sweep-name", "", "Human-readable sweep identifier (auto-generated if empty)")
 
 	// IAM
 	launchCmd.Flags().StringVar(&iamRole, "iam-role", "", "IAM role name (creates if doesn't exist)")
@@ -208,6 +226,12 @@ func runLaunch(cmd *cobra.Command, args []string) error {
 		return i18n.Te("error.instance_type_required", nil)
 	}
 
+	// Check for parameter sweep mode
+	if paramFile != "" || params != "" {
+		// Parameter sweep launch path
+		return launchParameterSweep(ctx, config, plat)
+	}
+
 	// Auto-detect region if not specified
 	if config.Region == "" {
 		fmt.Fprintf(os.Stderr, "🌍 No region specified, auto-detecting closest region...\n")
@@ -230,6 +254,249 @@ func runLaunch(cmd *cobra.Command, args []string) error {
 
 	// Launch with progress display
 	return launchWithProgress(ctx, awsClient, config, plat)
+}
+
+func launchParameterSweep(ctx context.Context, baseConfig *aws.LaunchConfig, plat *platform.Platform) error {
+	// Parse parameter file
+	var paramFormat *ParamFileFormat
+	var err error
+
+	if paramFile != "" {
+		paramFormat, err = parseParamFile(paramFile)
+		if err != nil {
+			return fmt.Errorf("failed to parse parameter file: %w", err)
+		}
+	} else if params != "" {
+		// TODO: Parse inline JSON params
+		return fmt.Errorf("inline --params not yet implemented, use --param-file for now")
+	} else {
+		return fmt.Errorf("either --param-file or --params must be specified for parameter sweep")
+	}
+
+	// Generate sweep ID
+	name := sweepName
+	if name == "" {
+		name = "sweep"
+	}
+	sweepID := generateSweepID(name)
+
+	fmt.Fprintf(os.Stderr, "\n🧪 Parameter Sweep: %s\n", sweepID)
+	fmt.Fprintf(os.Stderr, "   Parameters: %d\n", len(paramFormat.Params))
+	if maxConcurrent > 0 {
+		fmt.Fprintf(os.Stderr, "   Max Concurrent: %d\n", maxConcurrent)
+	} else {
+		fmt.Fprintf(os.Stderr, "   Mode: All at once\n")
+	}
+	fmt.Fprintf(os.Stderr, "\n")
+
+	// Initialize AWS client
+	awsClient, err := aws.NewClient(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to initialize AWS client: %w", err)
+	}
+
+	// Build launch configs for each parameter set
+	launchConfigs := make([]*aws.LaunchConfig, 0, len(paramFormat.Params))
+	for i, paramSet := range paramFormat.Params {
+		config, err := buildLaunchConfigFromParams(paramFormat.Defaults, paramSet, sweepID, name, i, len(paramFormat.Params))
+		if err != nil {
+			return fmt.Errorf("failed to build launch config for parameter set %d: %w", i, err)
+		}
+
+		// Copy base config fields that weren't in params
+		if config.Region == "" {
+			config.Region = baseConfig.Region
+		}
+		if config.Name == "" {
+			config.Name = fmt.Sprintf("%s-%d", name, i)
+		}
+
+		launchConfigs = append(launchConfigs, &config)
+	}
+
+	// Setup common resources (AMI, SSH key, IAM role) using first config as template
+	prog := progress.NewProgress()
+
+	firstConfig := launchConfigs[0]
+
+	// Auto-detect region if not specified
+	if firstConfig.Region == "" {
+		fmt.Fprintf(os.Stderr, "🌍 No region specified, auto-detecting closest region...\n")
+		detectedRegion, err := detectBestRegion(ctx, firstConfig.InstanceType)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "⚠️  Could not auto-detect region: %v\n", err)
+			fmt.Fprintf(os.Stderr, "   Using default: us-east-1\n")
+			firstConfig.Region = "us-east-1"
+		} else {
+			fmt.Fprintf(os.Stderr, "✓ Selected region: %s\n", detectedRegion)
+			firstConfig.Region = detectedRegion
+		}
+	}
+
+	// Apply region to all configs
+	for _, cfg := range launchConfigs {
+		if cfg.Region == "" {
+			cfg.Region = firstConfig.Region
+		}
+	}
+
+	// Step 1: Detect AMI
+	prog.Start("Detecting AMI")
+	if firstConfig.AMI == "" {
+		ami, err := awsClient.GetRecommendedAMI(ctx, firstConfig.Region, firstConfig.InstanceType)
+		if err != nil {
+			prog.Error("Detecting AMI", err)
+			return err
+		}
+		// Apply AMI to all configs that don't have one
+		for _, cfg := range launchConfigs {
+			if cfg.AMI == "" {
+				cfg.AMI = ami
+			}
+		}
+	}
+	prog.Complete("Detecting AMI")
+
+	// Step 2: Setup SSH key
+	prog.Start("Setting up SSH key")
+	if firstConfig.KeyName == "" {
+		keyName, err := setupSSHKey(ctx, awsClient, firstConfig.Region, plat)
+		if err != nil {
+			prog.Error("Setting up SSH key", err)
+			return err
+		}
+		// Apply key to all configs
+		for _, cfg := range launchConfigs {
+			if cfg.KeyName == "" {
+				cfg.KeyName = keyName
+			}
+		}
+	}
+	prog.Complete("Setting up SSH key")
+
+	// Step 3: Setup IAM role
+	prog.Start("Setting up IAM role")
+	if firstConfig.IamInstanceProfile == "" {
+		instanceProfile, err := awsClient.SetupSporedIAMRole(ctx)
+		if err != nil {
+			prog.Error("Setting up IAM role", err)
+			return err
+		}
+		// Apply IAM role to all configs
+		for _, cfg := range launchConfigs {
+			if cfg.IamInstanceProfile == "" {
+				cfg.IamInstanceProfile = instanceProfile
+			}
+		}
+	}
+	prog.Complete("Setting up IAM role")
+
+	// Build user-data for each config
+	for _, cfg := range launchConfigs {
+		userDataScript, err := buildUserData(plat, cfg)
+		if err != nil {
+			return fmt.Errorf("failed to build user data: %w", err)
+		}
+		cfg.UserData = base64.StdEncoding.EncodeToString([]byte(userDataScript))
+	}
+
+	// Launch all instances in parallel
+	fmt.Fprintf(os.Stderr, "\n🚀 Launching %d instances in parallel...\n\n", len(launchConfigs))
+
+	type launchResult struct {
+		index  int
+		result *aws.LaunchResult
+		err    error
+	}
+
+	resultsChan := make(chan launchResult, len(launchConfigs))
+	var wg sync.WaitGroup
+
+	for i, cfg := range launchConfigs {
+		wg.Add(1)
+		go func(idx int, config *aws.LaunchConfig) {
+			defer wg.Done()
+			result, err := awsClient.Launch(ctx, *config)
+			resultsChan <- launchResult{index: idx, result: result, err: err}
+		}(i, cfg)
+	}
+
+	// Wait for all launches
+	wg.Wait()
+	close(resultsChan)
+
+	// Collect results
+	launchedInstances := make([]*aws.LaunchResult, len(launchConfigs))
+	var failures []string
+	successCount := 0
+
+	for result := range resultsChan {
+		if result.err != nil {
+			failures = append(failures, fmt.Sprintf("Parameter set %d: %v", result.index, result.err))
+		} else {
+			launchedInstances[result.index] = result.result
+			successCount++
+			fmt.Fprintf(os.Stderr, "✓ Launched %s (parameter set %d/%d)\n", result.result.Name, result.index+1, len(launchConfigs))
+		}
+	}
+
+	// Handle failures
+	if len(failures) > 0 {
+		fmt.Fprintf(os.Stderr, "\n⚠️  Some instances failed to launch:\n")
+		for _, failure := range failures {
+			fmt.Fprintf(os.Stderr, "   • %s\n", failure)
+		}
+		return fmt.Errorf("%d/%d instances failed to launch", len(failures), len(launchConfigs))
+	}
+
+	// Save sweep state
+	state := &SweepState{
+		SweepID:       sweepID,
+		SweepName:     name,
+		CreatedAt:     time.Now(),
+		ParamFile:     paramFile,
+		TotalParams:   len(paramFormat.Params),
+		MaxConcurrent: maxConcurrent,
+		LaunchDelay:   launchDelay,
+		Completed:     0,
+		Running:       successCount,
+		Pending:       0,
+		Failed:        0,
+		Instances:     make([]InstanceState, 0, successCount),
+	}
+
+	for i, instance := range launchedInstances {
+		if instance != nil {
+			state.Instances = append(state.Instances, InstanceState{
+				Index:       i,
+				InstanceID:  instance.InstanceID,
+				State:       "running",
+				LaunchedAt:  time.Now(),
+			})
+		}
+	}
+
+	if err := saveSweepState(state); err != nil {
+		fmt.Fprintf(os.Stderr, "⚠️  Warning: Failed to save sweep state: %v\n", err)
+	}
+
+	// Display success
+	fmt.Fprintf(os.Stderr, "\n✅ Parameter sweep launched successfully!\n\n")
+	fmt.Fprintf(os.Stderr, "Sweep ID:   %s\n", sweepID)
+	fmt.Fprintf(os.Stderr, "Sweep Name: %s\n", name)
+	fmt.Fprintf(os.Stderr, "Instances:  %d\n\n", successCount)
+
+	fmt.Fprintf(os.Stderr, "Instances:\n")
+	for _, instance := range launchedInstances {
+		if instance != nil {
+			fmt.Fprintf(os.Stderr, "  • %s (%s) - %s\n", instance.Name, instance.InstanceID, instance.State)
+		}
+	}
+
+	fmt.Fprintf(os.Stderr, "\nTo view sweep status:\n")
+	fmt.Fprintf(os.Stderr, "  spawn list --sweep-id %s\n", sweepID)
+
+	return nil
 }
 
 func launchWithProgress(ctx context.Context, awsClient *aws.Client, config *aws.LaunchConfig, plat *platform.Platform) error {
@@ -755,6 +1022,56 @@ EOFJOBARRAY
     chmod 644 /etc/profile.d/job-array.sh
 
     echo "✅ Job array environment configured (Index: $JOB_ARRAY_INDEX/$JOB_ARRAY_SIZE)"
+fi
+
+# Setup parameter sweep environment variables (if part of a sweep)
+SWEEP_ID=$(aws ec2 describe-tags --region $REGION \
+    --filters "Name=resource-id,Values=$INSTANCE_ID" "Name=key,Values=spawn:sweep-id" \
+    --query 'Tags[0].Value' --output text 2>/dev/null || echo "None")
+
+if [ "$SWEEP_ID" != "None" ]; then
+    echo "Setting up parameter sweep environment..."
+
+    SWEEP_NAME=$(aws ec2 describe-tags --region $REGION \
+        --filters "Name=resource-id,Values=$INSTANCE_ID" "Name=key,Values=spawn:sweep-name" \
+        --query 'Tags[0].Value' --output text 2>/dev/null || echo "")
+
+    SWEEP_SIZE=$(aws ec2 describe-tags --region $REGION \
+        --filters "Name=resource-id,Values=$INSTANCE_ID" "Name=key,Values=spawn:sweep-size" \
+        --query 'Tags[0].Value' --output text 2>/dev/null || echo "0")
+
+    SWEEP_INDEX=$(aws ec2 describe-tags --region $REGION \
+        --filters "Name=resource-id,Values=$INSTANCE_ID" "Name=key,Values=spawn:sweep-index" \
+        --query 'Tags[0].Value' --output text 2>/dev/null || echo "0")
+
+    # Query all spawn:param:* tags
+    PARAM_TAGS=$(aws ec2 describe-tags --region $REGION \
+        --filters "Name=resource-id,Values=$INSTANCE_ID" "Name=key,Values=spawn:param:*" \
+        --query 'Tags[*].[Key,Value]' --output text 2>/dev/null || echo "")
+
+    # Create parameter sweep environment file
+    cat > /etc/profile.d/spawn-params.sh <<EOFPARAMS
+# Parameter Sweep Environment Variables
+# Available to all shells for parameter sweep workloads
+export SWEEP_ID="$SWEEP_ID"
+export SWEEP_NAME="$SWEEP_NAME"
+export SWEEP_SIZE="$SWEEP_SIZE"
+export SWEEP_INDEX="$SWEEP_INDEX"
+
+# Parse and export PARAM_* environment variables from tags
+EOFPARAMS
+
+    # Parse param tags and add exports
+    echo "$PARAM_TAGS" | while IFS=$'\t' read -r key value; do
+        if [[ $key == spawn:param:* ]]; then
+            param_name=${key#spawn:param:}
+            echo "export PARAM_${param_name}=\"${value}\"" >> /etc/profile.d/spawn-params.sh
+        fi
+    done
+
+    chmod 644 /etc/profile.d/spawn-params.sh
+
+    echo "✅ Parameter sweep environment configured (Index: $SWEEP_INDEX/$SWEEP_SIZE)"
 fi
 
 # Create login banner (MOTD) with spore configuration
