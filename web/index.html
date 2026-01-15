@@ -7,6 +7,7 @@
     <meta name="description" content="Launch ephemeral AWS EC2 instances effortlessly. Powered by Mycelium - making cloud compute accessible to everyone.">
     <link rel="stylesheet" href="css/style.css">
     <link rel="icon" type="image/png" href="assets/favicon.png">
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1564.0.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -114,13 +115,99 @@ tar -xzf spawn_*_$(uname -s)_$(uname -m).tar.gz
             </div>
         </section>
 
-        <!-- Coming Soon -->
+        <!-- Login Section -->
+        <section id="login-section" class="login-section" style="display: none;">
+            <h2>🔐 Sign In to Dashboard</h2>
+            <p class="login-subtitle">Choose your authentication provider to access your instances</p>
+
+            <div id="auth-error" style="display: none; padding: 1rem; margin: 2rem auto; max-width: 600px; background: rgba(255, 100, 100, 0.1); border: 1px solid rgba(255, 100, 100, 0.3); border-radius: 8px; color: var(--accent-red);"></div>
+
+            <div class="login-providers">
+                <button onclick="authManager.login('globus')" class="login-btn login-btn-globus">
+                    <span class="login-icon">🌐</span>
+                    <div class="login-text">
+                        <strong>Sign in with Globus Auth</strong>
+                        <small>Research & academic users</small>
+                    </div>
+                </button>
+
+                <button onclick="authManager.login('google')" class="login-btn login-btn-google">
+                    <span class="login-icon">🔵</span>
+                    <div class="login-text">
+                        <strong>Sign in with Google</strong>
+                        <small>Use your Google account</small>
+                    </div>
+                </button>
+
+                <button onclick="authManager.login('github')" class="login-btn login-btn-github">
+                    <span class="login-icon">⚫</span>
+                    <div class="login-text">
+                        <strong>Sign in with GitHub</strong>
+                        <small>Use your GitHub account</small>
+                    </div>
+                </button>
+            </div>
+
+            <div class="login-info">
+                <p><strong>🔒 Privacy & Security:</strong></p>
+                <ul>
+                    <li>✓ No passwords stored - uses OAuth 2.0 / OIDC</li>
+                    <li>✓ Temporary AWS credentials (expire in 1 hour)</li>
+                    <li>✓ Only you can see your instances</li>
+                    <li>✓ Open source - audit the code on <a href="https://github.com/scttfrdmn/mycelium" target="_blank">GitHub</a></li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- Web Dashboard -->
+        <section id="dashboard" class="dashboard" style="display: none;">
+            <div id="user-display" class="user-display"></div>
+            <h2>📊 Your Instances</h2>
+            <p class="dashboard-subtitle">View and monitor your spawn-managed EC2 instances across all regions</p>
+
+            <div id="dashboard-loading" style="display: none; text-align: center; padding: 2rem; color: var(--text-muted);">
+                Loading instances...
+            </div>
+
+            <div id="dashboard-error" style="display: none; padding: 1rem; margin: 1rem 0; background: rgba(255, 100, 100, 0.1); border: 1px solid rgba(255, 100, 100, 0.3); border-radius: 8px; color: var(--accent-red);"></div>
+
+            <div class="table-container">
+                <table class="instances-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Type</th>
+                            <th>State</th>
+                            <th>Region</th>
+                            <th>Public IP</th>
+                            <th>DNS Name</th>
+                            <th>Age</th>
+                        </tr>
+                    </thead>
+                    <tbody id="instances-tbody">
+                        <tr>
+                            <td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                                Loading instances...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="margin-top: 1.5rem; padding: 1rem; background: rgba(100, 150, 255, 0.05); border: 1px solid rgba(100, 150, 255, 0.2); border-radius: 8px;">
+                <p style="margin: 0; color: var(--text-muted); font-size: 0.9rem;">
+                    <strong>💡 Tip:</strong> Instances refresh automatically. Launch instances with <code>spawn launch</code> and they'll appear here within 30 seconds.
+                </p>
+            </div>
+        </section>
+
+        <!-- Coming Soon Features -->
         <section class="coming-soon">
-            <h2>🚧 Coming Soon: Web Dashboard</h2>
+            <h2>🚧 Coming Soon</h2>
             <div class="dashboard-preview">
                 <div class="preview-card">
-                    <h4>📊 Instance Management</h4>
-                    <p>View, control, and monitor all your spores in one place</p>
+                    <h4>⚡ Instance Control</h4>
+                    <p>Start, stop, and terminate instances from the dashboard</p>
                 </div>
                 <div class="preview-card">
                     <h4>💻 Web SSH</h4>
@@ -174,6 +261,7 @@ spawn --lang fr    # French</code></pre>
         </footer>
     </div>
 
+    <script src="js/auth.js"></script>
     <script src="js/main.js"></script>
 </body>
 </html>
