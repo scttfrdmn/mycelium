@@ -382,14 +382,29 @@ function displayInstances(instances) {
     const tbody = document.getElementById('instances-tbody');
     if (!tbody) return;
 
-    tbody.innerHTML = instances.map(instance => {
+    tbody.innerHTML = instances.map((instance, index) => {
         const launchTime = new Date(instance.launch_time);
         const age = formatAge(launchTime);
         const stateClass = getStateClass(instance.state);
+        const rowId = `instance-${index}`;
+        const detailId = `detail-${index}`;
+
+        // Calculate TTL remaining if present
+        let ttlRemaining = null;
+        if (instance.ttl) {
+            const ttlMinutes = parseTTL(instance.ttl);
+            const elapsed = Math.floor((Date.now() - launchTime.getTime()) / 60000);
+            const remaining = ttlMinutes - elapsed;
+            if (remaining > 0) {
+                ttlRemaining = formatDuration(remaining);
+            } else {
+                ttlRemaining = 'Expired';
+            }
+        }
 
         return `
-            <tr>
-                <td><strong>${escapeHtml(instance.name)}</strong></td>
+            <tr id="${rowId}" class="instance-row" onclick="toggleInstanceDetails('${detailId}', '${rowId}')" style="cursor: pointer;">
+                <td><strong>${escapeHtml(instance.name)}</strong> <span style="color: var(--text-muted); font-size: 0.85rem;">▼</span></td>
                 <td><code>${escapeHtml(instance.instance_type)}</code></td>
                 <td><span class="badge badge-${stateClass}">${escapeHtml(instance.state)}</span></td>
                 <td><code>${escapeHtml(instance.region)}</code></td>
@@ -397,8 +412,84 @@ function displayInstances(instances) {
                 <td>${instance.dns_name ? `<code>${escapeHtml(instance.dns_name)}</code>` : '<span style="color: var(--text-muted);">—</span>'}</td>
                 <td>${age}</td>
             </tr>
+            <tr id="${detailId}" class="instance-detail" style="display: none;">
+                <td colspan="7" style="padding: 0; background: rgba(79, 195, 247, 0.03);">
+                    <div style="padding: 1.5rem; border-top: 1px solid var(--border);">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem;">
+                            <div>
+                                <h4 style="margin: 0 0 0.5rem 0; color: var(--accent-blue); font-size: 0.9rem;">Instance Details</h4>
+                                <div style="font-size: 0.9rem; line-height: 1.8;">
+                                    <div><strong>Instance ID:</strong> <code>${escapeHtml(instance.instance_id)}</code></div>
+                                    <div><strong>AZ:</strong> <code>${escapeHtml(instance.availability_zone)}</code></div>
+                                    <div><strong>Private IP:</strong> ${instance.private_ip ? `<code>${escapeHtml(instance.private_ip)}</code>` : '<span style="color: var(--text-muted);">—</span>'}</div>
+                                    <div><strong>Spot:</strong> ${instance.spot_instance ? '<span style="color: var(--accent-green);">Yes</span>' : '<span style="color: var(--text-muted);">No</span>'}</div>
+                                    ${instance.key_name ? `<div><strong>Key Pair:</strong> <code>${escapeHtml(instance.key_name)}</code></div>` : ''}
+                                </div>
+                            </div>
+                            <div>
+                                <h4 style="margin: 0 0 0.5rem 0; color: var(--accent-blue); font-size: 0.9rem;">Lifecycle</h4>
+                                <div style="font-size: 0.9rem; line-height: 1.8;">
+                                    <div><strong>Launched:</strong> ${launchTime.toLocaleString()}</div>
+                                    ${instance.ttl ? `<div><strong>TTL:</strong> ${escapeHtml(instance.ttl)}</div>` : ''}
+                                    ${ttlRemaining ? `<div><strong>TTL Remaining:</strong> <span style="color: ${ttlRemaining === 'Expired' ? 'var(--accent-red)' : 'var(--accent-green)'};">${ttlRemaining}</span></div>` : ''}
+                                    ${instance.tags['spawn:idle-timeout'] ? `<div><strong>Idle Timeout:</strong> ${escapeHtml(instance.tags['spawn:idle-timeout'])}</div>` : ''}
+                                    ${instance.tags['spawn:session-timeout'] ? `<div><strong>Session Timeout:</strong> ${escapeHtml(instance.tags['spawn:session-timeout'])}</div>` : ''}
+                                </div>
+                            </div>
+                            <div>
+                                <h4 style="margin: 0 0 0.5rem 0; color: var(--accent-blue); font-size: 0.9rem;">Tags</h4>
+                                <div style="font-size: 0.85rem; line-height: 1.6; max-height: 150px; overflow-y: auto;">
+                                    ${Object.entries(instance.tags)
+                                        .filter(([key]) => !key.startsWith('aws:') && key !== 'Name')
+                                        .map(([key, value]) => `<div><code style="color: var(--accent-blue);">${escapeHtml(key)}</code>: ${escapeHtml(value)}</div>`)
+                                        .join('') || '<span style="color: var(--text-muted);">No custom tags</span>'}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </td>
+            </tr>
         `;
     }).join('');
+}
+
+function toggleInstanceDetails(detailId, rowId) {
+    const detailRow = document.getElementById(detailId);
+    const instanceRow = document.getElementById(rowId);
+
+    if (!detailRow || !instanceRow) return;
+
+    const isVisible = detailRow.style.display !== 'none';
+
+    // Toggle display
+    detailRow.style.display = isVisible ? 'none' : 'table-row';
+
+    // Update arrow indicator
+    const arrow = instanceRow.querySelector('span');
+    if (arrow) {
+        arrow.textContent = isVisible ? '▼' : '▲';
+    }
+}
+
+function parseTTL(ttlStr) {
+    // Parse TTL string like "1h", "30m", "2h30m" to minutes
+    const hours = ttlStr.match(/(\d+)h/);
+    const minutes = ttlStr.match(/(\d+)m/);
+
+    let total = 0;
+    if (hours) total += parseInt(hours[1]) * 60;
+    if (minutes) total += parseInt(minutes[1]);
+
+    return total;
+}
+
+function formatDuration(minutes) {
+    if (minutes < 60) {
+        return `${minutes}m`;
+    }
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
 }
 
 function formatAge(date) {

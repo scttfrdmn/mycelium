@@ -415,8 +415,21 @@ footer {
     border-bottom: none;
 }
 
-.instances-table tbody tr:hover {
-    background: rgba(79, 195, 247, 0.05);
+.instances-table tbody tr.instance-row:hover {
+    background: rgba(79, 195, 247, 0.08);
+}
+
+.instances-table tbody tr.instance-detail {
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
 }
 
 .instances-table td {
