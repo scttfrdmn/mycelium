@@ -12,6 +12,7 @@ const AUTH_CONFIG = {
             clientId: '8b578341-b7b5-4e0b-b29f-14a8b3d9011a',
             authEndpoint: 'https://auth.globus.org/v2/oauth2/authorize',
             scope: 'openid profile email',
+            responseType: 'token id_token', // Globus requires 'token id_token' (not 'id_token token')
             cognitoKey: 'auth.globus.org'
         },
         google: {
@@ -19,6 +20,7 @@ const AUTH_CONFIG = {
             clientId: '721954523328-d2ark4gifse2j3g763opso2isgqmp4em.apps.googleusercontent.com',
             authEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
             scope: 'openid profile email',
+            responseType: 'id_token token', // Google supports both tokens
             cognitoKey: 'accounts.google.com'
         },
         github: {
@@ -90,7 +92,7 @@ class AuthManager {
         const params = new URLSearchParams({
             client_id: config.clientId,
             redirect_uri: redirectUri,
-            response_type: 'id_token token',
+            response_type: config.responseType || 'id_token token', // Use provider-specific response type
             scope: config.scope,
             state: state,
             nonce: this.generateNonce()
