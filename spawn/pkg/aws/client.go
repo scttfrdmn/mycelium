@@ -969,3 +969,134 @@ func (c *Client) getRegionalConfig(ctx context.Context, region string) (aws.Conf
 	cfg.Region = region
 	return cfg, nil
 }
+
+// CreateOrGetMPISecurityGroup creates or gets a security group configured for MPI clusters
+// The security group allows all TCP traffic from instances in the same security group
+func (c *Client) CreateOrGetMPISecurityGroup(ctx context.Context, region, vpcID, groupName string) (string, error) {
+	cfg := c.cfg.Copy()
+	cfg.Region = region
+	ec2Client := ec2.NewFromConfig(cfg)
+
+	// Try to find existing security group
+	describeResult, err := ec2Client.DescribeSecurityGroups(ctx, &ec2.DescribeSecurityGroupsInput{
+		Filters: []types.Filter{
+			{
+				Name:   aws.String("group-name"),
+				Values: []string{groupName},
+			},
+			{
+				Name:   aws.String("vpc-id"),
+				Values: []string{vpcID},
+			},
+		},
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to describe security groups: %w", err)
+	}
+
+	// If security group exists, return it
+	if len(describeResult.SecurityGroups) > 0 {
+		return *describeResult.SecurityGroups[0].GroupId, nil
+	}
+
+	// Create new security group
+	createResult, err := ec2Client.CreateSecurityGroup(ctx, &ec2.CreateSecurityGroupInput{
+		GroupName:   aws.String(groupName),
+		Description: aws.String("Security group for MPI cluster inter-node communication"),
+		VpcId:       aws.String(vpcID),
+		TagSpecifications: []types.TagSpecification{
+			{
+				ResourceType: types.ResourceTypeSecurityGroup,
+				Tags: []types.Tag{
+					{
+						Key:   aws.String("Name"),
+						Value: aws.String(groupName),
+					},
+					{
+						Key:   aws.String("spawn:managed"),
+						Value: aws.String("true"),
+					},
+					{
+						Key:   aws.String("spawn:purpose"),
+						Value: aws.String("mpi-cluster"),
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to create security group: %w", err)
+	}
+
+	sgID := *createResult.GroupId
+
+	// Add ingress rule: allow all TCP from same security group
+	_, err = ec2Client.AuthorizeSecurityGroupIngress(ctx, &ec2.AuthorizeSecurityGroupIngressInput{
+		GroupId: aws.String(sgID),
+		IpPermissions: []types.IpPermission{
+			{
+				IpProtocol: aws.String("tcp"),
+				FromPort:   aws.Int32(0),
+				ToPort:     aws.Int32(65535),
+				UserIdGroupPairs: []types.UserIdGroupPair{
+					{
+						GroupId:     aws.String(sgID),
+						Description: aws.String("Allow all TCP from MPI cluster nodes"),
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to authorize security group ingress: %w", err)
+	}
+
+	// Add ingress rule: allow SSH from anywhere (for user access)
+	_, err = ec2Client.AuthorizeSecurityGroupIngress(ctx, &ec2.AuthorizeSecurityGroupIngressInput{
+		GroupId: aws.String(sgID),
+		IpPermissions: []types.IpPermission{
+			{
+				IpProtocol: aws.String("tcp"),
+				FromPort:   aws.Int32(22),
+				ToPort:     aws.Int32(22),
+				IpRanges: []types.IpRange{
+					{
+						CidrIp:      aws.String("0.0.0.0/0"),
+						Description: aws.String("SSH access"),
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		// Non-fatal if SSH rule fails (might already exist from default)
+		fmt.Printf("Warning: failed to add SSH rule: %v\n", err)
+	}
+
+	return sgID, nil
+}
+
+// GetDefaultVPC returns the default VPC ID for the region
+func (c *Client) GetDefaultVPC(ctx context.Context, region string) (string, error) {
+	cfg := c.cfg.Copy()
+	cfg.Region = region
+	ec2Client := ec2.NewFromConfig(cfg)
+
+	result, err := ec2Client.DescribeVpcs(ctx, &ec2.DescribeVpcsInput{
+		Filters: []types.Filter{
+			{
+				Name:   aws.String("is-default"),
+				Values: []string{"true"},
+			},
+		},
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to describe VPCs: %w", err)
+	}
+
+	if len(result.Vpcs) == 0 {
+		return "", fmt.Errorf("no default VPC found in region %s", region)
+	}
+
+	return *result.Vpcs[0].VpcId, nil
+}

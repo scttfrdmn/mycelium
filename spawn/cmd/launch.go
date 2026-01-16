@@ -778,8 +778,30 @@ func launchWithProgress(ctx context.Context, awsClient *aws.Client, config *aws.
 	prog.Complete("Setting up IAM role")
 	time.Sleep(300 * time.Millisecond)
 
-	// Step 4: Security group (simplified for now)
-	prog.Skip("Creating security group")
+	// Step 4: Security group (create for MPI if needed)
+	if mpiEnabled {
+		prog.Start("Creating MPI security group")
+		// Get default VPC
+		vpcID, err := awsClient.GetDefaultVPC(ctx, config.Region)
+		if err != nil {
+			prog.Error("Creating MPI security group", err)
+			return fmt.Errorf("failed to get default VPC: %w", err)
+		}
+
+		// Create or get MPI security group
+		sgName := fmt.Sprintf("spawn-mpi-%s", jobArrayName)
+		sgID, err := awsClient.CreateOrGetMPISecurityGroup(ctx, config.Region, vpcID, sgName)
+		if err != nil {
+			prog.Error("Creating MPI security group", err)
+			return fmt.Errorf("failed to create MPI security group: %w", err)
+		}
+
+		config.SecurityGroupIDs = []string{sgID}
+		prog.Complete("Creating MPI security group")
+		time.Sleep(300 * time.Millisecond)
+	} else {
+		prog.Skip("Creating security group")
+	}
 
 	// Step 5: Build user data
 	userDataScript, err := buildUserData(plat, config)

@@ -38,7 +38,6 @@ cat >> /etc/profile.d/mpi.sh <<'EOF'
 export PATH=/usr/lib64/openmpi/bin:$PATH
 export LD_LIBRARY_PATH=/usr/lib64/openmpi/lib:$LD_LIBRARY_PATH
 export OMPI_MCA_plm_rsh_agent=ssh
-export OMPI_MCA_btl_tcp_if_include=eth0
 export OMPI_ALLOW_RUN_AS_ROOT=1
 export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
 EOF
@@ -68,6 +67,6 @@ while [ ! -f /etc/spawn/job-array-peers.json ]; do sleep 2; done
 jq -r ".[] | \"\(.ip) slots=$SLOTS\"" /etc/spawn/job-array-peers.json > /tmp/mpi-hostfile
 if [ "{{.JobArrayIndex}}" -eq 0 ]; then
   sleep 10
-  {{if .MPICommand}}mpirun --mca orte_base_help_aggregate 0 --mca btl_tcp_if_include eth0 --mca oob_tcp_if_include eth0 -np $(({{.JobArraySize}} * SLOTS)) -hostfile /tmp/mpi-hostfile {{.MPICommand}}{{end}}
+  {{if .MPICommand}}mpirun --mca orte_base_help_aggregate 0 -np $(({{.JobArraySize}} * SLOTS)) -hostfile /tmp/mpi-hostfile {{.MPICommand}}{{end}}
 fi
 `
