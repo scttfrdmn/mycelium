@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - MPI (Message Passing Interface) support for distributed computing (Issue #28)
+  - `spawn launch --mpi` flag to enable MPI cluster setup
+  - `--mpi-processes-per-node` flag to control MPI process slots (defaults to vCPU count)
+  - `--mpi-command` flag to specify command to run via mpirun
+  - Automatic OpenMPI installation on all cluster nodes
+  - Passwordless SSH setup between nodes using S3 for key distribution
+  - MPI hostfile generation from peer discovery
+  - Leader/worker coordination (index 0 runs mpirun)
+  - S3 lifecycle policy for automatic MPI SSH key cleanup (1 day expiration)
+  - Works seamlessly with existing job array infrastructure
+- Future considerations documented in issues:
+  - Issue #29: Shared storage support (FSx Lustre, EFS, FSx ONTAP)
+  - Issue #30: MPI compatibility with AMI creation workflow
 
 ## [0.5.0] - 2026-01-16
 

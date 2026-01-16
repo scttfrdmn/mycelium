@@ -25,6 +25,7 @@ import (
 	"github.com/scttfrdmn/mycelium/spawn/pkg/platform"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/progress"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/sweep"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/userdata"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/wizard"
 )
 
@@ -70,6 +71,11 @@ var (
 	jobArrayName     string
 	instanceNames    string
 	command          string
+
+	// MPI
+	mpiEnabled          bool
+	mpiProcessesPerNode int
+	mpiCommand          string
 
 	// Parameter sweep
 	paramFile        string
@@ -148,6 +154,11 @@ func init() {
 	launchCmd.Flags().StringVar(&jobArrayName, "job-array-name", "", "Job array group name (required if --count > 1)")
 	launchCmd.Flags().StringVar(&instanceNames, "instance-names", "", "Instance name template (e.g., 'worker-{index}', default: '{job-array-name}-{index}')")
 	launchCmd.Flags().StringVar(&command, "command", "", "Command to run on all instances (executed after spored setup)")
+
+	// MPI
+	launchCmd.Flags().BoolVar(&mpiEnabled, "mpi", false, "Enable MPI cluster setup (requires --count > 1)")
+	launchCmd.Flags().IntVar(&mpiProcessesPerNode, "mpi-processes-per-node", 0, "MPI processes per node (default: vCPU count)")
+	launchCmd.Flags().StringVar(&mpiCommand, "mpi-command", "", "Command to run via mpirun (alternative to --command)")
 
 	// Parameter sweep
 	launchCmd.Flags().StringVar(&paramFile, "param-file", "", "Path to parameter sweep file (JSON/YAML/CSV)")
@@ -776,6 +787,25 @@ func launchWithProgress(ctx context.Context, awsClient *aws.Client, config *aws.
 		return fmt.Errorf("failed to build user data: %w", err)
 	}
 	config.UserData = base64.StdEncoding.EncodeToString([]byte(userDataScript))
+
+	// Validate MPI requirements
+	if mpiEnabled {
+		if count <= 1 {
+			return fmt.Errorf("--mpi requires --count > 1 (need multiple nodes)")
+		}
+		if jobArrayName == "" {
+			return fmt.Errorf("--mpi requires --job-array-name")
+		}
+
+		// Add MPI tags to config
+		if config.Tags == nil {
+			config.Tags = make(map[string]string)
+		}
+		config.Tags["spawn:mpi-enabled"] = "true"
+		if mpiProcessesPerNode > 0 {
+			config.Tags["spawn:mpi-processes-per-node"] = fmt.Sprintf("%d", mpiProcessesPerNode)
+		}
+	}
 
 	// Check if job array mode (count > 1)
 	if count > 1 {
@@ -1664,6 +1694,44 @@ func launchJobArray(ctx context.Context, awsClient *aws.Client, baseConfig *aws.
 			// Set DNS name with index suffix if DNS is enabled
 			if baseConfig.DNSName != "" {
 				instanceConfig.DNSName = fmt.Sprintf("%s-%d", baseConfig.DNSName, index)
+			}
+
+			// Append MPI user-data if MPI is enabled
+			if mpiEnabled {
+				// Decode base user-data
+				baseUserDataBytes, err := base64.StdEncoding.DecodeString(instanceConfig.UserData)
+				if err != nil {
+					results <- launchResult{
+						index: index,
+						err:   fmt.Errorf("failed to decode base user-data: %w", err),
+					}
+					return
+				}
+
+				// Generate MPI user-data for this instance
+				mpiConfig := userdata.MPIConfig{
+					Region:              baseConfig.Region,
+					JobArrayID:          jobArrayID,
+					JobArrayIndex:       index,
+					JobArraySize:        count,
+					MPIProcessesPerNode: mpiProcessesPerNode,
+					MPICommand:          mpiCommand,
+				}
+
+				mpiScript, err := userdata.GenerateMPIUserData(mpiConfig)
+				if err != nil {
+					results <- launchResult{
+						index: index,
+						err:   fmt.Errorf("failed to generate MPI user-data: %w", err),
+					}
+					return
+				}
+
+				// Combine base user-data + MPI script
+				combinedUserData := string(baseUserDataBytes) + "\n" + mpiScript
+
+				// Re-encode
+				instanceConfig.UserData = base64.StdEncoding.EncodeToString([]byte(combinedUserData))
 			}
 
 			// Launch the instance
