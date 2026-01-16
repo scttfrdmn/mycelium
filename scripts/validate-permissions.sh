@@ -4,7 +4,7 @@ set -e
 # Validate AWS IAM permissions for spawn
 # Usage: ./validate-permissions.sh [aws-profile]
 
-PROFILE=${1:-default}
+PROFILE=${1:-mycelium-infra}
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  Validating AWS IAM Permissions for spawn"

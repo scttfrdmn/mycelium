@@ -1,0 +1,149 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+)
+
+// handler is the main Lambda handler
+func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+	// Load AWS config
+	cfg, err := config.LoadDefaultConfig(ctx)
+	if err != nil {
+		return errorResponse(500, "Failed to load AWS config"), nil
+	}
+
+	// Extract path and method
+	path := request.Path
+	method := request.HTTPMethod
+
+	// Handle OPTIONS for CORS preflight
+	if method == "OPTIONS" {
+		return events.APIGatewayProxyResponse{
+			StatusCode: 200,
+			Headers:    corsHeaders,
+			Body:       "",
+		}, nil
+	}
+
+	// Extract user identity and account info
+	userID, accountID, accountBase36, err := getUserFromRequest(ctx, cfg, request)
+	if err != nil {
+		return errorResponse(401, fmt.Sprintf("Authentication failed: %v", err)), nil
+	}
+
+	// Route to appropriate handler
+	switch {
+	case path == "/api/instances" && method == "GET":
+		return handleListInstances(ctx, cfg, accountBase36, userID)
+
+	case path == "/api/instances/" && method == "GET":
+		// Extract instance ID from path
+		instanceID := request.PathParameters["id"]
+		if instanceID == "" {
+			return errorResponse(400, "Instance ID is required"), nil
+		}
+		return handleGetInstance(ctx, cfg, instanceID, accountBase36, userID)
+
+	case path == "/api/user/profile" && method == "GET":
+		return handleGetUserProfile(ctx, cfg, userID, accountID, accountBase36)
+
+	default:
+		return errorResponse(404, "Endpoint not found"), nil
+	}
+}
+
+// handleListInstances handles GET /api/instances
+func handleListInstances(ctx context.Context, cfg aws.Config, accountBase36 string, userID string) (events.APIGatewayProxyResponse, error) {
+	startTime := time.Now()
+
+	// Query all regions in parallel (filtered by IAM user for per-user isolation)
+	instances, err := listInstances(ctx, cfg, accountBase36, userID)
+	if err != nil {
+		return errorResponse(500, fmt.Sprintf("Failed to list instances: %v", err)), nil
+	}
+
+	elapsed := time.Since(startTime)
+	fmt.Printf("Listed %d instances across %d regions in %v\n", len(instances), len(awsRegions), elapsed)
+
+	// Build response
+	response := APIResponse{
+		Success:        true,
+		AccountBase36:  accountBase36,
+		RegionsQueried: awsRegions,
+		TotalInstances: len(instances),
+		Instances:      instances,
+	}
+
+	return successResponse(response)
+}
+
+// handleGetInstance handles GET /api/instances/{id}
+func handleGetInstance(ctx context.Context, cfg aws.Config, instanceID, accountBase36, userID string) (events.APIGatewayProxyResponse, error) {
+	// Get single instance (with per-user isolation check)
+	instance, err := getInstance(ctx, cfg, instanceID, accountBase36, userID)
+	if err != nil {
+		return errorResponse(404, fmt.Sprintf("Instance not found: %v", err)), nil
+	}
+
+	// Build response
+	response := APIResponse{
+		Success:       true,
+		AccountBase36: accountBase36,
+		Instance:      instance,
+	}
+
+	return successResponse(response)
+}
+
+// handleGetUserProfile handles GET /api/user/profile
+func handleGetUserProfile(ctx context.Context, cfg aws.Config, userID, accountID, accountBase36 string) (events.APIGatewayProxyResponse, error) {
+	// Get user profile from DynamoDB
+	cached, err := getUserAccount(ctx, cfg, userID)
+	if err != nil {
+		return errorResponse(500, fmt.Sprintf("Failed to get user profile: %v", err)), nil
+	}
+
+	var profile UserProfile
+	if cached != nil {
+		createdAt, _ := time.Parse(time.RFC3339, cached.CreatedAt)
+		lastAccess, _ := time.Parse(time.RFC3339, cached.LastAccess)
+
+		profile = UserProfile{
+			UserID:        cached.UserID,
+			AWSAccountID:  cached.AWSAccountID,
+			AccountBase36: cached.AccountBase36,
+			Email:         cached.Email,
+			CreatedAt:     createdAt,
+			LastAccess:    lastAccess,
+		}
+	} else {
+		// No cache entry, return detected info
+		profile = UserProfile{
+			UserID:        userID,
+			AWSAccountID:  accountID,
+			AccountBase36: accountBase36,
+			CreatedAt:     time.Now(),
+			LastAccess:    time.Now(),
+		}
+	}
+
+	// Build response
+	response := APIResponse{
+		Success: true,
+		User:    &profile,
+	}
+
+	return successResponse(response)
+}
+
+// main is the entry point for the Lambda function
+func main() {
+	lambda.Start(handler)
+}

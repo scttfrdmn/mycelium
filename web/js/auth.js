@@ -28,8 +28,11 @@ const AUTH_CONFIG = {
             clientId: 'Ov23liOPNcrWFpDvtWrX',
             authEndpoint: 'https://github.com/login/oauth/authorize',
             scope: 'read:user user:email',
-            cognitoKey: null, // GitHub OAuth 2.0 (not OIDC) - requires backend Lambda
-            disabled: true // Coming soon - requires additional backend infrastructure
+            responseType: 'code', // GitHub uses authorization code flow
+            useCustomCallback: true, // Redirect to Lambda, not frontend
+            customCallbackUrl: 'https://1yr1kjdm5j.execute-api.us-east-1.amazonaws.com/github/callback',
+            cognitoKey: 'api.spore.host', // Custom OIDC provider (Lambda bridge)
+            disabled: false
         }
     }
 };
@@ -48,6 +51,28 @@ class AuthManager {
         const hash = window.location.hash.substring(1);
         const params = new URLSearchParams(hash);
 
+        console.log('Auth init - hash:', hash);
+        console.log('Auth init - has github_auth:', params.has('github_auth'));
+        console.log('Auth init - has id_token:', params.has('id_token'));
+        console.log('Auth init - has error:', params.has('error'));
+
+        // Check for OAuth errors
+        if (params.has('error')) {
+            const error = params.get('error');
+            const errorDesc = params.get('error_description') || 'Authentication failed';
+            console.error('OAuth error:', error, errorDesc);
+            throw new Error(`${error}: ${errorDesc}`);
+        }
+
+        // Handle GitHub OAuth (custom flow with direct credentials)
+        if (params.has('github_auth')) {
+            console.log('Handling GitHub callback');
+            await this.handleGitHubCallback(params);
+            window.history.replaceState({}, document.title, window.location.pathname);
+            return true;
+        }
+
+        // Handle standard OIDC callback (Google, Globus)
         if (params.has('id_token')) {
             await this.handleOAuthCallback(params);
             window.history.replaceState({}, document.title, window.location.pathname);
@@ -86,7 +111,10 @@ class AuthManager {
         }
 
         // Build OAuth authorization URL
-        const redirectUri = window.location.origin + '/callback';
+        // GitHub uses custom callback (Lambda bridge), others use frontend callback
+        const redirectUri = config.useCustomCallback
+            ? config.customCallbackUrl
+            : window.location.origin;
         const state = this.generateState(provider);
 
         const params = new URLSearchParams({
@@ -144,6 +172,59 @@ class AuthManager {
         sessionStorage.removeItem('oauth_provider');
 
         console.log('Logged in as:', this.currentUser.email);
+    }
+
+    // Handle GitHub OAuth callback (direct credentials)
+    async handleGitHubCallback(params) {
+        try {
+            console.log('Processing GitHub OAuth callback...');
+
+            // Decode the base64-encoded auth data
+            const authDataB64 = params.get('github_auth');
+            console.log('GitHub auth data received:', authDataB64 ? 'yes' : 'no');
+
+            if (!authDataB64) {
+                throw new Error('No github_auth parameter in callback');
+            }
+
+            const authDataJson = atob(authDataB64.replace(/-/g, '+').replace(/_/g, '/'));
+            const authData = JSON.parse(authDataJson);
+            console.log('Decoded auth data:', authData);
+
+            // Verify state
+            const storedState = sessionStorage.getItem('oauth_state');
+            if (storedState !== authData.state) {
+                throw new Error('OAuth state mismatch - possible CSRF attack');
+            }
+
+            // Set current user
+            this.currentUser = {
+                provider: 'github',
+                id: authData.user.id,
+                email: authData.user.email,
+                name: authData.user.name,
+                picture: authData.user.picture
+            };
+
+            // Set credentials (already from STS AssumeRole)
+            this.credentials = authData.credentials;
+
+            // Configure AWS SDK
+            await this.configureAWS();
+
+            // Save to storage
+            this.saveToStorage();
+
+            // Clean up
+            sessionStorage.removeItem('oauth_state');
+            sessionStorage.removeItem('oauth_provider');
+
+            console.log('Logged in as:', this.currentUser.email, '(via GitHub)');
+
+        } catch (error) {
+            console.error('Failed to process GitHub auth:', error);
+            throw new Error(`GitHub authentication failed: ${error.message}`);
+        }
     }
 
     // Exchange OIDC token for AWS credentials
@@ -224,6 +305,11 @@ class AuthManager {
 
     // Logout
     logout() {
+        // Stop auto-refresh
+        if (typeof stopAutoRefresh === 'function') {
+            stopAutoRefresh();
+        }
+
         this.currentUser = null;
         this.credentials = null;
         localStorage.removeItem('spawn_auth');
@@ -312,7 +398,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (authenticated) {
             // User is logged in
             showDashboard();
-            loadDashboard(); // From main.js
+            await loadDashboard(); // From main.js
+            updateLastRefreshedTime(); // From main.js
+            startAutoRefresh(); // From main.js
         } else {
             // Show login page
             showLoginPage();
@@ -353,8 +441,12 @@ function showDashboard() {
     if (user) {
         const userDisplay = document.getElementById('user-display');
         if (userDisplay) {
+            const providerName = user.provider === 'github' ? 'GitHub' :
+                                 user.provider === 'google' ? 'Google' :
+                                 user.provider === 'globus' ? 'Globus Auth' :
+                                 user.provider;
             userDisplay.innerHTML = `
-                <span>Logged in as <strong>${escapeHtml(user.email)}</strong> via ${user.provider}</span>
+                <span>Logged in as <strong>${escapeHtml(user.email)}</strong> via ${providerName}</span>
                 <button onclick="authManager.logout()" class="btn-logout">Logout</button>
             `;
         }

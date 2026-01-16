@@ -3,25 +3,66 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spore - The Underground Network for AWS Compute</title>
-    <meta name="description" content="Launch ephemeral AWS EC2 instances effortlessly. Powered by Mycelium - making cloud compute accessible to everyone.">
+    <title>Mycelium - Launch Ephemeral AWS EC2 Instances</title>
+    <meta name="description" content="Free, open-source CLI tools for launching ephemeral AWS EC2 instances with automatic termination, cost control, and hibernation support.">
     <link rel="stylesheet" href="css/style.css">
     <link rel="icon" type="image/png" href="assets/favicon.png">
     <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1564.0.min.js"></script>
 </head>
 <body>
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <span class="nav-logo">🍄</span>
+                <span class="nav-title">spore.host</span>
+            </div>
+            <div class="nav-links">
+                <a href="#install">Install</a>
+                <a href="#examples">Examples</a>
+                <a href="#dashboard" onclick="scrollToDashboard(event)">Dashboard</a>
+                <a href="https://github.com/scttfrdmn/mycelium" target="_blank">GitHub</a>
+                <button id="theme-toggle" onclick="toggleTheme()" style="background: none; border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem 0.75rem; cursor: pointer; color: var(--text-primary); font-size: 1.2rem; transition: all 0.3s ease;" title="Toggle theme">
+                    <span id="theme-icon">🌙</span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
     <div class="container">
+        <!-- Welcome Banner for First-Time Visitors -->
+        <div id="welcome-banner" style="display: none; margin: 2rem 0; padding: 1.5rem; background: linear-gradient(135deg, rgba(79, 195, 247, 0.1), rgba(102, 187, 106, 0.1)); border: 1px solid var(--accent-blue); border-radius: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: start;">
+                <div style="flex: 1;">
+                    <h3 style="color: var(--accent-blue); margin-bottom: 0.5rem;">👋 Welcome to Mycelium!</h3>
+                    <p style="color: var(--text-secondary); margin-bottom: 1rem; line-height: 1.6;">
+                        Launch and manage <strong>ephemeral AWS EC2 instances</strong> with automatic termination (TTL), cost control, and hibernation support. Perfect for dev/test workloads.
+                    </p>
+                    <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                        <span style="padding: 0.5rem 1rem; background: rgba(79, 195, 247, 0.15); border-radius: 6px; font-size: 0.9rem;">✅ Free & Open Source</span>
+                        <span style="padding: 0.5rem 1rem; background: rgba(79, 195, 247, 0.15); border-radius: 6px; font-size: 0.9rem;">⚡ 2-Minute Setup</span>
+                        <span style="padding: 0.5rem 1rem; background: rgba(79, 195, 247, 0.15); border-radius: 6px; font-size: 0.9rem;">💰 ~$0.01/hr Instances</span>
+                    </div>
+                </div>
+                <button onclick="dismissWelcomeBanner()" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.5rem; padding: 0 0.5rem; transition: color 0.2s;" onmouseover="this.style.color='var(--text-primary)'" onmouseout="this.style.color='var(--text-muted)'" title="Dismiss">×</button>
+            </div>
+        </div>
+
         <!-- Hero Section -->
         <header class="hero">
             <div class="logo-container">
                 <img src="assets/logo-light.png" alt="Mycelium Logo" class="logo logo-light">
                 <img src="assets/logo-dark.png" alt="Mycelium Logo" class="logo logo-dark">
             </div>
-            <h1 class="glow">spore.host</h1>
-            <p class="tagline">The underground network for AWS compute</p>
+            <h1 class="glow">Mycelium</h1>
+            <p class="tagline">Launch <span data-tooltip="Temporary instances that terminate automatically">ephemeral</span> AWS EC2 instances in 2 minutes</p>
+            <p class="hero-subtitle">Free, open-source CLI tools for developers who value simplicity and cost control</p>
             <div class="hero-buttons">
-                <a href="#install" class="btn btn-primary">Get Started</a>
+                <a href="#install" class="btn btn-primary">Install CLI</a>
                 <a href="https://github.com/scttfrdmn/mycelium" class="btn btn-secondary" target="_blank">View on GitHub</a>
+            </div>
+            <div class="hero-note">
+                <p>✅ <strong>100% Free & Open Source</strong> • You only pay AWS for compute time (~$0.01/hr for small instances)</p>
             </div>
         </header>
 
@@ -37,13 +78,13 @@
                 <div class="icon">🚀</div>
                 <h3>Spawn</h3>
                 <p>Launch instances in 2 minutes with interactive wizard or CLI</p>
-                <span class="badge">Auto-termination</span>
+                <span class="badge" data-tooltip="Instances terminate automatically when TTL expires">Auto-termination</span>
             </div>
             <div class="feature-card">
                 <div class="icon">🤖</div>
                 <h3>Spored</h3>
-                <p>Monitor automatically with TTL, idle detection, and hibernation</p>
-                <span class="badge">Laptop-independent</span>
+                <p>Monitor automatically with <span data-tooltip="Time-To-Live: instances automatically terminate after this duration">TTL</span>, idle detection, and hibernation</p>
+                <span class="badge" data-tooltip="Runs on the instance itself, not your local machine">Laptop-independent</span>
             </div>
         </section>
 
@@ -87,7 +128,7 @@ tar -xzf spawn_*_$(uname -s)_$(uname -m).tar.gz
 
         <!-- Key Features -->
         <section class="key-features">
-            <h2>Why Spore?</h2>
+            <h2>Why Mycelium?</h2>
             <div class="features-grid">
                 <div class="feature-item">
                     <span class="check">✓</span>
@@ -95,7 +136,7 @@ tar -xzf spawn_*_$(uname -s)_$(uname -m).tar.gz
                 </div>
                 <div class="feature-item">
                     <span class="check">✓</span>
-                    <strong>No Surprise Bills</strong> - Auto-termination with TTL
+                    <strong>No Surprise Bills</strong> - Auto-termination with <span data-tooltip="Time-To-Live: instances automatically terminate after this duration">TTL</span>
                 </div>
                 <div class="feature-item">
                     <span class="check">✓</span>
@@ -107,12 +148,38 @@ tar -xzf spawn_*_$(uname -s)_$(uname -m).tar.gz
                 </div>
                 <div class="feature-item">
                     <span class="check">✓</span>
-                    <strong>Hibernation</strong> - Save 99% costs when idle
+                    <strong><span data-tooltip="Pause instance to disk and stop billing for compute, resume later">Hibernation</span></strong> - Save 99% costs when idle
                 </div>
                 <div class="feature-item">
                     <span class="check">✓</span>
                     <strong>Multilingual</strong> - 6 languages supported
                 </div>
+            </div>
+        </section>
+
+        <!-- Dashboard Intro -->
+        <section class="dashboard-intro">
+            <h2>📊 Also Available: Web Dashboard</h2>
+            <p class="section-subtitle">Prefer a GUI? Monitor your instances from any browser</p>
+            <div class="dashboard-features">
+                <div class="dashboard-feature">
+                    <span class="feature-icon">📡</span>
+                    <h4>Real-Time Monitoring</h4>
+                    <p>View all your instances across regions</p>
+                </div>
+                <div class="dashboard-feature">
+                    <span class="feature-icon">⏱️</span>
+                    <h4>TTL Tracking</h4>
+                    <p>See exactly when instances will terminate</p>
+                </div>
+                <div class="dashboard-feature">
+                    <span class="feature-icon">🔐</span>
+                    <h4>Secure OAuth</h4>
+                    <p>Sign in with Google, GitHub, or Globus</p>
+                </div>
+            </div>
+            <div style="text-align: center; margin-top: 2rem;">
+                <button onclick="scrollToDashboard(event)" class="btn btn-primary">Open Dashboard</button>
             </div>
         </section>
 
@@ -140,11 +207,11 @@ tar -xzf spawn_*_$(uname -s)_$(uname -m).tar.gz
                     </div>
                 </button>
 
-                <button onclick="authManager.login('github')" class="login-btn login-btn-github" style="opacity: 0.6; cursor: help;">
+                <button onclick="authManager.login('github')" class="login-btn login-btn-github">
                     <span class="login-icon">⚫</span>
                     <div class="login-text">
-                        <strong>Sign in with GitHub <span style="font-size: 0.75rem; color: var(--accent-blue);">• Coming Soon</span></strong>
-                        <small>Requires backend infrastructure</small>
+                        <strong>Sign in with GitHub</strong>
+                        <small>Use your GitHub account</small>
                     </div>
                 </button>
             </div>
@@ -163,11 +230,42 @@ tar -xzf spawn_*_$(uname -s)_$(uname -m).tar.gz
         <!-- Web Dashboard -->
         <section id="dashboard" class="dashboard" style="display: none;">
             <div id="user-display" class="user-display"></div>
-            <h2>📊 Your Instances</h2>
-            <p class="dashboard-subtitle">View and monitor your spawn-managed EC2 instances across all regions</p>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <h2 style="margin: 0;">🍄 Your Spores</h2>
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <span id="last-updated" style="font-size: 0.85rem; color: var(--text-muted);"></span>
+                    <button onclick="refreshDashboard()" id="refresh-btn" class="btn-refresh" style="padding: 0.5rem 1rem; background: var(--accent-blue); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem; transition: opacity 0.2s; min-width: 130px;">
+                        🔄 Refresh
+                    </button>
+                </div>
+            </div>
+            <p class="dashboard-subtitle">View and monitor your spawned instances across all regions</p>
+
+            <!-- Table Controls -->
+            <div class="table-controls" style="margin-bottom: 1rem; padding: 1rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;">
+                <div style="display: grid; grid-template-columns: 1fr auto auto auto; gap: 1rem; align-items: center;">
+                    <input type="text" id="search-input" placeholder="🔍 Search by name, ID, or tag..." style="padding: 0.6rem 1rem; background: var(--bg-dark); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.9rem;" oninput="applyTableFilters()">
+
+                    <select id="state-filter" style="padding: 0.6rem 1rem; background: var(--bg-dark); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.9rem; cursor: pointer;" onchange="applyTableFilters()">
+                        <option value="">All States</option>
+                        <option value="running">Running</option>
+                        <option value="pending">Pending</option>
+                        <option value="stopped">Stopped</option>
+                        <option value="terminated">Terminated</option>
+                    </select>
+
+                    <select id="region-filter" style="padding: 0.6rem 1rem; background: var(--bg-dark); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.9rem; cursor: pointer;" onchange="applyTableFilters()">
+                        <option value="">All Regions</option>
+                    </select>
+
+                    <button onclick="clearTableFilters()" style="padding: 0.6rem 1rem; background: var(--bg-dark); border: 1px solid var(--border); border-radius: 6px; color: var(--text-secondary); font-size: 0.9rem; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='var(--accent-blue)'" onmouseout="this.style.borderColor='var(--border)'">
+                        Clear Filters
+                    </button>
+                </div>
+            </div>
 
             <div id="dashboard-loading" style="display: none; text-align: center; padding: 2rem; color: var(--text-muted);">
-                Loading instances...
+                Loading spores...
             </div>
 
             <div id="dashboard-error" style="display: none; padding: 1rem; margin: 1rem 0; background: rgba(255, 100, 100, 0.1); border: 1px solid rgba(255, 100, 100, 0.3); border-radius: 8px; color: var(--accent-red);"></div>
@@ -176,19 +274,19 @@ tar -xzf spawn_*_$(uname -s)_$(uname -m).tar.gz
                 <table class="instances-table">
                     <thead>
                         <tr>
-                            <th>Name</th>
-                            <th>Type</th>
-                            <th>State</th>
-                            <th>Region</th>
-                            <th>Public IP</th>
-                            <th>DNS Name</th>
-                            <th>Age</th>
+                            <th onclick="sortTable('name')" style="cursor: pointer; user-select: none;">Name <span id="sort-name" style="color: var(--text-muted); font-size: 0.8rem;"></span></th>
+                            <th onclick="sortTable('type')" style="cursor: pointer; user-select: none;">Type <span id="sort-type" style="color: var(--text-muted); font-size: 0.8rem;"></span></th>
+                            <th onclick="sortTable('state')" style="cursor: pointer; user-select: none;">State <span id="sort-state" style="color: var(--text-muted); font-size: 0.8rem;"></span></th>
+                            <th onclick="sortTable('region')" style="cursor: pointer; user-select: none;">Region <span id="sort-region" style="color: var(--text-muted); font-size: 0.8rem;"></span></th>
+                            <th onclick="sortTable('ip')" style="cursor: pointer; user-select: none;">Public IP <span id="sort-ip" style="color: var(--text-muted); font-size: 0.8rem;"></span></th>
+                            <th onclick="sortTable('dns')" style="cursor: pointer; user-select: none;">DNS Name <span id="sort-dns" style="color: var(--text-muted); font-size: 0.8rem;"></span></th>
+                            <th onclick="sortTable('ttl')" style="cursor: pointer; user-select: none;">TTL <span id="sort-ttl" style="color: var(--text-muted); font-size: 0.8rem;"></span></th>
                         </tr>
                     </thead>
                     <tbody id="instances-tbody">
                         <tr>
                             <td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-muted);">
-                                Loading instances...
+                                Loading spores...
                             </td>
                         </tr>
                     </tbody>
@@ -197,40 +295,17 @@ tar -xzf spawn_*_$(uname -s)_$(uname -m).tar.gz
 
             <div style="margin-top: 1.5rem; padding: 1rem; background: rgba(100, 150, 255, 0.05); border: 1px solid rgba(100, 150, 255, 0.2); border-radius: 8px;">
                 <p style="margin: 0; color: var(--text-muted); font-size: 0.9rem;">
-                    <strong>💡 Tip:</strong> Instances refresh automatically. Launch instances with <code>spawn launch</code> and they'll appear here within 30 seconds.
+                    <strong>💡 Tip:</strong> Spores refresh automatically. Launch with <code>spawn launch</code> and they'll appear here within 30 seconds.
                 </p>
             </div>
         </section>
 
-        <!-- Coming Soon Features -->
-        <section class="coming-soon">
-            <h2>🚧 Coming Soon</h2>
-            <div class="dashboard-preview">
-                <div class="preview-card">
-                    <h4>⚡ Instance Control</h4>
-                    <p>Start, stop, and terminate instances from the dashboard</p>
-                </div>
-                <div class="preview-card">
-                    <h4>💻 Web SSH</h4>
-                    <p>Connect to instances directly from your browser</p>
-                </div>
-                <div class="preview-card">
-                    <h4>📈 Real-Time Monitoring</h4>
-                    <p>CPU, network, disk I/O, and GPU utilization</p>
-                </div>
-                <div class="preview-card">
-                    <h4>🎮 Remote Desktop</h4>
-                    <p>NICE DCV integration for graphical workloads</p>
-                </div>
-            </div>
-        </section>
-
         <!-- Examples -->
-        <section class="examples">
+        <section id="examples" class="examples">
             <h2>Common Use Cases</h2>
             <div class="example">
                 <h4>💰 Cheapest Dev Box</h4>
-                <pre><code>truffle spot "t3.*" --sort-by-price --pick-first | spawn --ttl 8h
+                <pre><code>truffle <span data-tooltip="Spare EC2 capacity at up to 90% discount, may be interrupted">spot</span> "t3.*" --sort-by-price --pick-first | spawn --ttl 8h
 # Cost: ~$0.01/hr • Auto-terminates after 8h</code></pre>
             </div>
             <div class="example">
@@ -248,11 +323,24 @@ spawn --lang fr    # French</code></pre>
 
         <!-- Footer -->
         <footer>
+            <div class="footer-roadmap">
+                <h3>🚧 Roadmap</h3>
+                <p class="footer-roadmap-subtitle">Future dashboard features under development:</p>
+                <div class="roadmap-items">
+                    <span class="roadmap-item">⚡ Instance Control</span>
+                    <span class="roadmap-item">💻 Web SSH</span>
+                    <span class="roadmap-item">📈 Real-Time Metrics</span>
+                    <span class="roadmap-item">🎮 Remote Desktop (DCV)</span>
+                </div>
+            </div>
+
             <div class="footer-links">
                 <a href="https://github.com/scttfrdmn/mycelium">GitHub</a>
                 <a href="https://github.com/scttfrdmn/mycelium/releases">Releases</a>
                 <a href="https://github.com/scttfrdmn/mycelium/blob/main/README.md">Documentation</a>
                 <a href="https://github.com/scttfrdmn/mycelium/issues">Issues</a>
+                <a href="/privacy.html">Privacy</a>
+                <a href="/terms.html">Terms</a>
             </div>
             <p class="footer-text">
                 Made with 🍄 by <a href="https://github.com/scttfrdmn">@scttfrdmn</a>
@@ -262,7 +350,99 @@ spawn --lang fr    # French</code></pre>
         </footer>
     </div>
 
-    <script src="js/auth.js"></script>
-    <script src="js/main.js"></script>
+    <script src="js/auth.js?v=2"></script>
+    <script src="js/main.js?v=2"></script>
+    <script>
+    function scrollToDashboard(event) {
+        event.preventDefault();
+        const dashboardSection = document.getElementById('dashboard');
+        const loginSection = document.getElementById('login-section');
+
+        // Check if user is authenticated
+        if (typeof authManager !== 'undefined' && authManager.isAuthenticated()) {
+            // Already logged in, show dashboard
+            dashboardSection.style.display = 'block';
+            loginSection.style.display = 'none';
+            dashboardSection.scrollIntoView({ behavior: 'smooth' });
+        } else {
+            // Show login section
+            loginSection.style.display = 'block';
+            dashboardSection.style.display = 'none';
+            loginSection.scrollIntoView({ behavior: 'smooth' });
+        }
+    }
+
+    // Theme toggle functionality
+    function toggleTheme() {
+        const html = document.documentElement;
+        const currentTheme = html.getAttribute('data-theme') || 'dark';
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+
+        html.setAttribute('data-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
+
+        // Update icon
+        const icon = document.getElementById('theme-icon');
+        if (icon) {
+            icon.textContent = newTheme === 'dark' ? '🌙' : '☀️';
+        }
+    }
+
+    // Initialize theme on page load
+    (function initTheme() {
+        const savedTheme = localStorage.getItem('theme') ||
+                          (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+
+        document.documentElement.setAttribute('data-theme', savedTheme);
+
+        const icon = document.getElementById('theme-icon');
+        if (icon) {
+            icon.textContent = savedTheme === 'dark' ? '🌙' : '☀️';
+        }
+    })();
+
+    // Listen for system theme changes
+    window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', e => {
+        if (!localStorage.getItem('theme')) {
+            const newTheme = e.matches ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', newTheme);
+            const icon = document.getElementById('theme-icon');
+            if (icon) {
+                icon.textContent = newTheme === 'dark' ? '🌙' : '☀️';
+            }
+        }
+    });
+
+    // Welcome banner functionality
+    function dismissWelcomeBanner() {
+        const banner = document.getElementById('welcome-banner');
+        if (banner) {
+            banner.style.opacity = '0';
+            banner.style.transform = 'translateY(-20px)';
+            setTimeout(() => {
+                banner.style.display = 'none';
+            }, 300);
+        }
+        localStorage.setItem('welcomeBannerDismissed', 'true');
+    }
+
+    // Show welcome banner for first-time visitors
+    (function initWelcomeBanner() {
+        const dismissed = localStorage.getItem('welcomeBannerDismissed');
+        const banner = document.getElementById('welcome-banner');
+
+        if (!dismissed && banner) {
+            banner.style.display = 'block';
+            banner.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+            banner.style.opacity = '0';
+            banner.style.transform = 'translateY(-20px)';
+
+            setTimeout(() => {
+                banner.style.opacity = '1';
+                banner.style.transform = 'translateY(0)';
+            }, 100);
+        }
+    })();
+    </script>
 </body>
 </html>

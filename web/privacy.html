@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy - Spore</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="icon" type="image/png" href="assets/favicon.png">
+</head>
+<body>
+    <div class="container">
+        <header class="hero" style="padding: 2rem 0;">
+            <h1>Privacy Policy</h1>
+            <p class="tagline">Last updated: January 14, 2026</p>
+        </header>
+
+        <section style="max-width: 800px; margin: 0 auto; padding: 2rem 0;">
+            <div style="background: var(--bg-card); padding: 2rem; border-radius: 8px; line-height: 1.8;">
+                <h2 style="color: var(--accent-blue); margin-bottom: 1rem;">Overview</h2>
+                <p>Spore is an open-source tool for managing AWS EC2 instances. We prioritize your privacy and minimize data collection.</p>
+
+                <h2 style="color: var(--accent-blue); margin: 2rem 0 1rem 0;">What We Collect</h2>
+
+                <h3 style="color: var(--text-primary); margin: 1.5rem 0 0.5rem 0;">Authentication Information</h3>
+                <p>When you sign in through Google, Globus Auth, or GitHub:</p>
+                <ul style="margin-left: 2rem; margin-top: 0.5rem;">
+                    <li>Your email address or username (from OAuth provider)</li>
+                    <li>Temporary AWS credentials (expire in 1 hour)</li>
+                    <li>OAuth tokens (stored locally in your browser only)</li>
+                </ul>
+
+                <h3 style="color: var(--text-primary); margin: 1.5rem 0 0.5rem 0;">What We Don't Collect</h3>
+                <ul style="margin-left: 2rem; margin-top: 0.5rem;">
+                    <li>❌ No passwords (OAuth only)</li>
+                    <li>❌ No browsing history</li>
+                    <li>❌ No tracking cookies</li>
+                    <li>❌ No analytics or telemetry</li>
+                    <li>❌ No EC2 instance data (stays in your AWS account)</li>
+                </ul>
+
+                <h2 style="color: var(--accent-blue); margin: 2rem 0 1rem 0;">How We Use Your Information</h2>
+                <p><strong>Authentication Only:</strong> Your OAuth credentials are used solely to obtain temporary AWS credentials via AWS Cognito Identity Pool. These credentials allow the dashboard to query your AWS account for instances you've launched with Spawn.</p>
+
+                <p style="margin-top: 1rem;"><strong>Client-Side Only:</strong> All EC2 queries happen directly from your browser to AWS. No data passes through our servers.</p>
+
+                <h2 style="color: var(--accent-blue); margin: 2rem 0 1rem 0;">Data Storage</h2>
+                <ul style="margin-left: 2rem; margin-top: 0.5rem;">
+                    <li><strong>Browser LocalStorage:</strong> OAuth tokens and AWS credentials (temporary, expire in 1 hour)</li>
+                    <li><strong>No Backend Database:</strong> We don't store any user data on servers</li>
+                    <li><strong>AWS Cognito:</strong> Identity mappings managed by AWS (federated identity only)</li>
+                </ul>
+
+                <h2 style="color: var(--accent-blue); margin: 2rem 0 1rem 0;">Third-Party Services</h2>
+                <ul style="margin-left: 2rem; margin-top: 0.5rem;">
+                    <li><strong>Google OAuth:</strong> Subject to <a href="https://policies.google.com/privacy" target="_blank" style="color: var(--accent-blue);">Google's Privacy Policy</a></li>
+                    <li><strong>Globus Auth:</strong> Subject to <a href="https://www.globus.org/legal/privacy" target="_blank" style="color: var(--accent-blue);">Globus Privacy Policy</a></li>
+                    <li><strong>GitHub OAuth:</strong> Subject to <a href="https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement" target="_blank" style="color: var(--accent-blue);">GitHub Privacy Statement</a></li>
+                    <li><strong>AWS Cognito:</strong> Subject to <a href="https://aws.amazon.com/privacy/" target="_blank" style="color: var(--accent-blue);">AWS Privacy Notice</a></li>
+                </ul>
+
+                <h2 style="color: var(--accent-blue); margin: 2rem 0 1rem 0;">Your Rights</h2>
+                <ul style="margin-left: 2rem; margin-top: 0.5rem;">
+                    <li><strong>Access:</strong> All data is stored locally in your browser (inspect LocalStorage)</li>
+                    <li><strong>Deletion:</strong> Click "Logout" or clear your browser's LocalStorage</li>
+                    <li><strong>Portability:</strong> Data stays in your AWS account under your control</li>
+                </ul>
+
+                <h2 style="color: var(--accent-blue); margin: 2rem 0 1rem 0;">Security</h2>
+                <ul style="margin-left: 2rem; margin-top: 0.5rem;">
+                    <li>HTTPS encryption for all connections</li>
+                    <li>OAuth 2.0 / OpenID Connect standards</li>
+                    <li>Temporary credentials with automatic expiration</li>
+                    <li>Read-only AWS permissions (cannot modify instances)</li>
+                </ul>
+
+                <h2 style="color: var(--accent-blue); margin: 2rem 0 1rem 0;">Open Source</h2>
+                <p>Spore is open source under the MIT License. You can audit the code on <a href="https://github.com/scttfrdmn/mycelium" target="_blank" style="color: var(--accent-blue);">GitHub</a> to verify these privacy claims.</p>
+
+                <h2 style="color: var(--accent-blue); margin: 2rem 0 1rem 0;">Changes to This Policy</h2>
+                <p>We may update this policy occasionally. Changes will be posted on this page with an updated date.</p>
+
+                <h2 style="color: var(--accent-blue); margin: 2rem 0 1rem 0;">Contact</h2>
+                <p>Questions about privacy? Open an issue on <a href="https://github.com/scttfrdmn/mycelium/issues" target="_blank" style="color: var(--accent-blue);">GitHub</a>.</p>
+            </div>
+
+            <div style="text-align: center; margin-top: 2rem;">
+                <a href="/" style="color: var(--accent-blue); text-decoration: none;">← Back to Home</a>
+            </div>
+        </section>
+
+        <footer style="margin-top: 4rem;">
+            <div class="footer-links">
+                <a href="https://github.com/scttfrdmn/mycelium">GitHub</a>
+                <a href="/privacy.html">Privacy Policy</a>
+                <a href="/terms.html">Terms of Service</a>
+            </div>
+            <p class="footer-text">
+                Made with 🍄 by <a href="https://github.com/scttfrdmn">@scttfrdmn</a>
+                <br>
+                Licensed under <a href="https://github.com/scttfrdmn/mycelium/blob/main/LICENSE">MIT</a>
+            </p>
+        </footer>
+    </div>
+</body>
+</html>

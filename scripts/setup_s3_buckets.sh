@@ -8,7 +8,7 @@ set -e
 #   ./setup_s3_buckets.sh my-spawn-account us-east-1 us-west-2
 #   ./setup_s3_buckets.sh my-spawn-account all  # All regions
 
-PROFILE=${1:-default}
+PROFILE=${1:-mycelium-infra}
 shift
 
 # Default regions if not specified

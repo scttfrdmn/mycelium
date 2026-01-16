@@ -199,8 +199,15 @@ const DashboardAPI = {
             throw new Error('AWS credentials not configured');
         }
 
-        // Assume cross-account role first
-        await this.assumeCrossAccountRole();
+        // Check if user authenticated via GitHub (credentials already have cross-account access)
+        const user = authManager.getUser();
+        const isGitHubAuth = user && user.provider === 'github';
+
+        // Only assume cross-account role for non-GitHub auth (Google, Globus)
+        // GitHub Lambda already provides cross-account credentials
+        if (!isGitHubAuth) {
+            await this.assumeCrossAccountRole();
+        }
 
         const results = await Promise.allSettled(
             AWS_REGIONS.map(region => this.listInstancesInRegion(region))
@@ -227,20 +234,29 @@ const DashboardAPI = {
 
     // List instances in a specific region
     async listInstancesInRegion(region) {
-        // Use cross-account credentials for EC2 API calls
-        const ec2 = new AWS.EC2({
-            region: region,
-            credentials: new AWS.Credentials({
+        // Check if user authenticated via GitHub
+        const user = authManager.getUser();
+        const isGitHubAuth = user && user.provider === 'github';
+
+        // GitHub: use existing credentials (already cross-account)
+        // Others: use cross-account credentials from STS AssumeRole
+        const credentials = isGitHubAuth
+            ? AWS.config.credentials
+            : new AWS.Credentials({
                 accessKeyId: this.crossAccountCredentials.accessKeyId,
                 secretAccessKey: this.crossAccountCredentials.secretAccessKey,
                 sessionToken: this.crossAccountCredentials.sessionToken
-            })
+            });
+
+        const ec2 = new AWS.EC2({
+            region: region,
+            credentials: credentials
         });
 
-        // Query EC2 with filters (filter by spawn:managed tag only)
+        // Query EC2 with filters (only show instances launched via spawn CLI)
         const params = {
             Filters: [
-                { Name: 'tag:spawn:managed', Values: ['true'] }
+                { Name: 'tag:spawn:created-by', Values: ['spawn'] }
             ]
         };
 
@@ -264,6 +280,20 @@ const DashboardAPI = {
             tags[tag.Key] = tag.Value;
         });
 
+        // Parse state transition reason to get termination time
+        let terminationTime = null;
+        if (instance.State.Name === 'terminated' && instance.StateTransitionReason) {
+            // Format: "User initiated (2026-01-15 01:30:45 GMT)"
+            const match = instance.StateTransitionReason.match(/\(([^)]+)\)/);
+            if (match) {
+                try {
+                    terminationTime = new Date(match[1]);
+                } catch (e) {
+                    // Ignore parsing errors
+                }
+            }
+        }
+
         return {
             instance_id: instance.InstanceId,
             name: tags['Name'] || instance.InstanceId,
@@ -274,6 +304,7 @@ const DashboardAPI = {
             public_ip: instance.PublicIpAddress || null,
             private_ip: instance.PrivateIpAddress || null,
             launch_time: instance.LaunchTime,
+            termination_time: terminationTime,
             ttl: tags['spawn:ttl'] || null,
             dns_name: tags['spawn:dns-name'] || null,
             spot_instance: instance.InstanceLifecycle === 'spot',
@@ -329,6 +360,22 @@ async function loadDashboard() {
         const errorDiv = document.getElementById('dashboard-error');
         const loadingDiv = document.getElementById('dashboard-loading');
 
+        // Save expansion state BEFORE clearing tbody
+        const expandedInstanceIds = new Set();
+        if (tbody) {
+            tbody.querySelectorAll('.instance-detail').forEach(detailRow => {
+                if (detailRow.style.display === 'table-row') {
+                    const instanceRow = detailRow.previousElementSibling;
+                    if (instanceRow) {
+                        const instanceId = instanceRow.getAttribute('data-instance-id');
+                        if (instanceId) {
+                            expandedInstanceIds.add(instanceId);
+                        }
+                    }
+                }
+            });
+        }
+
         if (loadingDiv) loadingDiv.style.display = 'block';
         if (errorDiv) errorDiv.style.display = 'none';
         if (tbody) tbody.innerHTML = '';
@@ -344,13 +391,38 @@ async function loadDashboard() {
         if (loadingDiv) loadingDiv.style.display = 'none';
 
         if (response.success && response.instances && response.instances.length > 0) {
-            displayInstances(response.instances);
+            // Cache instances for filtering
+            allInstancesCache = response.instances;
+
+            // Populate region filter
+            populateRegionFilter(response.instances);
+
+            // Apply current filters
+            applyTableFilters();
         } else {
+            allInstancesCache = [];
             if (tbody) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-muted);">
-                            No instances found. Launch your first instance with <code>spawn</code>!
+                        <td colspan="7" style="text-align: center; padding: 3rem;">
+                            <div style="max-width: 600px; margin: 0 auto;">
+                                <div style="font-size: 3rem; margin-bottom: 1rem;">🍄</div>
+                                <h3 style="color: var(--accent-blue); margin-bottom: 1rem;">No Spores Yet</h3>
+                                <p style="color: var(--text-secondary); margin-bottom: 2rem; line-height: 1.8;">
+                                    Spores are EC2 instances launched via the Spawn CLI. They'll appear here automatically once created.
+                                </p>
+                                <div style="background: rgba(79, 195, 247, 0.08); border: 1px solid rgba(79, 195, 247, 0.3); border-radius: 8px; padding: 1.5rem; text-align: left;">
+                                    <h4 style="color: var(--accent-blue); margin-bottom: 1rem; text-align: center;">🚀 Quick Start</h4>
+                                    <ol style="margin-left: 1.5rem; line-height: 2;">
+                                        <li><strong>Install the CLI:</strong> <code style="background: var(--bg-dark); padding: 0.2rem 0.5rem; border-radius: 4px;">brew install scttfrdmn/tap/spawn</code></li>
+                                        <li><strong>Launch your first spore:</strong> <code style="background: var(--bg-dark); padding: 0.2rem 0.5rem; border-radius: 4px;">spawn launch</code></li>
+                                        <li><strong>Watch it appear here:</strong> Refresh this page in ~30 seconds</li>
+                                    </ol>
+                                    <p style="text-align: center; margin-top: 1.5rem; color: var(--text-muted); font-size: 0.9rem;">
+                                        <a href="#install" style="color: var(--accent-blue); text-decoration: none;">View full installation guide ↓</a>
+                                    </p>
+                                </div>
+                            </div>
                         </td>
                     </tr>
                 `;
@@ -378,18 +450,196 @@ async function loadDashboard() {
     }
 }
 
-function displayInstances(instances) {
+// Auto-refresh interval (30 seconds)
+let dashboardRefreshInterval = null;
+
+// Manual refresh function
+async function refreshDashboard() {
+    const btn = document.getElementById('refresh-btn');
+    if (btn) {
+        btn.disabled = true;
+        btn.style.opacity = '0.5';
+        btn.textContent = '⏳ Refreshing...';
+    }
+
+    try {
+        await loadDashboard();
+        updateLastRefreshedTime();
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+            btn.textContent = '🔄 Refresh';
+        }
+    }
+}
+
+// Update last refreshed timestamp
+function updateLastRefreshedTime() {
+    const lastUpdated = document.getElementById('last-updated');
+    if (lastUpdated) {
+        const now = new Date();
+        lastUpdated.textContent = `Last updated: ${now.toLocaleTimeString()}`;
+    }
+}
+
+// Start auto-refresh
+function startAutoRefresh() {
+    // Clear any existing interval
+    if (dashboardRefreshInterval) {
+        clearInterval(dashboardRefreshInterval);
+    }
+
+    // Refresh every 30 seconds
+    dashboardRefreshInterval = setInterval(async () => {
+        console.log('Auto-refreshing dashboard...');
+        await loadDashboard();
+        updateLastRefreshedTime();
+    }, 30000);
+
+    console.log('Auto-refresh enabled (30s interval)');
+}
+
+// Stop auto-refresh (e.g., when user logs out)
+function stopAutoRefresh() {
+    if (dashboardRefreshInterval) {
+        clearInterval(dashboardRefreshInterval);
+        dashboardRefreshInterval = null;
+        console.log('Auto-refresh disabled');
+    }
+}
+
+function displayInstances(instances, expandedInstanceIds = new Set()) {
     const tbody = document.getElementById('instances-tbody');
     if (!tbody) return;
 
-    tbody.innerHTML = instances.map((instance, index) => {
-        const launchTime = new Date(instance.launch_time);
-        const age = formatAge(launchTime);
-        const stateClass = getStateClass(instance.state);
-        const rowId = `instance-${index}`;
-        const detailId = `detail-${index}`;
+    // Group instances by job array ID
+    const jobArrays = {};
+    const standaloneInstances = [];
 
-        // Calculate TTL remaining if present
+    instances.forEach(instance => {
+        const jobArrayId = instance.tags['spawn:job-array-id'];
+        if (jobArrayId) {
+            if (!jobArrays[jobArrayId]) {
+                jobArrays[jobArrayId] = {
+                    id: jobArrayId,
+                    name: instance.tags['spawn:job-array-name'] || jobArrayId,
+                    size: parseInt(instance.tags['spawn:job-array-size']) || 0,
+                    instances: []
+                };
+            }
+            jobArrays[jobArrayId].instances.push(instance);
+        } else {
+            standaloneInstances.push(instance);
+        }
+    });
+
+    // Sort job array instances by index
+    Object.values(jobArrays).forEach(jobArray => {
+        jobArray.instances.sort((a, b) => {
+            const indexA = parseInt(a.tags['spawn:job-array-index']) || 0;
+            const indexB = parseInt(b.tags['spawn:job-array-index']) || 0;
+            return indexA - indexB;
+        });
+    });
+
+    // Build list of instance IDs in order (for diffing)
+    const newInstanceOrder = [];
+    Object.values(jobArrays).forEach(jobArray => {
+        jobArray.instances.forEach(instance => {
+            newInstanceOrder.push(instance.instance_id);
+        });
+    });
+    standaloneInstances.forEach(instance => {
+        newInstanceOrder.push(instance.instance_id);
+    });
+
+    // Get current instance IDs
+    const existingRows = Array.from(tbody.querySelectorAll('tr.instance-row'));
+    const existingInstanceIds = existingRows.map(row => row.getAttribute('data-instance-id')).filter(id => id);
+
+    // Check if structure changed (new/removed instances or reordering)
+    const structureChanged =
+        newInstanceOrder.length !== existingInstanceIds.length ||
+        newInstanceOrder.some((id, i) => id !== existingInstanceIds[i]);
+
+    // If structure changed, do full rebuild
+    if (structureChanged) {
+        // Build HTML
+        let html = '';
+        let globalIndex = 0;
+
+        // Display job arrays first
+        Object.values(jobArrays).forEach(jobArray => {
+            const runningCount = jobArray.instances.filter(i => i.state === 'running').length;
+            const terminatedCount = jobArray.instances.filter(i => i.state === 'terminated').length;
+            const pendingCount = jobArray.instances.filter(i => i.state === 'pending').length;
+
+            html += `
+                <tr class="job-array-header" style="background: rgba(79, 195, 247, 0.08); border-left: 3px solid var(--accent-blue);">
+                    <td colspan="7" style="padding: 0.8rem 1rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <strong style="color: var(--accent-blue);">🔗 Job Array:</strong>
+                                <strong>${escapeHtml(jobArray.name)}</strong>
+                                <span style="color: var(--text-muted); margin-left: 1rem;">
+                                    ${jobArray.instances.length} of ${jobArray.size} instances
+                                    ${runningCount > 0 ? `• ${runningCount} running` : ''}
+                                    ${pendingCount > 0 ? `• ${pendingCount} pending` : ''}
+                                    ${terminatedCount > 0 ? `• ${terminatedCount} terminated` : ''}
+                                </span>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            `;
+
+            jobArray.instances.forEach(instance => {
+                html += renderInstanceRow(instance, globalIndex++, expandedInstanceIds, true);
+            });
+
+            html += `
+                <tr class="job-array-spacer" style="height: 1rem; background: transparent;">
+                    <td colspan="7" style="padding: 0; border: none;"></td>
+                </tr>
+            `;
+        });
+
+        standaloneInstances.forEach(instance => {
+            html += renderInstanceRow(instance, globalIndex++, expandedInstanceIds, false);
+        });
+
+        tbody.style.opacity = '0';
+        setTimeout(() => {
+            tbody.innerHTML = html;
+            tbody.style.opacity = '1';
+        }, 150);
+    } else {
+        // Structure unchanged, update cells in place
+        updateInstanceRows(instances, jobArrays);
+    }
+}
+
+function updateInstanceRows(instances, jobArrays) {
+    const tbody = document.getElementById('instances-tbody');
+    if (!tbody) return;
+
+    // Create map of instance data
+    const instanceMap = new Map();
+    instances.forEach(instance => {
+        instanceMap.set(instance.instance_id, instance);
+    });
+
+    // Update each instance row
+    tbody.querySelectorAll('tr.instance-row').forEach(row => {
+        const instanceId = row.getAttribute('data-instance-id');
+        const instance = instanceMap.get(instanceId);
+        if (!instance) return;
+
+        const launchTime = new Date(instance.launch_time);
+        const stateClass = getStateClass(instance.state);
+
+        // Calculate TTL remaining first
         let ttlRemaining = null;
         if (instance.ttl) {
             const ttlMinutes = parseTTL(instance.ttl);
@@ -402,20 +652,159 @@ function displayInstances(instances) {
             }
         }
 
+        // Update state badge
+        const stateTd = row.children[2];
+        if (stateTd) {
+            const newState = `<span class="badge badge-${stateClass}">${escapeHtml(instance.state)}</span>`;
+            if (stateTd.innerHTML !== newState) {
+                stateTd.style.transition = 'background-color 0.3s ease';
+                stateTd.innerHTML = newState;
+            }
+        }
+
+        // Update public IP
+        const ipTd = row.children[4];
+        if (ipTd) {
+            const newIp = instance.public_ip ? `<code>${escapeHtml(instance.public_ip)}</code>` : '<span style="color: var(--text-muted);">—</span>';
+            if (ipTd.innerHTML !== newIp) {
+                ipTd.style.transition = 'opacity 0.3s ease';
+                ipTd.style.opacity = '0.5';
+                setTimeout(() => {
+                    ipTd.innerHTML = newIp;
+                    ipTd.style.opacity = '1';
+                }, 150);
+            }
+        }
+
+        // Update DNS name
+        const dnsTd = row.children[5];
+        if (dnsTd) {
+            const newDns = instance.dns_name ? `<code>${escapeHtml(instance.dns_name)}</code>` : '<span style="color: var(--text-muted);">—</span>';
+            if (dnsTd.innerHTML !== newDns) {
+                dnsTd.style.transition = 'opacity 0.3s ease';
+                dnsTd.style.opacity = '0.5';
+                setTimeout(() => {
+                    dnsTd.innerHTML = newDns;
+                    dnsTd.style.opacity = '1';
+                }, 150);
+            }
+        }
+
+        // Update TTL display (ttlRemaining already calculated above)
+        const ttlTd = row.children[6];
+        if (ttlTd) {
+            const ttlColor = ttlRemaining === 'Expired' ? 'var(--accent-red)' : ttlRemaining ? 'var(--accent-green)' : 'var(--text-muted)';
+
+            let ttlDisplay;
+            if (instance.state === 'terminated') {
+                ttlDisplay = '<span style="color: var(--text-muted);">Terminated</span>';
+            } else if (ttlRemaining) {
+                ttlDisplay = `<span style="color: ${ttlColor};">${ttlRemaining}</span>`;
+            } else {
+                ttlDisplay = '<span style="color: var(--text-muted);">No TTL</span>';
+            }
+
+            if (ttlTd.innerHTML !== ttlDisplay) {
+                ttlTd.style.transition = 'color 0.3s ease';
+                ttlTd.innerHTML = ttlDisplay;
+            }
+        }
+    });
+
+    // Update job array headers
+    Object.values(jobArrays).forEach(jobArray => {
+        const runningCount = jobArray.instances.filter(i => i.state === 'running').length;
+        const terminatedCount = jobArray.instances.filter(i => i.state === 'terminated').length;
+        const pendingCount = jobArray.instances.filter(i => i.state === 'pending').length;
+
+        // Find header row by checking for job array name
+        const headers = tbody.querySelectorAll('tr.job-array-header');
+        headers.forEach(header => {
+            const headerText = header.textContent;
+            if (headerText.includes(jobArray.name)) {
+                const statusSpan = header.querySelector('span[style*="color: var(--text-muted)"]');
+                if (statusSpan) {
+                    const newStatus = `${jobArray.instances.length} of ${jobArray.size} instances
+                                ${runningCount > 0 ? `• ${runningCount} running` : ''}
+                                ${pendingCount > 0 ? `• ${pendingCount} pending` : ''}
+                                ${terminatedCount > 0 ? `• ${terminatedCount} terminated` : ''}`;
+                    if (statusSpan.textContent.trim() !== newStatus.trim()) {
+                        statusSpan.style.transition = 'opacity 0.3s ease';
+                        statusSpan.style.opacity = '0.5';
+                        setTimeout(() => {
+                            statusSpan.textContent = newStatus;
+                            statusSpan.style.opacity = '1';
+                        }, 150);
+                    }
+                }
+            }
+        });
+    });
+}
+
+function renderInstanceRow(instance, index, expandedInstanceIds = new Set(), isJobArray = false) {
+        const launchTime = new Date(instance.launch_time);
+        const stateClass = getStateClass(instance.state);
+        const rowId = `instance-${index}`;
+        const detailId = `detail-${index}`;
+
+        // Check if this instance should be expanded
+        const isExpanded = expandedInstanceIds.has(instance.instance_id);
+        const displayStyle = isExpanded ? 'table-row' : 'none';
+        const arrowIcon = isExpanded ? '▲' : '▼';
+
+        // Add indentation for job array instances
+        const nameCellStyle = isJobArray ? 'padding-left: 2.5rem;' : '';
+
+        // For terminated instances, show runtime. For others, show age.
+        let ageDisplay;
+        if (instance.state === 'terminated' && instance.termination_time) {
+            const runtime = Math.floor((instance.termination_time - launchTime) / 1000 / 60); // minutes
+            ageDisplay = `Ran ${formatDuration(runtime)}`;
+        } else {
+            ageDisplay = formatAge(launchTime);
+        }
+
+        // Calculate TTL remaining if present
+        let ttlRemaining = null;
+        let ttlColor = 'var(--text-muted)';
+        if (instance.ttl) {
+            const ttlMinutes = parseTTL(instance.ttl);
+            const elapsed = Math.floor((Date.now() - launchTime.getTime()) / 60000);
+            const remaining = ttlMinutes - elapsed;
+            if (remaining > 0) {
+                ttlRemaining = formatDuration(remaining);
+                ttlColor = 'var(--accent-green)';
+            } else {
+                ttlRemaining = 'Expired';
+                ttlColor = 'var(--accent-red)';
+            }
+        }
+
+        // TTL display for table column
+        let ttlDisplay;
+        if (instance.state === 'terminated') {
+            ttlDisplay = '<span style="color: var(--text-muted);">Terminated</span>';
+        } else if (ttlRemaining) {
+            ttlDisplay = `<span style="color: ${ttlColor};">${ttlRemaining}</span>`;
+        } else {
+            ttlDisplay = '<span style="color: var(--text-muted);">No TTL</span>';
+        }
+
         return `
-            <tr id="${rowId}" class="instance-row" onclick="toggleInstanceDetails('${detailId}', '${rowId}')" style="cursor: pointer;">
-                <td><strong>${escapeHtml(instance.name)}</strong> <span style="color: var(--text-muted); font-size: 0.85rem;">▼</span></td>
-                <td><code>${escapeHtml(instance.instance_type)}</code></td>
-                <td><span class="badge badge-${stateClass}">${escapeHtml(instance.state)}</span></td>
-                <td><code>${escapeHtml(instance.region)}</code></td>
-                <td>${instance.public_ip ? `<code>${escapeHtml(instance.public_ip)}</code>` : '<span style="color: var(--text-muted);">—</span>'}</td>
-                <td>${instance.dns_name ? `<code>${escapeHtml(instance.dns_name)}</code>` : '<span style="color: var(--text-muted);">—</span>'}</td>
-                <td>${age}</td>
+            <tr id="${rowId}" class="instance-row" data-instance-id="${escapeHtml(instance.instance_id)}" onclick="toggleInstanceDetails('${detailId}', '${rowId}')" style="cursor: pointer;">
+                <td data-label="Name" style="${nameCellStyle}"><strong>${escapeHtml(instance.name)}</strong> <span style="color: var(--text-muted); font-size: 0.85rem;">${arrowIcon}</span></td>
+                <td data-label="Type"><code>${escapeHtml(instance.instance_type)}</code></td>
+                <td data-label="State"><span class="badge badge-${stateClass}">${escapeHtml(instance.state)}</span></td>
+                <td data-label="Region"><code>${escapeHtml(instance.region)}</code></td>
+                <td data-label="Public IP">${instance.public_ip ? `<code>${escapeHtml(instance.public_ip)}</code>` : '<span style="color: var(--text-muted);">—</span>'}</td>
+                <td data-label="DNS Name">${instance.dns_name ? `<code>${escapeHtml(instance.dns_name)}</code>` : '<span style="color: var(--text-muted);">—</span>'}</td>
+                <td data-label="TTL">${ttlDisplay}</td>
             </tr>
-            <tr id="${detailId}" class="instance-detail" style="display: none;">
+            <tr id="${detailId}" class="instance-detail" style="display: ${displayStyle};">
                 <td colspan="7" style="padding: 0; background: rgba(79, 195, 247, 0.03);">
                     <div style="padding: 1.5rem; border-top: 1px solid var(--border);">
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
                             <div>
                                 <h4 style="margin: 0 0 0.5rem 0; color: var(--accent-blue); font-size: 0.9rem;">Instance Details</h4>
                                 <div style="font-size: 0.9rem; line-height: 1.8;">
@@ -429,28 +818,29 @@ function displayInstances(instances) {
                             <div>
                                 <h4 style="margin: 0 0 0.5rem 0; color: var(--accent-blue); font-size: 0.9rem;">Lifecycle</h4>
                                 <div style="font-size: 0.9rem; line-height: 1.8;">
-                                    <div><strong>Launched:</strong> ${launchTime.toLocaleString()}</div>
-                                    ${instance.ttl ? `<div><strong>TTL:</strong> ${escapeHtml(instance.ttl)}</div>` : ''}
-                                    ${ttlRemaining ? `<div><strong>TTL Remaining:</strong> <span style="color: ${ttlRemaining === 'Expired' ? 'var(--accent-red)' : 'var(--accent-green)'};">${ttlRemaining}</span></div>` : ''}
-                                    ${instance.tags['spawn:idle-timeout'] ? `<div><strong>Idle Timeout:</strong> ${escapeHtml(instance.tags['spawn:idle-timeout'])}</div>` : ''}
-                                    ${instance.tags['spawn:session-timeout'] ? `<div><strong>Session Timeout:</strong> ${escapeHtml(instance.tags['spawn:session-timeout'])}</div>` : ''}
+                                    <div><strong>Launched:</strong> <span style="color: var(--text-secondary);">${launchTime.toLocaleString()}</span></div>
+                                    ${instance.termination_time ? `<div><strong>Terminated:</strong> <span style="color: var(--text-secondary);">${instance.termination_time.toLocaleString()}</span></div>` : ''}
+                                    ${instance.termination_time ? `<div><strong>Runtime:</strong> <span style="color: var(--text-secondary);">${ageDisplay}</span></div>` : ''}
+                                    ${instance.ttl ? `<div><strong>TTL:</strong> <code>${escapeHtml(instance.ttl)}</code></div>` : ''}
+                                    ${ttlRemaining && !instance.termination_time ? `<div><strong>TTL Remaining:</strong> <span style="color: ${ttlRemaining === 'Expired' ? 'var(--accent-red)' : 'var(--accent-green)'};">${ttlRemaining}</span></div>` : ''}
+                                    ${instance.tags['spawn:idle-timeout'] ? `<div><strong>Idle Timeout:</strong> <code>${escapeHtml(instance.tags['spawn:idle-timeout'])}</code></div>` : ''}
+                                    ${instance.tags['spawn:session-timeout'] ? `<div><strong>Session Timeout:</strong> <code>${escapeHtml(instance.tags['spawn:session-timeout'])}</code></div>` : ''}
                                 </div>
                             </div>
-                            <div>
-                                <h4 style="margin: 0 0 0.5rem 0; color: var(--accent-blue); font-size: 0.9rem;">Tags</h4>
-                                <div style="font-size: 0.85rem; line-height: 1.6; max-height: 150px; overflow-y: auto;">
-                                    ${Object.entries(instance.tags)
-                                        .filter(([key]) => !key.startsWith('aws:') && key !== 'Name')
-                                        .map(([key, value]) => `<div><code style="color: var(--accent-blue);">${escapeHtml(key)}</code>: ${escapeHtml(value)}</div>`)
-                                        .join('') || '<span style="color: var(--text-muted);">No custom tags</span>'}
-                                </div>
+                        </div>
+                        <div style="margin-top: 1.5rem;">
+                            <h4 style="margin: 0 0 0.5rem 0; color: var(--accent-blue); font-size: 0.9rem;">Tags</h4>
+                            <div style="font-size: 0.85rem; line-height: 1.6;">
+                                ${Object.entries(instance.tags)
+                                    .filter(([key]) => !key.startsWith('aws:') && key !== 'Name')
+                                    .map(([key, value]) => `<div><code style="color: var(--accent-blue);">${escapeHtml(key)}</code>: <span style="color: var(--text-secondary);">${escapeHtml(value)}</span></div>`)
+                                    .join('') || '<span style="color: var(--text-muted);">No custom tags</span>'}
                             </div>
                         </div>
                     </div>
                 </td>
             </tr>
         `;
-    }).join('');
 }
 
 function toggleInstanceDetails(detailId, rowId) {
@@ -522,6 +912,162 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// Table filtering, searching, and sorting
+let allInstancesCache = [];
+let currentSort = { column: null, direction: 'asc' };
+
+function applyTableFilters() {
+    if (allInstancesCache.length === 0) return;
+
+    const searchTerm = document.getElementById('search-input')?.value.toLowerCase() || '';
+    const stateFilter = document.getElementById('state-filter')?.value || '';
+    const regionFilter = document.getElementById('region-filter')?.value || '';
+
+    let filteredInstances = allInstancesCache.filter(instance => {
+        // Search filter
+        const searchMatch = !searchTerm ||
+            instance.name.toLowerCase().includes(searchTerm) ||
+            instance.instance_id.toLowerCase().includes(searchTerm) ||
+            instance.instance_type.toLowerCase().includes(searchTerm) ||
+            Object.values(instance.tags).some(v => String(v).toLowerCase().includes(searchTerm));
+
+        // State filter
+        const stateMatch = !stateFilter || instance.state === stateFilter;
+
+        // Region filter
+        const regionMatch = !regionFilter || instance.region === regionFilter;
+
+        return searchMatch && stateMatch && regionMatch;
+    });
+
+    // Apply current sort
+    if (currentSort.column) {
+        filteredInstances = sortInstances(filteredInstances, currentSort.column, currentSort.direction);
+    }
+
+    // Preserve expansion state
+    const tbody = document.getElementById('instances-tbody');
+    const expandedInstanceIds = new Set();
+    if (tbody) {
+        tbody.querySelectorAll('.instance-detail').forEach(detailRow => {
+            if (detailRow.style.display === 'table-row') {
+                const instanceRow = detailRow.previousElementSibling;
+                if (instanceRow) {
+                    const instanceId = instanceRow.getAttribute('data-instance-id');
+                    if (instanceId) {
+                        expandedInstanceIds.add(instanceId);
+                    }
+                }
+            }
+        });
+    }
+
+    displayInstances(filteredInstances, expandedInstanceIds);
+}
+
+function clearTableFilters() {
+    const searchInput = document.getElementById('search-input');
+    const stateFilter = document.getElementById('state-filter');
+    const regionFilter = document.getElementById('region-filter');
+
+    if (searchInput) searchInput.value = '';
+    if (stateFilter) stateFilter.value = '';
+    if (regionFilter) regionFilter.value = '';
+
+    applyTableFilters();
+}
+
+function sortTable(column) {
+    // Toggle direction if same column, otherwise default to ascending
+    if (currentSort.column === column) {
+        currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+    } else {
+        currentSort.column = column;
+        currentSort.direction = 'asc';
+    }
+
+    // Update sort indicators
+    ['name', 'type', 'state', 'region', 'ip', 'dns', 'ttl'].forEach(col => {
+        const indicator = document.getElementById(`sort-${col}`);
+        if (indicator) {
+            if (col === column) {
+                indicator.textContent = currentSort.direction === 'asc' ? '▲' : '▼';
+                indicator.style.color = 'var(--accent-blue)';
+            } else {
+                indicator.textContent = '';
+            }
+        }
+    });
+
+    applyTableFilters();
+}
+
+function sortInstances(instances, column, direction) {
+    return [...instances].sort((a, b) => {
+        let aVal, bVal;
+
+        switch (column) {
+            case 'name':
+                aVal = a.name.toLowerCase();
+                bVal = b.name.toLowerCase();
+                break;
+            case 'type':
+                aVal = a.instance_type;
+                bVal = b.instance_type;
+                break;
+            case 'state':
+                aVal = a.state;
+                bVal = b.state;
+                break;
+            case 'region':
+                aVal = a.region;
+                bVal = b.region;
+                break;
+            case 'ip':
+                aVal = a.public_ip || '';
+                bVal = b.public_ip || '';
+                break;
+            case 'dns':
+                aVal = a.dns_name || '';
+                bVal = b.dns_name || '';
+                break;
+            case 'ttl':
+                aVal = a.ttl ? parseTTL(a.ttl) : 0;
+                bVal = b.ttl ? parseTTL(b.ttl) : 0;
+                break;
+            default:
+                return 0;
+        }
+
+        if (aVal < bVal) return direction === 'asc' ? -1 : 1;
+        if (aVal > bVal) return direction === 'asc' ? 1 : -1;
+        return 0;
+    });
+}
+
+function populateRegionFilter(instances) {
+    const regionFilter = document.getElementById('region-filter');
+    if (!regionFilter) return;
+
+    // Get unique regions
+    const regions = [...new Set(instances.map(i => i.region))].sort();
+
+    // Preserve current selection
+    const currentValue = regionFilter.value;
+
+    // Clear and repopulate
+    regionFilter.innerHTML = '<option value="">All Regions</option>';
+    regions.forEach(region => {
+        const option = document.createElement('option');
+        option.value = region;
+        option.textContent = region;
+        regionFilter.appendChild(option);
+    });
+
+    // Restore selection
+    regionFilter.value = currentValue;
 }
 
 // Export for use in other scripts
