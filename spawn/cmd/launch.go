@@ -1948,6 +1948,15 @@ func launchSweepDetached(ctx context.Context, paramFormat *ParamFileFormat, base
 		Params:   paramFormat.Params,
 	}
 
+	// Validate parameter sets before launching (best-effort, warn on failure)
+	fmt.Fprintf(os.Stderr, "🔍 Validating parameter sets...\n")
+	if err := sweep.ValidateParameterSets(ctx, infraCfg, sweepParamFormat, accountID); err != nil {
+		fmt.Fprintf(os.Stderr, "⚠️  Parameter validation skipped (requires cross-account access)\n")
+		fmt.Fprintf(os.Stderr, "   Parameters will be validated by Lambda orchestrator\n\n")
+	} else {
+		fmt.Fprintf(os.Stderr, "✓ All parameter sets validated\n\n")
+	}
+
 	// Upload parameters to S3
 	fmt.Fprintf(os.Stderr, "📤 Uploading parameters to S3...\n")
 	s3Key, err := sweep.UploadParamsToS3(ctx, infraCfg, sweepParamFormat, sweepID, "us-east-1")

@@ -8,9 +8,12 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
@@ -201,6 +204,178 @@ func SaveSweepState(ctx context.Context, cfg aws.Config, record *SweepRecord) er
 	})
 	if err != nil {
 		return fmt.Errorf("failed to save state: %w", err)
+	}
+
+	return nil
+}
+
+// ValidateParameterSets validates all parameter sets before launch
+func ValidateParameterSets(ctx context.Context, cfg aws.Config, params *ParamFileFormat, accountID string) error {
+	// Group validations by region to minimize API calls
+	regionInstanceTypes := make(map[string]map[string]bool)
+
+	// Collect all instance types per region
+	for i, paramSet := range params.Params {
+		// Get region (from param set or defaults)
+		region := getStringValue(paramSet, "region", "")
+		if region == "" {
+			if defaults, ok := params.Defaults["region"].(string); ok {
+				region = defaults
+			} else {
+				return fmt.Errorf("param set %d: no region specified", i)
+			}
+		}
+
+		// Get instance type (from param set or defaults)
+		instanceType := getStringValue(paramSet, "instance_type", "")
+		if instanceType == "" {
+			if defaults, ok := params.Defaults["instance_type"].(string); ok {
+				instanceType = defaults
+			} else {
+				return fmt.Errorf("param set %d: no instance_type specified", i)
+			}
+		}
+
+		// Add to validation map
+		if regionInstanceTypes[region] == nil {
+			regionInstanceTypes[region] = make(map[string]bool)
+		}
+		regionInstanceTypes[region][instanceType] = false // false = not yet validated
+	}
+
+	// Create STS client for cross-account access
+	stsClient := sts.NewFromConfig(cfg)
+
+	// Assume cross-account role
+	roleArn := fmt.Sprintf("arn:aws:iam::%s:role/SpawnSweepCrossAccountRole", accountID)
+	assumeResult, err := stsClient.AssumeRole(ctx, &sts.AssumeRoleInput{
+		RoleArn:         aws.String(roleArn),
+		RoleSessionName: aws.String("spawn-validate-" + time.Now().Format("20060102-150405")),
+		DurationSeconds: aws.Int32(900), // 15 minutes
+	})
+	if err != nil {
+		return fmt.Errorf("failed to assume role for validation: %w", err)
+	}
+
+	// Validate each region's instance types
+	for region, instanceTypes := range regionInstanceTypes {
+		// Create EC2 client for this region
+		creds := assumeResult.Credentials
+		ec2Cfg, err := config.LoadDefaultConfig(ctx,
+			config.WithRegion(region),
+			config.WithCredentialsProvider(aws.CredentialsProviderFunc(func(ctx context.Context) (aws.Credentials, error) {
+				return aws.Credentials{
+					AccessKeyID:     *creds.AccessKeyId,
+					SecretAccessKey: *creds.SecretAccessKey,
+					SessionToken:    *creds.SessionToken,
+					Source:          "AssumeRole",
+				}, nil
+			})),
+		)
+		if err != nil {
+			return fmt.Errorf("failed to create config for region %s: %w", region, err)
+		}
+
+		ec2Client := ec2.NewFromConfig(ec2Cfg)
+
+		// Query available instance types in this region
+		for instanceType := range instanceTypes {
+			result, err := ec2Client.DescribeInstanceTypeOfferings(ctx, &ec2.DescribeInstanceTypeOfferingsInput{
+				Filters: []ec2types.Filter{
+					{
+						Name:   aws.String("instance-type"),
+						Values: []string{instanceType},
+					},
+				},
+			})
+			if err != nil {
+				return fmt.Errorf("failed to validate instance type %s in %s: %w", instanceType, region, err)
+			}
+
+			if len(result.InstanceTypeOfferings) == 0 {
+				return fmt.Errorf("instance type %s is not available in region %s", instanceType, region)
+			}
+
+			regionInstanceTypes[region][instanceType] = true
+		}
+	}
+
+	return nil
+}
+
+func getStringValue(m map[string]interface{}, key, defaultValue string) string {
+	if val, ok := m[key]; ok {
+		if str, ok := val.(string); ok {
+			return str
+		}
+	}
+	return defaultValue
+}
+
+// TerminateSweepInstances terminates EC2 instances via cross-account access
+func TerminateSweepInstances(ctx context.Context, cfg aws.Config, accountID, region string, instanceIDs []string) error {
+	if len(instanceIDs) == 0 {
+		return nil
+	}
+
+	// Create STS client
+	stsClient := sts.NewFromConfig(cfg)
+
+	// Assume cross-account role
+	roleArn := fmt.Sprintf("arn:aws:iam::%s:role/SpawnSweepCrossAccountRole", accountID)
+	assumeResult, err := stsClient.AssumeRole(ctx, &sts.AssumeRoleInput{
+		RoleArn:         aws.String(roleArn),
+		RoleSessionName: aws.String("spawn-cancel-" + time.Now().Format("20060102-150405")),
+		DurationSeconds: aws.Int32(900), // 15 minutes
+	})
+	if err != nil {
+		return fmt.Errorf("failed to assume role: %w", err)
+	}
+
+	// Create EC2 client with assumed role credentials
+	creds := assumeResult.Credentials
+	ec2Cfg, err := config.LoadDefaultConfig(ctx,
+		config.WithRegion(region),
+		config.WithCredentialsProvider(aws.CredentialsProviderFunc(func(ctx context.Context) (aws.Credentials, error) {
+			return aws.Credentials{
+				AccessKeyID:     *creds.AccessKeyId,
+				SecretAccessKey: *creds.SecretAccessKey,
+				SessionToken:    *creds.SessionToken,
+				Source:          "AssumeRole",
+			}, nil
+		})),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create config: %w", err)
+	}
+
+	ec2Client := ec2.NewFromConfig(ec2Cfg)
+
+	// Terminate instances
+	_, err = ec2Client.TerminateInstances(ctx, &ec2.TerminateInstancesInput{
+		InstanceIds: instanceIDs,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to terminate instances: %w", err)
+	}
+
+	return nil
+}
+
+// TerminateSweepInstancesDirect terminates EC2 instances using provided credentials (no cross-account)
+func TerminateSweepInstancesDirect(ctx context.Context, cfg aws.Config, instanceIDs []string) error {
+	if len(instanceIDs) == 0 {
+		return nil
+	}
+
+	ec2Client := ec2.NewFromConfig(cfg)
+
+	// Terminate instances
+	_, err := ec2Client.TerminateInstances(ctx, &ec2.TerminateInstancesInput{
+		InstanceIds: instanceIDs,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to terminate instances: %w", err)
 	}
 
 	return nil
