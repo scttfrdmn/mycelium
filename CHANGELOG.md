@@ -1,53 +1,184 @@
 # Changelog
 
-All notable changes to mycelium will be documented in this file.
+All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.0] - 2025-12-19
+## [Unreleased]
+
+### Added
+- MPI (Message Passing Interface) support for distributed computing (Issue #28)
+
+## [0.5.0] - 2026-01-16
+
+### Added
+- Detached mode for parameter sweeps with Lambda orchestration (Issue #21)
+- `spawn status --sweep-id` command to monitor detached sweeps from any machine
+- `spawn cancel --sweep-id` command to cancel running sweeps and terminate instances
+- `spawn resume --sweep-id --detach` to resume sweeps in Lambda mode from checkpoint
+- Parameter validation for sweeps (validates instance types exist in target regions)
+- Enhanced `spawn list` command with sweep grouping and collapsible sections (Issue #20)
+- Estimated completion time display in sweep status
+- Failed launch tracking with error messages in DynamoDB
+- S3 parameter storage for unlimited sweep file sizes
+- DynamoDB state management for cross-machine monitoring
+- Lambda self-reinvocation pattern for multi-hour sweeps (13min polling + reinvoke)
+- Dashboard OAuth authentication (Google, GitHub placeholder, Globus Auth)
+- Expandable instance details in dashboard UI
+- Cross-account IAM role support for sweep orchestration
+- Documentation: PARAMETER_SWEEPS.md and DETACHED_MODE.md
+
+### Fixed
+- Cross-account IAM role trust policy to use IAM role principal
+- Always include spored EC2 permissions in custom IAM roles
+- Upload script to use correct spored binary names
+- Adaptive logo rendering in dashboard (light/dark mode)
+- JavaScript errors in dashboard
+- OAuth response_type for Globus Auth provider
+
+### Changed
+- Improved dashboard table layout and column widths
+- Better responsive design for dashboard
+
+## [0.4.0] - 2026-01-14
+
+### Added
+- AMI management commands (`spawn create-ami` and `spawn list-amis`) for reusable software stacks
+- AMI health checks for base AMI age tracking
+- IAM instance profile support for secure AWS service access
+  - 13 built-in policy templates (S3, DynamoDB, SQS, ECR, Secrets Manager, etc.)
+  - Custom policy support via `--iam-policy-file`
+  - AWS managed policy support via `--iam-managed-policies`
+  - Named role support with `--iam-role` for reusability
+- Job array support for coordinated instance groups
+  - Launch N instances coordinately with `--count` and `--job-array-name`
+  - Peer discovery via `/etc/spawn/job-array-peers.json`
+  - Environment variables: `$JOB_ARRAY_INDEX`, `$JOB_ARRAY_SIZE`, `$JOB_ARRAY_ID`, `$JOB_ARRAY_NAME`
+  - Group DNS: `{name}.{account}.spore.host` resolves to all IPs
+  - Batch operations: `spawn list --job-array-name`, `spawn extend --job-array-name`
+- Account-level tagging to spawn CLI
+- Spore.host landing page and web dashboard foundation
+- Logo image files for light and dark modes with adaptive integration
+
+### Fixed
+- AMI health check warnings to show newer base AMI availability more clearly
+
+## [0.3.0] - 2025-12-23
+
+### Added
+- Lambda DNS gateway for spore.host domain (serverless DNS updates)
+- Completion signal feature for workload-driven instance lifecycle
+  - `spored complete` command to signal work completion
+  - `/tmp/SPAWN_COMPLETE` file detection (universal signaling)
+  - Configurable actions: terminate, stop, or hibernate on completion
+  - Configurable grace period (default 30s) via `--completion-delay`
+  - Priority system: Spot interruption > Completion > TTL > Idle
+- Internationalization (i18n) support for spawn and truffle CLIs
+  - 6 languages: English, Spanish, French, German, Japanese, Portuguese
+  - 443+ translation keys covering all CLI output
+  - Language detection from `--lang` flag, `SPAWN_LANG` env, system locale
+  - Accessibility mode (`--accessibility` flag) for screen readers
+  - No-emoji mode (`--no-emoji` flag) for cleaner terminal output
+- Instance management commands
+  - `spawn list`: List all spawn-managed instances across regions
+    - Filters: `--region`, `--state`, `--instance-type`, `--family`, `--tag`
+    - Output formats: table (default), JSON (`--format json`), YAML (`--format yaml`)
+    - Human-readable age format (2h30m, 5d6h)
+  - `spawn extend`: Extend instance TTL to prevent termination
+    - Flexible time formats: 30m, 2h, 1d, 3h30m, 1d2h30m
+    - Works with instance ID or name
+    - Updates spored configuration on running instances
+  - `spawn connect` / `spawn ssh`: SSH connection (both commands are aliases)
+    - Auto-resolves SSH keys from `~/.ssh/` directory
+    - Fallback to AWS Session Manager if no public IP
+    - Custom user, port, and key support
+- Enhanced monitoring in spored
+  - Disk I/O threshold detection (100KB/min)
+  - GPU utilization monitoring with nvidia-smi
+  - Multi-GPU support (reports max utilization across GPUs)
+  - Partition detection for accurate disk stats
+- Comprehensive test suite
+  - 667+ test cases across 48+ test functions
+  - i18n validation tests (443 keys, 6 languages)
+  - Command tests (list, extend, connect)
+  - Monitoring tests (disk I/O, GPU, idle detection)
+  - Table-driven tests with edge case coverage
+- Documentation
+  - TESTING.md: Complete testing guide
+  - spawn/MONITORING.md: Comprehensive monitoring documentation
+  - Enhanced spawn/README.md with detailed command examples
+  - DNSSEC_CONFIGURATION.md: DNS security setup
+
+### Fixed
+- I18n command description translation formatting issues
+- Format string safety in wizard.go (non-constant format strings)
+- Cross-account DNS API request support in Lambda
+- Goreleaser config for spored (renamed from spawnd)
+
+### Changed
+- Renamed `spawnd` → `spored` for consistency
+- Enhanced idle detection to include disk I/O and GPU metrics
+- Improved SSH key resolution with multiple pattern matching
+
+## [0.2.0] - 2025-12-21
+
+### Added
+- Essential instance management (Phase 1 features)
+- Comprehensive feature roadmap documentation
+
+## [0.1.2] - 2025-12-21
+
+### Fixed
+- Truffle dependency to use fully qualified package name
+
+## [0.1.1] - 2025-12-21
+
+### Added
+- Truffle dependency to spawn package
+
+### Fixed
+- Goreleaser v2 deprecation warnings
+
+## [0.1.0] - 2025-12-21
 
 ### Added - truffle
-
 - **Search command**: Find instance types by pattern with fuzzy matching
 - **Spot command**: Discover and compare Spot instance prices across regions
 - **Capacity command**: Find ML capacity (Capacity Blocks, ODCRs, reservations)
 - **Quotas command**: View and manage AWS Service Quotas
-- **--check-quotas flag**: Pre-launch quota validation
-- **Python bindings**: Native cgo bindings (10-50x faster than boto3)
-- **Multi-region support**: Query across multiple AWS regions simultaneously
-- **JSON output**: Clean JSON for piping to spawn
-- **No-credential mode**: Most features work without AWS credentials
+- `--check-quotas` flag for pre-launch quota validation
+- Python bindings with native cgo (10-50x faster than boto3)
+- Multi-region support for simultaneous queries
+- JSON output for piping to spawn
+- No-credential mode (most features work without AWS credentials)
 
 ### Added - spawn
+- Interactive wizard with 6-step guided setup for beginners
+- Pipe mode to accept JSON input from truffle
+- Direct mode with command-line flags
+- Windows 11/10 native support
+- Platform detection for Windows/Linux/macOS paths
+- SSH key management with auto-creation
+- AMI auto-detection (4 variants: x86/ARM × GPU/non-GPU, AL2023)
+- Live progress display with real-time step-by-step updates
+- Cost estimates (hourly and total) before launch
+- Auto-termination via TTL and idle monitoring
+- Hibernation support (pause instead of terminate when idle)
+- S3 distribution with regional buckets for fast binary downloads
+- Multi-architecture support (x86_64 and ARM64 Graviton)
+- GPU support with auto-selected GPU-enabled AMIs
 
-- **Interactive wizard**: 6-step guided setup for beginners
-- **Pipe mode**: Accept JSON input from truffle
-- **Direct mode**: Launch with command-line flags
-- **Windows support**: Native support for Windows 11/10
-- **Platform detection**: Auto-detects Windows/Linux/macOS paths
-- **SSH key management**: Auto-creates keys if missing
-- **AMI auto-detection**: 4 variants (x86/ARM, GPU/non-GPU, AL2023)
-- **Live progress display**: Real-time step-by-step updates
-- **Cost estimates**: Shows hourly and total costs before launch
-- **Auto-termination**: TTL and idle monitoring
-- **Hibernation support**: Pause instead of terminate when idle
-- **S3 distribution**: Regional S3 buckets for fast spawnd downloads
-- **Multi-architecture**: Supports x86_64 and ARM64 (Graviton)
-- **GPU support**: Auto-selects GPU-enabled AMIs for P/G instances
+### Added - spored (spawnd)
+- TTL monitoring with auto-terminate after configured time limit
+- Idle detection monitoring CPU and network activity
+- Hibernation capability (can hibernate instead of terminate)
+- Self-monitoring via instance tag configuration
+- systemd integration as proper Linux daemon with auto-restart
+- Laptop-independent operation
+- Graceful warnings (5 minutes before action)
 
-### Added - spawnd
-
-- **TTL monitoring**: Auto-terminate after configured time limit
-- **Idle detection**: Monitors CPU and network activity
-- **Hibernation**: Can hibernate instead of terminate
-- **Self-monitoring**: Reads configuration from instance tags
-- **systemd integration**: Proper Linux daemon with auto-restart
-- **Laptop-independent**: Works even when user disconnects
-- **Graceful warnings**: Warns user 5 minutes before action
-
-### Documentation
-
+### Added - Documentation
 - README.md for each component
 - QUICK_REFERENCE.md - Command cheat sheet
 - COMPLETE_ECOSYSTEM.md - Full ecosystem overview
@@ -55,218 +186,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - spawn/ENHANCEMENTS.md - S3/Windows/Wizard details
 - spawn/IMPLEMENTATION.md - Technical details
 
-### Build System
-
-- Multi-platform builds (Linux x86_64/ARM64, macOS Intel/M1, Windows)
+### Added - Build System
+- Multi-platform builds (Linux x86_64/ARM64, macOS Intel/Apple Silicon, Windows x86_64/ARM64)
 - Makefile for each component
 - Top-level Makefile for entire suite
-- Installation targets
-
-## [0.3.0] - 2025-12-23
-
-### Added - Internationalization 🌍
-
-- **6 Language Support**: English, Spanish, French, German, Japanese, Portuguese
-- **443 Translation Keys**: Complete CLI translation coverage
-- **Accessibility Mode**: Screen reader support with `--accessibility` flag
-- **No-emoji Mode**: `--no-emoji` flag for cleaner output
-- **Language Detection**: Auto-detects from `LANG`, `LC_ALL`, or `SPAWN_LANG` environment variables
-- **Per-command Language**: Use `--lang` flag to override language for any command
-
-### Added - Completion Signals ✅
-
-- **Workload-Driven Lifecycle**: Instances can signal when work is complete
-- **`spored complete` Command**: Signal completion from within instance
-- **Auto-Actions**: Terminate, stop, or hibernate on completion
-- **Grace Period**: Configurable delay before action (default 30s)
-- **File-Based Signaling**: Universal `/tmp/SPAWN_COMPLETE` file support
-- **Priority System**: Spot interruption > Completion > TTL > Idle
-
-### Added - Instance Management Commands 📋
-
-- **`spawn list`**: List all spawn-managed instances across regions
-  - Filter by region, state, instance type/family, or tags
-  - Multiple filter support with AND logic
-  - JSON/YAML output for automation
-  - Human-readable age format (2h30m, 5d6h)
-- **`spawn extend`**: Extend instance TTL to prevent termination
-  - Flexible time formats (30m, 2h, 1d, 3h30m)
-  - Update running instances without restart
-  - Works with instance ID or name
-- **`spawn connect` / `spawn ssh`**: SSH alias support
-  - Both commands work identically
-  - Auto-resolves SSH keys from `~/.ssh/`
-  - Fallback to AWS Session Manager
-  - Custom user, port, and key support
-
-### Added - Monitoring & Testing 🧪
-
-- **Comprehensive Test Suite**: 667+ test cases across 48+ test functions
-  - i18n validation tests (443 keys, 6 languages)
-  - Command tests (list, extend, connect)
-  - Monitoring tests (disk I/O, GPU, idle detection)
-- **Enhanced Monitoring**:
-  - Disk I/O threshold detection (100KB/min)
-  - GPU utilization monitoring with nvidia-smi
-  - Multi-GPU support (reports max utilization)
-  - Partition detection for accurate disk stats
-- **Test Infrastructure**:
-  - Makefile test targets (`test`, `test-i18n`, `test-coverage`, `test-coverage-report`)
-  - Table-driven tests with comprehensive edge cases
-  - Mock data and temporary file handling
-
-### Added - Documentation 📚
-
-- **TESTING.md**: Complete testing guide
-  - Running tests
-  - Writing tests (patterns and examples)
-  - Test organization
-  - Coverage goals and CI/CD integration
-- **spawn/MONITORING.md**: Comprehensive monitoring documentation
-  - Metrics monitored (CPU, network, disk I/O, GPU)
-  - Idle detection logic
-  - Configuration via EC2 tags
-  - Debugging and use cases
-- **Enhanced spawn/README.md**:
-  - Commands section with detailed examples
-  - spawn list filtering examples
-  - spawn extend TTL format rules
-  - spawn connect/ssh key resolution
-
-### Added - DNS & Infrastructure 🌐
-
-- **Lambda DNS Gateway**: Serverless DNS updates for spore.host
-- **Cross-Account DNS**: Support for DNS updates across AWS accounts
-- **DNSSEC Support**: Enhanced DNS security configuration
-- **Automatic DNS Registration**: Instances auto-register on startup
-
-### Fixed 🐛
-
-- **i18n Command Descriptions**: Fixed translation formatting issues
-- **Format String Safety**: Fixed non-constant format string in wizard.go
-- **Portuguese Support**: Added complete Portuguese translations
-- **Cross-Account Requests**: Fixed Lambda permissions for cross-account DNS
-
-### Changed 🔄
-
-- **spawnd → spored**: Renamed daemon for consistency
-- **Enhanced Idle Detection**: Now includes disk I/O and GPU metrics
-- **Improved Key Resolution**: Better SSH key finding with multiple patterns
-
-### Documentation Improvements
-
-- Added i18n usage examples for all supported languages
-- Enhanced command help text with translations
-- Improved accessibility documentation
-- Added real-world monitoring scenarios
-
-## [0.2.0] - 2025-12-20
-
-### Added
-
-- **Phase 1 - Essential Instance Management**: Core infrastructure
-- **Feature Roadmap**: Comprehensive development plan
-
-## [0.1.2] - 2025-12-20
+- Installation targets for easy deployment
+- Goreleaser v2 configuration for automated releases
+- GitHub token configuration for Homebrew and Scoop repositories
 
 ### Fixed
+- Goreleaser v2 compatibility issues
+- Scoop configuration to use "scoops" (plural)
+- Archive structure to avoid directory conflicts
 
-- Goreleaser v2 deprecation warnings
-- Truffle dependency fully qualified names
-
-## [0.1.1] - 2025-12-19
-
-### Added
-
-- Truffle dependency integration with spawn package
-
-## [Unreleased]
-
-### Planned for 0.4.0
-
-- [ ] Web UI for spawn wizard
-- [ ] Auto quota increase requests
-- [ ] Cost tracking and budgets
-- [ ] Multi-instance orchestration
-- [ ] CloudFormation/Terraform output
-- [ ] Homebrew formula
-- [ ] Chocolatey package
-
-### Planned for 0.5.0
-
-- [ ] Fargate support
-- [ ] Lambda integration
-- [ ] Custom AMI builder
-- [ ] Team/organization features
-- [ ] Cross-account quotas
-
----
-
-## Release Notes
-
-### v0.3.0 - "Global Reach"
-
-This release brings mycelium to a global audience with internationalization, enhanced testing, and powerful new instance management commands.
-
-**Key Highlights:**
-- 🌍 **Multilingual**: 6 languages (English, Spanish, French, German, Japanese, Portuguese)
-- 📋 **Instance Management**: `spawn list`, `spawn extend`, `spawn ssh` commands
-- ✅ **Completion Signals**: Workload-driven lifecycle management
-- 🧪 **Comprehensive Testing**: 667+ test cases, 76.8% i18n coverage
-- 📚 **Enhanced Documentation**: TESTING.md, MONITORING.md, expanded README
-- 🌐 **DNS Gateway**: Lambda-based serverless DNS for spore.host
-- 🐛 **Bug Fixes**: Format string safety, i18n improvements
-
-**New Commands:**
-```bash
-spawn list --family m7i --state running    # Filter instances
-spawn extend my-instance 2h                # Extend TTL
-spawn ssh i-xxx                            # SSH alias for connect
-spored complete --status success           # Signal job completion
-```
-
-**Accessibility:**
-```bash
-spawn --lang es list                       # Spanish
-spawn --lang ja connect i-xxx              # Japanese
-spawn --accessibility launch               # Screen reader mode
-```
-
-**Time to first instance (now in 6 languages!):** 2 minutes for absolute beginners!
-
-**Philosophy:**
-Like mycelium spreading across continents, v0.3.0 brings cloud computing to users worldwide in their native language.
-
-### v0.2.0 - "Essential Management"
-
-Phase 1 completion with essential instance management capabilities.
-
-**Key Highlights:**
-- Core infrastructure complete
-- Roadmap established
-- Foundation for advanced features
-
-### v0.1.0 - "The Underground Network"
-
-This is the initial release of mycelium, bringing together truffle and spawn to make AWS EC2 accessible to everyone.
-
-**Key Highlights:**
-- 🔍 **truffle** helps you find the right instance (no AWS account needed!)
-- 🚀 **spawn** helps you launch it effortlessly (wizard or pipe)
-- 🤖 **spored** monitors it automatically (no surprises)
-- 🪟 **Windows native** support (finally!)
-- 📊 **Quota-aware** (prevents launch failures)
-- 💰 **Cost-conscious** (auto-termination, estimates)
-
-**Time to first instance:** 2 minutes for absolute beginners!
-
-**Philosophy:**
-Like mycelium in nature connects trees and enables resource sharing, our mycelium connects you to AWS compute resources efficiently and accessibly.
-
----
-
-[0.3.0]: https://github.com/scttfrdmn/mycelium/releases/tag/v0.3.0
-[0.2.0]: https://github.com/scttfrdmn/mycelium/releases/tag/v0.2.0
-[0.1.2]: https://github.com/scttfrdmn/mycelium/releases/tag/v0.1.2
-[0.1.1]: https://github.com/scttfrdmn/mycelium/releases/tag/v0.1.1
+[unreleased]: https://github.com/scttfrdmn/mycelium/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/scttfrdmn/mycelium/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/scttfrdmn/mycelium/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/scttfrdmn/mycelium/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/scttfrdmn/mycelium/compare/v0.1.2...v0.2.0
+[0.1.2]: https://github.com/scttfrdmn/mycelium/compare/v0.1.1...v0.1.2
+[0.1.1]: https://github.com/scttfrdmn/mycelium/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/scttfrdmn/mycelium/releases/tag/v0.1.0
