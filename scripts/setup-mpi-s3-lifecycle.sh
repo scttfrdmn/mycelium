@@ -42,7 +42,7 @@ LIFECYCLE_POLICY=$(cat <<'EOF'
 {
   "Rules": [
     {
-      "Id": "DeleteOldMPIKeys",
+      "ID": "DeleteOldMPIKeys",
       "Status": "Enabled",
       "Filter": {
         "Prefix": "mpi-keys/"
@@ -73,7 +73,7 @@ echo "→ Verifying lifecycle policy..."
 POLICY_JSON=$(aws s3api get-bucket-lifecycle-configuration \
   --bucket "$BUCKET" \
   --profile "$PROFILE" \
-  --query 'Rules[?Id==`DeleteOldMPIKeys`]' \
+  --query 'Rules[?ID==`DeleteOldMPIKeys`]' \
   --output json 2>/dev/null)
 
 if [ "$POLICY_JSON" = "[]" ] || [ -z "$POLICY_JSON" ]; then
