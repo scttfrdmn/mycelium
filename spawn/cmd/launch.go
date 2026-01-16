@@ -400,44 +400,21 @@ func launchParameterSweep(ctx context.Context, baseConfig *aws.LaunchConfig, pla
 		cfg.UserData = base64.StdEncoding.EncodeToString([]byte(userDataScript))
 	}
 
-	// Launch all instances in parallel
-	fmt.Fprintf(os.Stderr, "\n🚀 Launching %d instances in parallel...\n\n", len(launchConfigs))
-
-	type launchResult struct {
-		index  int
-		result *aws.LaunchResult
-		err    error
-	}
-
-	resultsChan := make(chan launchResult, len(launchConfigs))
-	var wg sync.WaitGroup
-
-	for i, cfg := range launchConfigs {
-		wg.Add(1)
-		go func(idx int, config *aws.LaunchConfig) {
-			defer wg.Done()
-			result, err := awsClient.Launch(ctx, *config)
-			resultsChan <- launchResult{index: idx, result: result, err: err}
-		}(i, cfg)
-	}
-
-	// Wait for all launches
-	wg.Wait()
-	close(resultsChan)
-
-	// Collect results
-	launchedInstances := make([]*aws.LaunchResult, len(launchConfigs))
+	// Launch instances with rolling queue or all at once
+	var launchedInstances []*aws.LaunchResult
 	var failures []string
-	successCount := 0
+	var successCount int
 
-	for result := range resultsChan {
-		if result.err != nil {
-			failures = append(failures, fmt.Sprintf("Parameter set %d: %v", result.index, result.err))
-		} else {
-			launchedInstances[result.index] = result.result
-			successCount++
-			fmt.Fprintf(os.Stderr, "✓ Launched %s (parameter set %d/%d)\n", result.result.Name, result.index+1, len(launchConfigs))
+	if maxConcurrent > 0 && maxConcurrent < len(launchConfigs) {
+		// Rolling queue mode
+		launchedInstances, failures, successCount, err = launchWithRollingQueue(ctx, awsClient, launchConfigs, sweepID, name, maxConcurrent, launchDelay)
+		if err != nil {
+			return err
 		}
+	} else {
+		// All-at-once mode (maxConcurrent == 0 or >= total params)
+		fmt.Fprintf(os.Stderr, "\n🚀 Launching %d instances in parallel...\n\n", len(launchConfigs))
+		launchedInstances, failures, successCount = launchAllAtOnce(ctx, awsClient, launchConfigs)
 	}
 
 	// Handle failures
@@ -497,6 +474,223 @@ func launchParameterSweep(ctx context.Context, baseConfig *aws.LaunchConfig, pla
 	fmt.Fprintf(os.Stderr, "  spawn list --sweep-id %s\n", sweepID)
 
 	return nil
+}
+
+// launchAllAtOnce launches all instances in parallel (no rolling queue)
+func launchAllAtOnce(ctx context.Context, awsClient *aws.Client, launchConfigs []*aws.LaunchConfig) ([]*aws.LaunchResult, []string, int) {
+	type launchResult struct {
+		index  int
+		result *aws.LaunchResult
+		err    error
+	}
+
+	resultsChan := make(chan launchResult, len(launchConfigs))
+	var wg sync.WaitGroup
+
+	for i, cfg := range launchConfigs {
+		wg.Add(1)
+		go func(idx int, config *aws.LaunchConfig) {
+			defer wg.Done()
+			result, err := awsClient.Launch(ctx, *config)
+			resultsChan <- launchResult{index: idx, result: result, err: err}
+		}(i, cfg)
+	}
+
+	// Wait for all launches
+	wg.Wait()
+	close(resultsChan)
+
+	// Collect results
+	launchedInstances := make([]*aws.LaunchResult, len(launchConfigs))
+	var failures []string
+	successCount := 0
+
+	for result := range resultsChan {
+		if result.err != nil {
+			failures = append(failures, fmt.Sprintf("Parameter set %d: %v", result.index, result.err))
+		} else {
+			launchedInstances[result.index] = result.result
+			successCount++
+			fmt.Fprintf(os.Stderr, "✓ Launched %s (parameter set %d/%d)\n", result.result.Name, result.index+1, len(launchConfigs))
+		}
+	}
+
+	return launchedInstances, failures, successCount
+}
+
+// launchWithRollingQueue launches instances with rolling queue orchestration
+func launchWithRollingQueue(ctx context.Context, awsClient *aws.Client, launchConfigs []*aws.LaunchConfig, sweepID, sweepName string, maxConcurrent int, launchDelay string) ([]*aws.LaunchResult, []string, int, error) {
+	fmt.Fprintf(os.Stderr, "\n🚀 Launching parameter sweep with rolling queue...\n")
+	fmt.Fprintf(os.Stderr, "   Max concurrent: %d\n", maxConcurrent)
+	fmt.Fprintf(os.Stderr, "   Launch delay: %s\n\n", launchDelay)
+
+	// Parse launch delay
+	delay, err := time.ParseDuration(launchDelay)
+	if err != nil {
+		return nil, nil, 0, fmt.Errorf("invalid launch delay %q: %w", launchDelay, err)
+	}
+
+	// Initialize tracking
+	launchedInstances := make([]*aws.LaunchResult, len(launchConfigs))
+	var failures []string
+	successCount := 0
+
+	// Track active instances (index -> instance ID)
+	activeInstances := make(map[int]string)
+	nextToLaunch := 0
+
+	// Launch first batch
+	initialBatch := maxConcurrent
+	if initialBatch > len(launchConfigs) {
+		initialBatch = len(launchConfigs)
+	}
+
+	fmt.Fprintf(os.Stderr, "Launching initial batch of %d instances...\n", initialBatch)
+	for i := 0; i < initialBatch; i++ {
+		result, err := awsClient.Launch(ctx, *launchConfigs[i])
+		if err != nil {
+			failures = append(failures, fmt.Sprintf("Parameter set %d: %v", i, err))
+		} else {
+			launchedInstances[i] = result
+			activeInstances[i] = result.InstanceID
+			successCount++
+			fmt.Fprintf(os.Stderr, "✓ Launched %s (parameter set %d/%d)\n", result.Name, i+1, len(launchConfigs))
+		}
+
+		// Apply launch delay between initial launches
+		if i < initialBatch-1 && delay > 0 {
+			time.Sleep(delay)
+		}
+	}
+	nextToLaunch = initialBatch
+
+	// Save initial state
+	state := &SweepState{
+		SweepID:       sweepID,
+		SweepName:     sweepName,
+		CreatedAt:     time.Now(),
+		ParamFile:     paramFile,
+		TotalParams:   len(launchConfigs),
+		MaxConcurrent: maxConcurrent,
+		LaunchDelay:   launchDelay,
+		Completed:     0,
+		Running:       len(activeInstances),
+		Pending:       len(launchConfigs) - nextToLaunch,
+		Failed:        len(failures),
+		Instances:     make([]InstanceState, 0, len(launchConfigs)),
+	}
+
+	for i, instance := range launchedInstances {
+		if instance != nil {
+			state.Instances = append(state.Instances, InstanceState{
+				Index:      i,
+				InstanceID: instance.InstanceID,
+				State:      "running",
+				LaunchedAt: time.Now(),
+			})
+		}
+	}
+
+	if err := saveSweepState(state); err != nil {
+		fmt.Fprintf(os.Stderr, "⚠️  Warning: Failed to save sweep state: %v\n", err)
+	}
+
+	// Rolling queue: poll for completions and launch next
+	if nextToLaunch < len(launchConfigs) {
+		fmt.Fprintf(os.Stderr, "\nMonitoring instances and launching next in queue...\n")
+		fmt.Fprintf(os.Stderr, "Press Ctrl-C to stop (sweep can be resumed later)\n\n")
+
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+
+		for nextToLaunch < len(launchConfigs) {
+			select {
+			case <-ctx.Done():
+				fmt.Fprintf(os.Stderr, "\n⚠️  Interrupted. Progress saved to sweep state.\n")
+				fmt.Fprintf(os.Stderr, "Resume with: spawn resume --sweep-id %s\n", sweepID)
+				return launchedInstances, failures, successCount, ctx.Err()
+
+			case <-ticker.C:
+				// Query instance states
+				instanceIDs := make([]string, 0, len(activeInstances))
+				for _, id := range activeInstances {
+					instanceIDs = append(instanceIDs, id)
+				}
+
+				if len(instanceIDs) == 0 {
+					continue
+				}
+
+				// Get instance states
+				instances, err := awsClient.ListInstances(ctx, launchConfigs[0].Region, "")
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "⚠️  Warning: Failed to query instance states: %v\n", err)
+					continue
+				}
+
+				// Build state map
+				stateMap := make(map[string]string)
+				for _, inst := range instances {
+					stateMap[inst.InstanceID] = inst.State
+				}
+
+				// Check for terminated instances
+				var toRemove []int
+				for idx, instID := range activeInstances {
+					state, exists := stateMap[instID]
+					if !exists || state == "terminated" || state == "stopping" || state == "stopped" {
+						toRemove = append(toRemove, idx)
+					}
+				}
+
+				// Remove terminated instances and launch next
+				for _, idx := range toRemove {
+					delete(activeInstances, idx)
+
+					// Wait launch delay if specified
+					if delay > 0 {
+						time.Sleep(delay)
+					}
+
+					// Launch next pending instance
+					if nextToLaunch < len(launchConfigs) {
+						result, err := awsClient.Launch(ctx, *launchConfigs[nextToLaunch])
+						if err != nil {
+							failures = append(failures, fmt.Sprintf("Parameter set %d: %v", nextToLaunch, err))
+							fmt.Fprintf(os.Stderr, "✗ Failed to launch parameter set %d: %v\n", nextToLaunch+1, err)
+						} else {
+							launchedInstances[nextToLaunch] = result
+							activeInstances[nextToLaunch] = result.InstanceID
+							successCount++
+							fmt.Fprintf(os.Stderr, "✓ Launched %s (parameter set %d/%d) [%d active, %d pending]\n",
+								result.Name, nextToLaunch+1, len(launchConfigs),
+								len(activeInstances), len(launchConfigs)-nextToLaunch-1)
+
+							// Update state file
+							state.Running = len(activeInstances)
+							state.Pending = len(launchConfigs) - nextToLaunch - 1
+							state.Failed = len(failures)
+							state.Instances = append(state.Instances, InstanceState{
+								Index:      nextToLaunch,
+								InstanceID: result.InstanceID,
+								State:      "running",
+								LaunchedAt: time.Now(),
+							})
+
+							if err := saveSweepState(state); err != nil {
+								fmt.Fprintf(os.Stderr, "⚠️  Warning: Failed to save sweep state: %v\n", err)
+							}
+						}
+						nextToLaunch++
+					}
+				}
+			}
+		}
+
+		fmt.Fprintf(os.Stderr, "\n✅ All instances launched. Waiting for final batch to complete...\n")
+	}
+
+	return launchedInstances, failures, successCount, nil
 }
 
 func launchWithProgress(ctx context.Context, awsClient *aws.Client, config *aws.LaunchConfig, plat *platform.Platform) error {
