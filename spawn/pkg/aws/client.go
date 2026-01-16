@@ -570,6 +570,13 @@ type InstanceInfo struct {
 	JobArrayName  string
 	JobArrayIndex string
 	JobArraySize  string
+
+	// Sweep fields
+	SweepID     string
+	SweepName   string
+	SweepIndex  string
+	SweepSize   string
+	Parameters  map[string]string // Extracted from spawn:param:* tags
 }
 
 // ListInstances returns all spawn-managed instances, optionally filtered by region and state
@@ -656,6 +663,7 @@ func (c *Client) listInstancesInRegion(ctx context.Context, region string, state
 					KeyName:          valueOrEmpty(instance.KeyName),
 					SpotInstance:     instance.InstanceLifecycle == types.InstanceLifecycleTypeSpot,
 					Tags:             make(map[string]string),
+					Parameters:       make(map[string]string),
 				}
 
 				if instance.LaunchTime != nil {
@@ -693,8 +701,22 @@ func (c *Client) listInstancesInRegion(ctx context.Context, region string, state
 							info.JobArrayIndex = value
 						case "spawn:job-array-size":
 							info.JobArraySize = value
+						case "spawn:sweep-id":
+							info.SweepID = value
+						case "spawn:sweep-name":
+							info.SweepName = value
+						case "spawn:sweep-index":
+							info.SweepIndex = value
+						case "spawn:sweep-size":
+							info.SweepSize = value
 						default:
-							info.Tags[key] = value
+							// Check for parameter tags
+							if strings.HasPrefix(key, "spawn:param:") {
+								paramName := strings.TrimPrefix(key, "spawn:param:")
+								info.Parameters[paramName] = value
+							} else {
+								info.Tags[key] = value
+							}
 						}
 					}
 				}

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"sort"
@@ -10,8 +11,8 @@ import (
 	"time"
 
 	"github.com/scttfrdmn/mycelium/pkg/i18n"
-	"github.com/spf13/cobra"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/aws"
+	"github.com/spf13/cobra"
 )
 
 var (
@@ -24,6 +25,8 @@ var (
 	listJSON           bool
 	listJobArrayID     string
 	listJobArrayName   string
+	listSweepID        string
+	listSweepName      string
 )
 
 var listCmd = &cobra.Command{
@@ -45,6 +48,8 @@ func init() {
 	listCmd.Flags().BoolVar(&listJSON, "json", false, "Output as JSON")
 	listCmd.Flags().StringVar(&listJobArrayID, "job-array-id", "", "Filter by job array ID")
 	listCmd.Flags().StringVar(&listJobArrayName, "job-array-name", "", "Filter by job array name")
+	listCmd.Flags().StringVar(&listSweepID, "sweep-id", "", "Filter by parameter sweep ID")
+	listCmd.Flags().StringVar(&listSweepName, "sweep-name", "", "Filter by parameter sweep name")
 }
 
 func runList(cmd *cobra.Command, args []string) error {
@@ -99,17 +104,81 @@ func runList(cmd *cobra.Command, args []string) error {
 func outputTable(instances []aws.InstanceInfo) error {
 	fmt.Println() // Blank line after search message
 
-	// Group instances by job array ID
-	jobArrays := make(map[string][]aws.InstanceInfo)
-	standaloneInstances := []aws.InstanceInfo{}
+	// Separate instances into three groups: sweeps, standalone job arrays, and standalone instances
+	sweepInstances := make(map[string][]aws.InstanceInfo)
+	standaloneJobArrays := make(map[string][]aws.InstanceInfo)
+	var standaloneInstances []aws.InstanceInfo
 
 	for _, inst := range instances {
-		if inst.JobArrayID != "" {
-			jobArrays[inst.JobArrayID] = append(jobArrays[inst.JobArrayID], inst)
+		if inst.SweepID != "" {
+			sweepInstances[inst.SweepID] = append(sweepInstances[inst.SweepID], inst)
+		} else if inst.JobArrayID != "" {
+			standaloneJobArrays[inst.JobArrayID] = append(standaloneJobArrays[inst.JobArrayID], inst)
 		} else {
 			standaloneInstances = append(standaloneInstances, inst)
 		}
 	}
+
+	// Display parameter sweeps
+	if len(sweepInstances) > 0 {
+		displayParameterSweeps(sweepInstances)
+	}
+
+	// Display standalone job arrays
+	if len(standaloneJobArrays) > 0 {
+		displayStandaloneJobArrays(standaloneJobArrays)
+	}
+
+	// Display standalone instances
+	if len(standaloneInstances) > 0 {
+		displayStandaloneInstances(standaloneInstances, len(sweepInstances) > 0 || len(standaloneJobArrays) > 0)
+	}
+
+	return nil
+}
+
+// displayParameterSweeps shows all parameter sweeps with stats and instances
+func displayParameterSweeps(sweeps map[string][]aws.InstanceInfo) {
+	fmt.Println("\033[1mParameter Sweeps:\033[0m")
+
+	// Sort sweep IDs for consistent output
+	var sweepIDs []string
+	for id := range sweeps {
+		sweepIDs = append(sweepIDs, id)
+	}
+	sort.Strings(sweepIDs)
+
+	for _, sweepID := range sweepIDs {
+		instances := sweeps[sweepID]
+
+		// Sort instances by sweep index
+		sort.Slice(instances, func(i, j int) bool {
+			return instances[i].SweepIndex < instances[j].SweepIndex
+		})
+
+		// Calculate stats
+		completed, running, pending := calculateSweepStats(instances)
+
+		// Display sweep summary
+		sweepName := instances[0].SweepName
+		if sweepName == "" {
+			sweepName = "unnamed"
+		}
+		fmt.Printf("\n  %s (%d instances, %d completed, %d running, %d pending)\n",
+			sweepName, len(instances), completed, running, pending)
+		fmt.Printf("  Sweep ID: %s\n", sweepID)
+
+		// Display instances with parameters
+		for _, inst := range instances {
+			displayInstanceWithParams(inst, "    ")
+		}
+	}
+	fmt.Println()
+}
+
+// displayStandaloneJobArrays shows standalone job arrays (not part of a sweep)
+func displayStandaloneJobArrays(jobArrays map[string][]aws.InstanceInfo) {
+	fmt.Println("\033[1mJob Arrays:\033[0m")
 
 	// Sort job array IDs for consistent output
 	var jobArrayIDs []string
@@ -118,121 +187,176 @@ func outputTable(instances []aws.InstanceInfo) error {
 	}
 	sort.Strings(jobArrayIDs)
 
-	// Display job arrays first
-	if len(jobArrays) > 0 {
-		fmt.Println("\033[1mJob Arrays:\033[0m")
-		for _, arrayID := range jobArrayIDs {
-			arrayInstances := jobArrays[arrayID]
+	for _, arrayID := range jobArrayIDs {
+		arrayInstances := jobArrays[arrayID]
 
-			// Sort instances by index within array
-			sort.Slice(arrayInstances, func(i, j int) bool {
-				return arrayInstances[i].JobArrayIndex < arrayInstances[j].JobArrayIndex
-			})
+		// Sort instances by index within array
+		sort.Slice(arrayInstances, func(i, j int) bool {
+			return arrayInstances[i].JobArrayIndex < arrayInstances[j].JobArrayIndex
+		})
 
-			// Count states
-			runningCount := 0
-			stoppedCount := 0
-			pendingCount := 0
-			for _, inst := range arrayInstances {
-				switch inst.State {
-				case "running":
-					runningCount++
-				case "stopped", "stopping":
-					stoppedCount++
-				case "pending":
-					pendingCount++
-				}
-			}
+		// Count states
+		completed, running, pending := calculateSweepStats(arrayInstances)
 
-			// Display job array summary
-			arrayName := arrayInstances[0].JobArrayName
-			if arrayName == "" {
-				arrayName = "unnamed"
-			}
-			fmt.Printf("\n  %s (%d instances", arrayName, len(arrayInstances))
-			if runningCount > 0 {
-				fmt.Printf(", %d running", runningCount)
-			}
-			if pendingCount > 0 {
-				fmt.Printf(", %d pending", pendingCount)
-			}
-			if stoppedCount > 0 {
-				fmt.Printf(", %d stopped", stoppedCount)
-			}
-			fmt.Printf(")\n")
-			fmt.Printf("  Array ID: %s\n", arrayID)
-
-			// Display instances
-			for _, inst := range arrayInstances {
-				displayInstance(inst, "    ")
-			}
+		// Display job array summary
+		arrayName := arrayInstances[0].JobArrayName
+		if arrayName == "" {
+			arrayName = "unnamed"
 		}
-		fmt.Println()
+		fmt.Printf("\n  %s (%d instances, %d completed, %d running, %d pending)\n",
+			arrayName, len(arrayInstances), completed, running, pending)
+		fmt.Printf("  Array ID: %s\n", arrayID)
+
+		// Display instances
+		for _, inst := range arrayInstances {
+			displayInstance(inst, "    ")
+		}
+	}
+	fmt.Println()
+}
+
+// displayStandaloneInstances shows standalone instances (not part of sweep or job array)
+func displayStandaloneInstances(instances []aws.InstanceInfo, hasOtherGroups bool) {
+	if hasOtherGroups {
+		fmt.Println("\033[1mStandalone Instances:\033[0m")
 	}
 
-	// Display standalone instances
-	if len(standaloneInstances) > 0 {
-		if len(jobArrays) > 0 {
-			fmt.Println("\033[1mStandalone Instances:\033[0m")
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	defer w.Flush()
+
+	// Header
+	fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+		i18n.T("spawn.list.header.instance_id"),
+		i18n.T("spawn.list.header.name"),
+		i18n.T("spawn.list.header.type"),
+		i18n.T("spawn.list.header.state"),
+		i18n.T("spawn.list.header.iam_role"),
+		i18n.T("spawn.list.header.az"),
+		i18n.T("spawn.list.header.age"),
+		i18n.T("spawn.list.header.ttl"),
+		i18n.T("spawn.list.header.public_ip"),
+		i18n.T("spawn.list.header.spot"),
+	)
+
+	for _, inst := range instances {
+		age := formatDuration(time.Since(inst.LaunchTime))
+		ttl := inst.TTL
+		if ttl == "" {
+			ttl = "none"
+		}
+		name := inst.Name
+		if name == "" {
+			name = "-"
+		}
+		spotIndicator := ""
+		if inst.SpotInstance {
+			spotIndicator = "✓"
+		}
+		state := colorizeState(inst.State)
+		publicIP := inst.PublicIP
+		if publicIP == "" {
+			publicIP = "-"
+		}
+		iamRole := inst.IAMRole
+		if iamRole == "" {
+			iamRole = "-"
 		}
 
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		defer w.Flush()
-
-		// Header
 		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-			i18n.T("spawn.list.header.instance_id"),
-			i18n.T("spawn.list.header.name"),
-			i18n.T("spawn.list.header.type"),
-			i18n.T("spawn.list.header.state"),
-			i18n.T("spawn.list.header.iam_role"),
-			i18n.T("spawn.list.header.az"),
-			i18n.T("spawn.list.header.age"),
-			i18n.T("spawn.list.header.ttl"),
-			i18n.T("spawn.list.header.public_ip"),
-			i18n.T("spawn.list.header.spot"),
+			inst.InstanceID,
+			name,
+			inst.InstanceType,
+			state,
+			iamRole,
+			inst.AvailabilityZone,
+			age,
+			ttl,
+			publicIP,
+			spotIndicator,
 		)
+	}
+}
 
-		for _, inst := range standaloneInstances {
-			age := formatDuration(time.Since(inst.LaunchTime))
-			ttl := inst.TTL
-			if ttl == "" {
-				ttl = "none"
-			}
-			name := inst.Name
-			if name == "" {
-				name = "-"
-			}
-			spotIndicator := ""
-			if inst.SpotInstance {
-				spotIndicator = "✓"
-			}
-			state := colorizeState(inst.State)
-			publicIP := inst.PublicIP
-			if publicIP == "" {
-				publicIP = "-"
-			}
-			iamRole := inst.IAMRole
-			if iamRole == "" {
-				iamRole = "-"
-			}
-
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-				inst.InstanceID,
-				name,
-				inst.InstanceType,
-				state,
-				iamRole,
-				inst.AvailabilityZone,
-				age,
-				ttl,
-				publicIP,
-				spotIndicator,
-			)
+// calculateSweepStats computes completed/running/pending counts
+func calculateSweepStats(instances []aws.InstanceInfo) (completed, running, pending int) {
+	for _, inst := range instances {
+		switch inst.State {
+		case "running":
+			running++
+		case "pending":
+			pending++
+		case "terminated", "stopped", "stopping", "shutting-down":
+			completed++
 		}
 	}
+	return
+}
 
-	return nil
+// displayInstanceWithParams shows instance details with parameters
+func displayInstanceWithParams(inst aws.InstanceInfo, prefix string) {
+	state := colorizeState(inst.State)
+	publicIP := inst.PublicIP
+	if publicIP == "" {
+		publicIP = "-"
+	}
+	name := inst.Name
+	if name == "" {
+		name = "-"
+	}
+	spotIndicator := ""
+	if inst.SpotInstance {
+		spotIndicator = " (spot)"
+	}
+
+	// Format parameters (max 3)
+	paramsStr := formatParameters(inst.Parameters, 3)
+	if paramsStr != "" {
+		paramsStr = "  " + paramsStr
+	}
+
+	fmt.Printf("%s├─ %s  %s  %s  %s%s%s\n",
+		prefix,
+		name,
+		inst.InstanceID,
+		inst.InstanceType,
+		state,
+		paramsStr,
+		spotIndicator,
+	)
+}
+
+// formatParameters formats param key-value pairs for display (max maxParams)
+func formatParameters(params map[string]string, maxParams int) string {
+	if len(params) == 0 {
+		return ""
+	}
+
+	// Sort parameter keys alphabetically
+	keys := make([]string, 0, len(params))
+	for k := range params {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	// Format up to maxParams
+	var parts []string
+	for i, k := range keys {
+		if i >= maxParams {
+			break
+		}
+		value := truncateValue(params[k], 20)
+		parts = append(parts, fmt.Sprintf("%s=%s", k, value))
+	}
+
+	return strings.Join(parts, " ")
+}
+
+// truncateValue truncates string if > maxLen, adds "..."
+func truncateValue(value string, maxLen int) string {
+	if len(value) <= maxLen {
+		return value
+	}
+	return value[:maxLen-3] + "..."
 }
 
 func displayInstance(inst aws.InstanceInfo, prefix string) {
@@ -284,50 +408,44 @@ func colorizeState(state string) string {
 }
 
 func outputJSON(instances []aws.InstanceInfo) error {
-	// Simple JSON output
-	fmt.Println("[")
+	// Build JSON objects for each instance
+	output := make([]map[string]interface{}, len(instances))
 	for i, inst := range instances {
-		comma := ","
-		if i == len(instances)-1 {
-			comma = ""
+		obj := map[string]interface{}{
+			"instance_id":       inst.InstanceID,
+			"name":              inst.Name,
+			"instance_type":     inst.InstanceType,
+			"state":             inst.State,
+			"region":            inst.Region,
+			"availability_zone": inst.AvailabilityZone,
+			"public_ip":         inst.PublicIP,
+			"private_ip":        inst.PrivateIP,
+			"launch_time":       inst.LaunchTime.Format(time.RFC3339),
+			"ttl":               inst.TTL,
+			"idle_timeout":      inst.IdleTimeout,
+			"key_name":          inst.KeyName,
+			"spot":              inst.SpotInstance,
+			"iam_role":          inst.IAMRole,
+			"job_array_id":      inst.JobArrayID,
+			"job_array_name":    inst.JobArrayName,
+			"job_array_index":   inst.JobArrayIndex,
+			"job_array_size":    inst.JobArraySize,
+			"sweep_id":          inst.SweepID,
+			"sweep_name":        inst.SweepName,
+			"sweep_index":       inst.SweepIndex,
+			"sweep_size":        inst.SweepSize,
+			"parameters":        inst.Parameters,
 		}
-
-		fmt.Printf(`  {
-    "instance_id": "%s",
-    "name": "%s",
-    "instance_type": "%s",
-    "state": "%s",
-    "region": "%s",
-    "availability_zone": "%s",
-    "public_ip": "%s",
-    "private_ip": "%s",
-    "launch_time": "%s",
-    "ttl": "%s",
-    "idle_timeout": "%s",
-    "key_name": "%s",
-    "spot": %t,
-    "iam_role": "%s"
-  }%s
-`,
-			inst.InstanceID,
-			inst.Name,
-			inst.InstanceType,
-			inst.State,
-			inst.Region,
-			inst.AvailabilityZone,
-			inst.PublicIP,
-			inst.PrivateIP,
-			inst.LaunchTime.Format(time.RFC3339),
-			inst.TTL,
-			inst.IdleTimeout,
-			inst.KeyName,
-			inst.SpotInstance,
-			inst.IAMRole,
-			comma,
-		)
+		output[i] = obj
 	}
-	fmt.Println("]")
 
+	// Marshal to JSON with indentation
+	jsonBytes, err := json.MarshalIndent(output, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal JSON: %w", err)
+	}
+
+	fmt.Println(string(jsonBytes))
 	return nil
 }
 
@@ -384,6 +502,16 @@ func filterInstances(instances []aws.InstanceInfo) []aws.InstanceInfo {
 
 		// Filter by job array name
 		if listJobArrayName != "" && inst.JobArrayName != listJobArrayName {
+			continue
+		}
+
+		// Filter by sweep ID
+		if listSweepID != "" && inst.SweepID != listSweepID {
+			continue
+		}
+
+		// Filter by sweep name
+		if listSweepName != "" && inst.SweepName != listSweepName {
 			continue
 		}
 
