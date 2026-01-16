@@ -61,6 +61,7 @@ spawn --instance-type m7i.large --region us-east-1 --ttl 8h
 - **🔢 Job Arrays**: Launch coordinated instance groups for MPI, distributed training, parameter sweeps ([docs](JOB_ARRAYS.md))
 - **💾 AMI Management**: Create and manage custom AMIs for reusable software stacks ([docs](AMI_MANAGEMENT.md))
 - **🔐 IAM Instance Profiles**: Secure AWS service access without credentials, 13 built-in policy templates ([docs](IAM_INSTANCE_PROFILES_STATUS.md))
+- **☁️ Detached Mode**: Lambda-orchestrated parameter sweeps that survive laptop disconnection ([docs](PARAMETER_SWEEPS.md))
 
 ## 📦 Installation
 
@@ -1092,6 +1093,191 @@ spawn launch \
 # Each worker processes its partition of data
 ```
 
+## 🔄 Parameter Sweeps & Detached Mode
+
+Launch dozens or hundreds of instances for hyperparameter tuning, A/B testing, or batch processing with **Lambda orchestration** that survives laptop disconnection.
+
+### Quick Start
+
+```bash
+# Create parameter file
+cat > sweep.json <<'EOF'
+{
+  "defaults": {
+    "instance_type": "t3.micro",
+    "region": "us-east-1",
+    "ttl": "2h"
+  },
+  "params": [
+    {"name": "model-alpha-0.1", "alpha": 0.1},
+    {"name": "model-alpha-0.2", "alpha": 0.2},
+    {"name": "model-alpha-0.3", "alpha": 0.3}
+  ]
+}
+EOF
+
+# Launch detached sweep (Lambda orchestrates, you can close your laptop!)
+spawn launch --param-file sweep.json --max-concurrent 2 --detach
+
+# Output:
+# Sweep queued: sweep-20260116-abc123
+# Check status: spawn status --sweep-id sweep-20260116-abc123
+
+# Monitor from anywhere
+spawn status --sweep-id sweep-20260116-abc123
+
+# Cancel if needed
+spawn cancel --sweep-id sweep-20260116-abc123
+```
+
+### Why Detached Mode?
+
+**The Problem:** Running 100-instance sweeps requires keeping your terminal open for hours. Network interruptions or laptop sleep kills the entire sweep.
+
+**The Solution:** Detached mode uploads parameters to S3, queues the sweep in Lambda, and exits immediately. Lambda orchestrates the rolling queue in the cloud while respecting max concurrent limits.
+
+### Key Features
+
+**Launch & Forget:**
+- CLI uploads params to S3 and exits immediately
+- Lambda orchestrates rolling queue in the cloud
+- Sweep continues even if laptop is off
+
+**Monitor from Anywhere:**
+- Check status from any machine with AWS credentials
+- Real-time progress from DynamoDB
+- View failed launches with error messages
+
+**Resume from Checkpoint:**
+- Interrupted sweeps can be resumed
+- Continues from last launched parameter
+- Handles transient failures gracefully
+
+**Cost Efficient:**
+- ~$0.005 per sweep (half a cent)
+- 10-second polling interval
+- Self-reinvoking Lambda pattern
+
+### Architecture
+
+```
+User Workstation          mycelium-infra (966362334030)    mycelium-dev (435415984226)
+───────────────          ──────────────────────────────    ───────────────────────────
+spawn CLI                S3: spawn-sweeps-us-east-1        EC2 Instances
+  --detach ────────────> Upload params.json                  (Launched by Lambda)
+             │           DynamoDB: spawn-sweep-orchestration       ↑
+             └──────────> Lambda: spawn-sweep-orchestrator ────────┘
+
+CLI exits immediately
+"Sweep queued: <id>"
+```
+
+### Commands
+
+```bash
+# Launch detached sweep
+spawn launch --param-file sweep.json --max-concurrent 5 --detach
+
+# Check sweep status
+spawn status --sweep-id <id>
+
+# Resume interrupted sweep
+spawn resume --sweep-id <id> --detach
+
+# Cancel running sweep
+spawn cancel --sweep-id <id>
+```
+
+### Example: Hyperparameter Tuning
+
+```bash
+# Define 50 hyperparameter combinations
+cat > hyperparam.json <<'EOF'
+{
+  "defaults": {
+    "instance_type": "g5.xlarge",
+    "region": "us-east-1",
+    "ami": "ami-pytorch",
+    "ttl": "4h",
+    "iam_role": "ml-training-role"
+  },
+  "params": [
+    {"name": "run-001", "learning_rate": 0.001, "batch_size": 32},
+    {"name": "run-002", "learning_rate": 0.001, "batch_size": 64},
+    {"name": "run-003", "learning_rate": 0.01, "batch_size": 32},
+    ...
+  ]
+}
+EOF
+
+# Launch 50 training runs, 5 at a time
+spawn launch \
+  --param-file hyperparam.json \
+  --max-concurrent 5 \
+  --detach \
+  --launch-delay 10s
+
+# Monitor progress (from anywhere!)
+spawn status --sweep-id sweep-20260116-abc123
+
+# Output:
+# Sweep: hyperparam-sweep
+# Status: RUNNING
+# Progress: 20/50 launched (40.0%)
+# Active: 5 running
+# Failed: 0
+# Est. Completion: 3:45 PM PST (in 1h 23m)
+```
+
+### Example: A/B Testing at Scale
+
+```bash
+# Test 3 configurations across 100 instances
+cat > ab-test.json <<'EOF'
+{
+  "defaults": {
+    "instance_type": "t3.medium",
+    "region": "us-east-1",
+    "ttl": "30m"
+  },
+  "params": [
+    {"name": "variant-a-1", "config": "variant-a"},
+    {"name": "variant-a-2", "config": "variant-a"},
+    ...
+    {"name": "variant-b-1", "config": "variant-b"},
+    ...
+    {"name": "variant-c-1", "config": "variant-c"},
+    ...
+  ]
+}
+EOF
+
+# Launch 100 instances, 20 at a time
+spawn launch --param-file ab-test.json --max-concurrent 20 --detach
+```
+
+### Error Handling
+
+**Launch Failures:**
+- Failed launches tracked in DynamoDB with error messages
+- Sweep continues with remaining parameters
+- View failures in status output
+
+**Resume Support:**
+- Checkpoint saved after every launch
+- Resume continues from NextToLaunch index
+- Validates sweep is resumable (not COMPLETED)
+
+**Cost Control:**
+- Parameter validation before launch (checks instance types)
+- TTL and idle timeout per instance
+- Cancel running sweeps anytime
+
+### Documentation
+
+- **[PARAMETER_SWEEPS.md](PARAMETER_SWEEPS.md)** - Complete user guide with examples
+- **[DETACHED_MODE.md](DETACHED_MODE.md)** - Architecture and technical details
+
 ## 🛠️ Development
 
 ### Building
@@ -1248,6 +1434,8 @@ spawn reads this and launches accordingly!
 
 ## 📚 Documentation
 
+- **[PARAMETER_SWEEPS.md](PARAMETER_SWEEPS.md)** - Parameter sweeps and hyperparameter tuning
+- **[DETACHED_MODE.md](DETACHED_MODE.md)** - Lambda-orchestrated sweeps architecture
 - **[JOB_ARRAYS.md](JOB_ARRAYS.md)** - Job arrays for coordinated instance groups
 - **[AMI_MANAGEMENT.md](AMI_MANAGEMENT.md)** - Create and manage custom AMIs
 - **[IAM_INSTANCE_PROFILES_STATUS.md](IAM_INSTANCE_PROFILES_STATUS.md)** - IAM instance profiles for secure AWS service access
