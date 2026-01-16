@@ -1,13 +1,16 @@
 package cmd
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"os"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/aws"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/platform"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/sweep"
 	"github.com/spf13/cobra"
 )
 
@@ -51,7 +54,12 @@ func init() {
 func runResume(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 
-	// Load sweep state
+	// Check if detached mode requested - handle early since detached sweeps have no local state
+	if resumeDetach {
+		return resumeSweepDetached(ctx, resumeSweepID)
+	}
+
+	// Load sweep state (for locally-orchestrated sweeps)
 	state, err := loadSweepState(resumeSweepID)
 	if err != nil {
 		return fmt.Errorf("failed to load sweep state: %w", err)
@@ -66,11 +74,6 @@ func runResume(cmd *cobra.Command, args []string) error {
 	fmt.Fprintf(os.Stderr, "   Running: %d\n", state.Running)
 	fmt.Fprintf(os.Stderr, "   Pending: %d\n", state.Pending)
 	fmt.Fprintf(os.Stderr, "   Failed: %d\n\n", state.Failed)
-
-	// Check if detached mode requested
-	if resumeDetach {
-		return fmt.Errorf("detached mode (--detach) not yet implemented")
-	}
 
 	// Load original parameter file
 	if state.ParamFile == "" {
@@ -314,6 +317,66 @@ func runResume(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("sweep resumed with errors: %w", err)
 	}
+
+	return nil
+}
+
+func resumeSweepDetached(ctx context.Context, sweepID string) error {
+	fmt.Fprintf(os.Stderr, "\n🔄 Resuming sweep in detached mode...\n")
+	fmt.Fprintf(os.Stderr, "   Sweep ID: %s\n\n", sweepID)
+
+	// Load mycelium-infra config for DynamoDB and Lambda
+	cfg, err := config.LoadDefaultConfig(ctx,
+		config.WithRegion("us-east-1"),
+		config.WithSharedConfigProfile("mycelium-infra"),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to load AWS config: %w", err)
+	}
+
+	// Query current sweep state from DynamoDB
+	fmt.Fprintf(os.Stderr, "📊 Querying current sweep state...\n")
+	state, err := sweep.QuerySweepStatus(ctx, cfg, sweepID)
+	if err != nil {
+		return fmt.Errorf("failed to query sweep state: %w", err)
+	}
+
+	// Display current status
+	fmt.Fprintf(os.Stderr, "\n   Sweep Name: %s\n", state.SweepName)
+	fmt.Fprintf(os.Stderr, "   Status: %s\n", state.Status)
+	fmt.Fprintf(os.Stderr, "   Progress: %d/%d launched\n", state.Launched, state.TotalParams)
+	fmt.Fprintf(os.Stderr, "   Failed: %d\n", state.Failed)
+	fmt.Fprintf(os.Stderr, "   Next to launch: %d\n\n", state.NextToLaunch)
+
+	// Validate resumable
+	if state.Status == "COMPLETED" {
+		return fmt.Errorf("sweep already completed (status: COMPLETED)")
+	}
+
+	if state.NextToLaunch >= state.TotalParams {
+		// Check if there are still active instances
+		activeCount := 0
+		for _, inst := range state.Instances {
+			if inst.State == "pending" || inst.State == "running" {
+				activeCount++
+			}
+		}
+		if activeCount == 0 {
+			return fmt.Errorf("all parameters already launched (%d/%d)", state.NextToLaunch, state.TotalParams)
+		}
+		fmt.Fprintf(os.Stderr, "ℹ️  All parameters launched, but %d instances still running\n", activeCount)
+		fmt.Fprintf(os.Stderr, "   Re-invoking Lambda to monitor completion...\n\n")
+	}
+
+	// Re-invoke Lambda orchestrator
+	fmt.Fprintf(os.Stderr, "🚀 Re-invoking Lambda orchestrator...\n")
+	if err := sweep.InvokeSweepOrchestrator(ctx, cfg, sweepID); err != nil {
+		return fmt.Errorf("failed to invoke Lambda: %w", err)
+	}
+
+	fmt.Fprintf(os.Stderr, "\n✅ Sweep resumed in detached mode!\n")
+	fmt.Fprintf(os.Stderr, "   Lambda will continue orchestration from checkpoint\n")
+	fmt.Fprintf(os.Stderr, "   Check status: spawn status --sweep-id %s\n\n", sweepID)
 
 	return nil
 }

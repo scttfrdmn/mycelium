@@ -136,6 +136,22 @@ func runSweepStatus(ctx context.Context, sweepID string) error {
 	fmt.Fprintf(os.Stdout, "  Launched:          %d (%.1f%%)\n", status.Launched, float64(status.Launched)/float64(status.TotalParams)*100)
 	fmt.Fprintf(os.Stdout, "  Next to Launch:    %d\n", status.NextToLaunch)
 	fmt.Fprintf(os.Stdout, "  Failed:            %d\n", status.Failed)
+
+	// Calculate and display estimated completion time
+	if status.Status == "RUNNING" && status.Launched > 0 && status.NextToLaunch < status.TotalParams {
+		elapsed := updatedAt.Sub(createdAt)
+		avgTimePerLaunch := elapsed / time.Duration(status.Launched)
+		remaining := status.TotalParams - status.NextToLaunch
+
+		// Account for max concurrent limiting
+		remainingBatches := (remaining + status.MaxConcurrent - 1) / status.MaxConcurrent
+		estimatedRemaining := time.Duration(remainingBatches) * avgTimePerLaunch * time.Duration(status.MaxConcurrent)
+		estimatedCompletion := time.Now().Add(estimatedRemaining)
+
+		fmt.Fprintf(os.Stdout, "  Est. Completion:   %s (in %s)\n",
+			estimatedCompletion.Format("3:04 PM MST"),
+			formatDuration(estimatedRemaining))
+	}
 	fmt.Fprintf(os.Stdout, "\n")
 
 	// Display configuration
