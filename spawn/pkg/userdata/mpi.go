@@ -65,7 +65,7 @@ EOF
 chmod 600 /root/.ssh/config
 while [ ! -f /etc/spawn/job-array-peers.json ]; do sleep 2; done
 {{if .MPIProcessesPerNode}}SLOTS={{.MPIProcessesPerNode}}{{else}}SLOTS=$(nproc){{end}}
-jq -r ".[] | \"\(.dns) slots=$SLOTS\"" /etc/spawn/job-array-peers.json > /tmp/mpi-hostfile
+jq -r ".[] | \"\(.ip) slots=$SLOTS\"" /etc/spawn/job-array-peers.json > /tmp/mpi-hostfile
 if [ "{{.JobArrayIndex}}" -eq 0 ]; then
   sleep 10
   {{if .MPICommand}}mpirun -np $(({{.JobArraySize}} * SLOTS)) -hostfile /tmp/mpi-hostfile {{.MPICommand}}{{end}}
