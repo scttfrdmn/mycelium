@@ -280,13 +280,40 @@ func runResume(cmd *cobra.Command, args []string) error {
 	}
 
 	// Use the existing rolling queue implementation
-	// We need to track which indices we're launching (they're not sequential)
-	indexedConfigs := make(map[int]*aws.LaunchConfig)
-	for i, cfg := range launchConfigs {
-		indexedConfigs[pending[i]] = cfg
+	fmt.Fprintf(os.Stderr, "🚀 Launching %d pending parameters with rolling queue...\n\n", len(pending))
+
+	// Call the rolling queue launcher
+	resumedInstances, failures, successCount, err := launchWithRollingQueue(
+		ctx,
+		awsClient,
+		launchConfigs,
+		state.SweepID,
+		state.SweepName,
+		maxConcurrent,
+		state.LaunchDelay,
+	)
+
+	// Report results
+	fmt.Fprintf(os.Stderr, "\n✅ Resume complete!\n")
+	fmt.Fprintf(os.Stderr, "   Successfully launched: %d\n", successCount)
+	if len(failures) > 0 {
+		fmt.Fprintf(os.Stderr, "   Failed: %d\n", len(failures))
+		for _, msg := range failures {
+			fmt.Fprintf(os.Stderr, "     • %s\n", msg)
+		}
 	}
 
-	// TODO: Implement resume-specific rolling queue that handles non-sequential indices
-	// For now, use simplified approach
-	return fmt.Errorf("resume command partially implemented - full rolling queue integration in progress")
+	// Display all resumed instances
+	if len(resumedInstances) > 0 {
+		fmt.Fprintf(os.Stderr, "\nResumed instances:\n")
+		for _, inst := range resumedInstances {
+			fmt.Fprintf(os.Stderr, "  • %s (%s) - %s\n", inst.Name, inst.InstanceID, inst.State)
+		}
+	}
+
+	if err != nil {
+		return fmt.Errorf("sweep resumed with errors: %w", err)
+	}
+
+	return nil
 }
