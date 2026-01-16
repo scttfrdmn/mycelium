@@ -17,11 +17,14 @@ import (
 
 	"github.com/scttfrdmn/mycelium/pkg/i18n"
 	"github.com/spf13/cobra"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/aws"
 	spawnconfig "github.com/scttfrdmn/mycelium/spawn/pkg/config"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/input"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/platform"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/progress"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/sweep"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/wizard"
 )
 
@@ -287,12 +290,20 @@ func launchParameterSweep(ctx context.Context, baseConfig *aws.LaunchConfig, pla
 	} else {
 		fmt.Fprintf(os.Stderr, "   Mode: All at once\n")
 	}
+	if detach {
+		fmt.Fprintf(os.Stderr, "   Orchestration: Lambda (detached)\n")
+	}
 	fmt.Fprintf(os.Stderr, "\n")
 
 	// Initialize AWS client
 	awsClient, err := aws.NewClient(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS client: %w", err)
+	}
+
+	// Check for detached mode (Lambda orchestration)
+	if detach && maxConcurrent > 0 {
+		return launchSweepDetached(ctx, paramFormat, baseConfig, sweepID, name, maxConcurrent, launchDelay)
 	}
 
 	// Build launch configs for each parameter set
@@ -1889,4 +1900,103 @@ func parseIAMRoleTags(tags []string) map[string]string {
 		}
 	}
 	return result
+}
+
+// launchSweepDetached launches a parameter sweep in detached mode (Lambda orchestration)
+func launchSweepDetached(ctx context.Context, paramFormat *ParamFileFormat, baseConfig *aws.LaunchConfig, sweepID, sweepName string, maxConcurrent int, launchDelay string) error {
+	// Determine region (auto-detect if not specified)
+	sweepRegion := baseConfig.Region
+	if sweepRegion == "" {
+		fmt.Fprintf(os.Stderr, "🌍 No region specified, auto-detecting closest region...\n")
+		detectedRegion, err := detectBestRegion(ctx, baseConfig.InstanceType)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "⚠️  Could not auto-detect region: %v\n", err)
+			fmt.Fprintf(os.Stderr, "   Using default: us-east-1\n")
+			sweepRegion = "us-east-1"
+		} else {
+			fmt.Fprintf(os.Stderr, "✓ Selected region: %s\n", sweepRegion)
+			sweepRegion = detectedRegion
+		}
+	}
+
+	// Load dev account config to get account ID
+	devCfg, err := config.LoadDefaultConfig(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to load AWS config: %w", err)
+	}
+
+	// Get AWS account ID from dev account
+	stsClient := sts.NewFromConfig(devCfg)
+	identity, err := stsClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+	if err != nil {
+		return fmt.Errorf("failed to get AWS account ID: %w", err)
+	}
+	accountID := *identity.Account
+
+	// Use mycelium-infra config for Lambda/S3/DynamoDB operations
+	infraCfg, err := config.LoadDefaultConfig(ctx,
+		config.WithRegion("us-east-1"),
+		config.WithSharedConfigProfile("mycelium-infra"),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to load mycelium-infra AWS config: %w", err)
+	}
+
+	// Convert ParamFileFormat to sweep.ParamFileFormat
+	sweepParamFormat := &sweep.ParamFileFormat{
+		Defaults: paramFormat.Defaults,
+		Params:   paramFormat.Params,
+	}
+
+	// Upload parameters to S3
+	fmt.Fprintf(os.Stderr, "📤 Uploading parameters to S3...\n")
+	s3Key, err := sweep.UploadParamsToS3(ctx, infraCfg, sweepParamFormat, sweepID, "us-east-1")
+	if err != nil {
+		return fmt.Errorf("failed to upload params to S3: %w", err)
+	}
+	fmt.Fprintf(os.Stderr, "✓ Uploaded: %s\n\n", s3Key)
+
+	// Create DynamoDB record
+	fmt.Fprintf(os.Stderr, "💾 Creating sweep orchestration record...\n")
+	record := &sweep.SweepRecord{
+		SweepID:       sweepID,
+		SweepName:     sweepName,
+		S3ParamsKey:   s3Key,
+		MaxConcurrent: maxConcurrent,
+		LaunchDelay:   launchDelay,
+		TotalParams:   len(paramFormat.Params),
+		Region:        sweepRegion,
+		AWSAccountID:  accountID,
+	}
+
+	err = sweep.CreateSweepRecord(ctx, infraCfg, record)
+	if err != nil {
+		return fmt.Errorf("failed to create sweep record: %w", err)
+	}
+	fmt.Fprintf(os.Stderr, "✓ Record created\n\n")
+
+	// Invoke Lambda orchestrator
+	fmt.Fprintf(os.Stderr, "🚀 Invoking Lambda orchestrator...\n")
+	err = sweep.InvokeSweepOrchestrator(ctx, infraCfg, sweepID)
+	if err != nil {
+		return fmt.Errorf("failed to invoke Lambda: %w", err)
+	}
+	fmt.Fprintf(os.Stderr, "✓ Lambda invoked\n\n")
+
+	// Display success
+	fmt.Fprintf(os.Stderr, "✅ Parameter sweep queued successfully!\n\n")
+	fmt.Fprintf(os.Stderr, "Sweep ID:          %s\n", sweepID)
+	fmt.Fprintf(os.Stderr, "Sweep Name:        %s\n", sweepName)
+	fmt.Fprintf(os.Stderr, "Total Parameters:  %d\n", len(paramFormat.Params))
+	fmt.Fprintf(os.Stderr, "Max Concurrent:    %d\n", maxConcurrent)
+	fmt.Fprintf(os.Stderr, "Region:            %s\n", sweepRegion)
+	fmt.Fprintf(os.Stderr, "Orchestration:     Lambda (mycelium-infra account)\n\n")
+
+	fmt.Fprintf(os.Stderr, "The sweep is now running in Lambda. You can disconnect safely.\n\n")
+	fmt.Fprintf(os.Stderr, "To check status:\n")
+	fmt.Fprintf(os.Stderr, "  spawn status --sweep-id %s\n\n", sweepID)
+	fmt.Fprintf(os.Stderr, "To resume if needed:\n")
+	fmt.Fprintf(os.Stderr, "  spawn resume --sweep-id %s --detach\n", sweepID)
+
+	return nil
 }
