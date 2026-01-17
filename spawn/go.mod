@@ -25,6 +25,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.17 // indirect
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.53.6 // indirect
 	github.com/aws/aws-sdk-go-v2/service/dynamodbstreams v1.32.10 // indirect
+	github.com/aws/aws-sdk-go-v2/service/fsx v1.65.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.9.8 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/endpoint-discovery v1.11.17 // indirect

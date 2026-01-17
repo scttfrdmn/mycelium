@@ -27,9 +27,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Automatic NFS client installation and fstab configuration
   - Works with single instances, job arrays, and MPI clusters
   - All instances in job array share the same EFS filesystem
+- FSx Lustre creation with S3 backing (Issue #34, Milestone 3 of #29)
+  - `spawn launch --fsx-create` flag to create new FSx Lustre filesystem with S3 backing
+  - `--fsx-id` flag to mount existing FSx Lustre filesystem
+  - `--fsx-recall` flag to recreate filesystem from previous S3-backed configuration
+  - `--fsx-storage-capacity` flag to specify capacity in GB (1200, 2400, or increments of 2400)
+  - `--fsx-s3-bucket` flag to specify S3 bucket for import/export
+  - `--fsx-import-path` and `--fsx-export-path` flags for S3 paths
+  - `--fsx-mount-point` flag to customize mount location (default: /fsx)
+  - Automatic S3 bucket creation if not exists
+  - Data Repository Association (DRA) for lazy import from S3
+  - Automatic export of modified files back to S3
+  - Automatic Lustre client installation and filesystem mounting
+  - Works with single instances, job arrays, and MPI clusters
+  - Tags for tracking S3-backed filesystems for recall workflow
 - Future considerations documented in issues:
-  - Issue #33: EFS tuning options and performance profiles (Milestone 2 of #29)
-  - Issue #34: FSx Lustre creation with S3 backing (Milestone 3 of #29)
   - Issue #35: FSx recall workflow for ephemeral compute (Milestone 4 of #29)
   - Issue #36: FSx management commands (Milestone 5 of #29)
   - Issue #30: MPI compatibility with AMI creation workflow

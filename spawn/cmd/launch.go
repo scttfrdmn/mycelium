@@ -84,6 +84,16 @@ var (
 	efsProfile      string
 	efsMountOptions string
 
+	// FSx Lustre
+	fsxCreate          bool
+	fsxID              string
+	fsxRecall          string
+	fsxStorageCapacity int32
+	fsxS3Bucket        string
+	fsxImportPath      string
+	fsxExportPath      string
+	fsxMountPoint      string
+
 	// Parameter sweep
 	paramFile        string
 	params           string
@@ -172,6 +182,16 @@ func init() {
 	launchCmd.Flags().StringVar(&efsMountPoint, "efs-mount-point", "/efs", "EFS mount point (default: /efs)")
 	launchCmd.Flags().StringVar(&efsProfile, "efs-profile", "general", "EFS performance profile: general, max-io, max-throughput, burst")
 	launchCmd.Flags().StringVar(&efsMountOptions, "efs-mount-options", "", "Custom EFS mount options (overrides profile)")
+
+	// FSx Lustre
+	launchCmd.Flags().BoolVar(&fsxCreate, "fsx-create", false, "Create new FSx Lustre filesystem with S3 backing")
+	launchCmd.Flags().StringVar(&fsxID, "fsx-id", "", "Existing FSx Lustre filesystem ID to mount (fs-xxx)")
+	launchCmd.Flags().StringVar(&fsxRecall, "fsx-recall", "", "Recall FSx filesystem by stack name (recreate from S3)")
+	launchCmd.Flags().Int32Var(&fsxStorageCapacity, "fsx-storage-capacity", 1200, "FSx storage capacity in GB (1200, 2400, or increments of 2400)")
+	launchCmd.Flags().StringVar(&fsxS3Bucket, "fsx-s3-bucket", "", "S3 bucket for FSx import/export (required with --fsx-create)")
+	launchCmd.Flags().StringVar(&fsxImportPath, "fsx-import-path", "", "S3 path to import from (e.g., s3://bucket/prefix)")
+	launchCmd.Flags().StringVar(&fsxExportPath, "fsx-export-path", "", "S3 path to export to (e.g., s3://bucket/prefix)")
+	launchCmd.Flags().StringVar(&fsxMountPoint, "fsx-mount-point", "/fsx", "FSx mount point (default: /fsx)")
 
 	// Parameter sweep
 	launchCmd.Flags().StringVar(&paramFile, "param-file", "", "Path to parameter sweep file (JSON/YAML/CSV)")
@@ -816,24 +836,108 @@ func launchWithProgress(ctx context.Context, awsClient *aws.Client, config *aws.
 		prog.Skip("Creating security group")
 	}
 
+	// Step 4.5: Create or get FSx Lustre filesystem
+	var fsxInfo *aws.FSxInfo
+	var err error
+
+	if fsxCreate {
+		prog.Start("Creating FSx Lustre filesystem")
+
+		// Generate stack name
+		stackName := jobArrayName
+		if stackName == "" {
+			stackName = name
+		}
+		if stackName == "" {
+			stackName = "fsx"
+		}
+
+		// Set import/export paths if not specified
+		importPath := fsxImportPath
+		if importPath == "" {
+			importPath = fmt.Sprintf("s3://%s/", fsxS3Bucket)
+		}
+
+		exportPath := fsxExportPath
+		if exportPath == "" {
+			exportPath = fmt.Sprintf("s3://%s/", fsxS3Bucket)
+		}
+
+		fsxConfig := aws.FSxConfig{
+			StackName:        stackName,
+			Region:           config.Region,
+			StorageCapacity:  fsxStorageCapacity,
+			S3Bucket:         fsxS3Bucket,
+			ImportPath:       importPath,
+			ExportPath:       exportPath,
+			AutoCreateBucket: true,
+		}
+
+		fsxInfo, err = awsClient.CreateFSxLustreFilesystem(ctx, fsxConfig)
+		if err != nil {
+			prog.Error("Creating FSx Lustre filesystem", err)
+			return fmt.Errorf("failed to create FSx filesystem: %w", err)
+		}
+
+		prog.Complete("Creating FSx Lustre filesystem")
+		time.Sleep(300 * time.Millisecond)
+
+	} else if fsxID != "" {
+		prog.Start("Getting FSx filesystem info")
+
+		fsxInfo, err = awsClient.GetFSxFilesystem(ctx, fsxID, config.Region)
+		if err != nil {
+			prog.Error("Getting FSx filesystem info", err)
+			return fmt.Errorf("failed to get FSx info: %w", err)
+		}
+
+		prog.Complete("Getting FSx filesystem info")
+		time.Sleep(300 * time.Millisecond)
+
+	} else if fsxRecall != "" {
+		prog.Start("Recalling FSx filesystem from S3")
+
+		fsxInfo, err = awsClient.RecallFSxFilesystem(ctx, fsxRecall, config.Region)
+		if err != nil {
+			prog.Error("Recalling FSx filesystem", err)
+			return fmt.Errorf("failed to recall FSx: %w", err)
+		}
+
+		prog.Complete("Recalling FSx filesystem from S3")
+		time.Sleep(300 * time.Millisecond)
+	} else {
+		prog.Skip("FSx Lustre filesystem")
+	}
+
 	// Step 5: Build user data
 	userDataScript, err := buildUserData(plat, config)
 	if err != nil {
 		return fmt.Errorf("failed to build user data: %w", err)
 	}
 
-	// Add storage mounting if EFS enabled (single instance)
-	if efsID != "" {
-		mountOptions, err := getEFSMountOptions()
-		if err != nil {
-			return fmt.Errorf("failed to get EFS mount options: %w", err)
+	// Add storage mounting if EFS or FSx enabled (single instance)
+	if efsID != "" || fsxInfo != nil {
+		storageConfig := userdata.StorageConfig{}
+
+		// EFS configuration
+		if efsID != "" {
+			mountOptions, err := getEFSMountOptions()
+			if err != nil {
+				return fmt.Errorf("failed to get EFS mount options: %w", err)
+			}
+
+			storageConfig.EFSEnabled = true
+			storageConfig.EFSFilesystemDNS = aws.GetEFSDNSName(efsID, config.Region)
+			storageConfig.EFSMountPoint = efsMountPoint
+			storageConfig.EFSMountOptions = mountOptions
 		}
 
-		storageConfig := userdata.StorageConfig{
-			EFSEnabled:       true,
-			EFSFilesystemDNS: aws.GetEFSDNSName(efsID, config.Region),
-			EFSMountPoint:    efsMountPoint,
-			EFSMountOptions:  mountOptions,
+		// FSx configuration
+		if fsxInfo != nil {
+			storageConfig.FSxLustreEnabled = true
+			storageConfig.FSxFilesystemDNS = fsxInfo.DNSName
+			storageConfig.FSxMountName = fsxInfo.MountName
+			storageConfig.FSxMountPoint = fsxMountPoint
 		}
 
 		storageScript, err := userdata.GenerateStorageUserData(storageConfig)
@@ -871,7 +975,7 @@ func launchWithProgress(ctx context.Context, awsClient *aws.Client, config *aws.
 		if jobArrayName == "" {
 			return fmt.Errorf("--job-array-name is required when --count > 1")
 		}
-		return launchJobArray(ctx, awsClient, config, plat, prog)
+		return launchJobArray(ctx, awsClient, config, plat, prog, fsxInfo)
 	}
 
 	// Step 6: Launch instance
@@ -1050,6 +1154,54 @@ func buildLaunchConfig(truffleInput *input.TruffleInput) (*aws.LaunchConfig, err
 	}
 	if efsMountPoint != "" {
 		config.EFSMountPoint = efsMountPoint
+	}
+
+	// FSx Lustre flags
+	config.FSxLustreCreate = fsxCreate
+	if fsxID != "" {
+		config.FSxLustreID = fsxID
+	}
+	if fsxRecall != "" {
+		config.FSxLustreRecall = fsxRecall
+	}
+	if fsxStorageCapacity > 0 {
+		config.FSxStorageCapacity = fsxStorageCapacity
+	}
+	if fsxS3Bucket != "" {
+		config.FSxS3Bucket = fsxS3Bucket
+	}
+	if fsxImportPath != "" {
+		config.FSxImportPath = fsxImportPath
+	}
+	if fsxExportPath != "" {
+		config.FSxExportPath = fsxExportPath
+	}
+	if fsxMountPoint != "" {
+		config.FSxMountPoint = fsxMountPoint
+	}
+
+	// Validate FSx flags
+	if fsxCreate && fsxID != "" {
+		return nil, fmt.Errorf("cannot use --fsx-create and --fsx-id together")
+	}
+	if fsxCreate && fsxRecall != "" {
+		return nil, fmt.Errorf("cannot use --fsx-create and --fsx-recall together")
+	}
+	if fsxID != "" && fsxRecall != "" {
+		return nil, fmt.Errorf("cannot use --fsx-id and --fsx-recall together")
+	}
+	if fsxCreate && fsxS3Bucket == "" {
+		return nil, fmt.Errorf("--fsx-create requires --fsx-s3-bucket")
+	}
+
+	// Validate storage capacity (must be 1200, 2400, or multiples of 2400)
+	if fsxCreate && fsxStorageCapacity > 0 {
+		if fsxStorageCapacity < 1200 {
+			return nil, fmt.Errorf("minimum FSx storage capacity is 1200 GB")
+		}
+		if fsxStorageCapacity != 1200 && fsxStorageCapacity != 2400 && (fsxStorageCapacity-2400)%2400 != 0 {
+			return nil, fmt.Errorf("invalid FSx storage capacity: must be 1200, 2400, or increments of 2400")
+		}
 	}
 
 	return config, nil
@@ -1742,7 +1894,7 @@ func formatInstanceName(template string, jobArrayName string, index int) string 
 }
 
 // launchJobArray launches N instances in parallel as a job array
-func launchJobArray(ctx context.Context, awsClient *aws.Client, baseConfig *aws.LaunchConfig, plat *platform.Platform, prog *progress.Progress) error {
+func launchJobArray(ctx context.Context, awsClient *aws.Client, baseConfig *aws.LaunchConfig, plat *platform.Platform, prog *progress.Progress, fsxInfo *aws.FSxInfo) error {
 	// Generate unique job array ID
 	jobArrayID := generateJobArrayID(jobArrayName)
 	createdAt := time.Now()
@@ -1787,7 +1939,7 @@ func launchJobArray(ctx context.Context, awsClient *aws.Client, baseConfig *aws.
 			}
 
 			// Append MPI and/or storage user-data if enabled
-			if mpiEnabled || efsID != "" {
+			if mpiEnabled || efsID != "" || fsxInfo != nil {
 				// Decode base user-data
 				baseUserDataBytes, err := base64.StdEncoding.DecodeString(instanceConfig.UserData)
 				if err != nil {
@@ -1824,22 +1976,33 @@ func launchJobArray(ctx context.Context, awsClient *aws.Client, baseConfig *aws.
 					combinedUserData += "\n" + mpiScript
 				}
 
-				// Add storage user-data if EFS enabled
-				if efsID != "" {
-					mountOptions, err := getEFSMountOptions()
-					if err != nil {
-						results <- launchResult{
-							index: index,
-							err:   fmt.Errorf("failed to get EFS mount options: %w", err),
+				// Add storage user-data if EFS or FSx enabled
+				if efsID != "" || fsxInfo != nil {
+					storageConfig := userdata.StorageConfig{}
+
+					// EFS configuration
+					if efsID != "" {
+						mountOptions, err := getEFSMountOptions()
+						if err != nil {
+							results <- launchResult{
+								index: index,
+								err:   fmt.Errorf("failed to get EFS mount options: %w", err),
+							}
+							return
 						}
-						return
+
+						storageConfig.EFSEnabled = true
+						storageConfig.EFSFilesystemDNS = aws.GetEFSDNSName(efsID, baseConfig.Region)
+						storageConfig.EFSMountPoint = efsMountPoint
+						storageConfig.EFSMountOptions = mountOptions
 					}
 
-					storageConfig := userdata.StorageConfig{
-						EFSEnabled:       true,
-						EFSFilesystemDNS: aws.GetEFSDNSName(efsID, baseConfig.Region),
-						EFSMountPoint:    efsMountPoint,
-						EFSMountOptions:  mountOptions,
+					// FSx configuration
+					if fsxInfo != nil {
+						storageConfig.FSxLustreEnabled = true
+						storageConfig.FSxFilesystemDNS = fsxInfo.DNSName
+						storageConfig.FSxMountName = fsxInfo.MountName
+						storageConfig.FSxMountPoint = fsxMountPoint
 					}
 
 					storageScript, err := userdata.GenerateStorageUserData(storageConfig)

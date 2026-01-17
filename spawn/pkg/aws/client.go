@@ -103,6 +103,16 @@ type LaunchConfig struct {
 	EFSID         string // EFS filesystem ID to mount (fs-xxx)
 	EFSMountPoint string // EFS mount point (default: /efs)
 
+	// FSx Lustre settings
+	FSxLustreCreate    bool   // Create new FSx Lustre filesystem
+	FSxLustreID        string // Existing FSx filesystem ID to mount (fs-xxx)
+	FSxLustreRecall    string // Recall FSx by stack name
+	FSxStorageCapacity int32  // Storage capacity in GB (1200, 2400, +2400)
+	FSxS3Bucket        string // S3 bucket for import/export
+	FSxImportPath      string // S3 import path (s3://bucket/prefix)
+	FSxExportPath      string // S3 export path (s3://bucket/prefix)
+	FSxMountPoint      string // FSx mount point (default: /fsx)
+
 	// Metadata
 	Name string
 	Tags map[string]string
