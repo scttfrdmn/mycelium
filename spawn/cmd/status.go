@@ -113,7 +113,18 @@ func runSweepStatus(ctx context.Context, sweepID string) error {
 	fmt.Fprintf(os.Stdout, "Sweep ID:          %s\n", status.SweepID)
 	fmt.Fprintf(os.Stdout, "Sweep Name:        %s\n", status.SweepName)
 	fmt.Fprintf(os.Stdout, "Status:            %s\n", colorizeStatus(status.Status))
-	fmt.Fprintf(os.Stdout, "Region:            %s\n", status.Region)
+
+	// Display region information
+	if status.MultiRegion && len(status.RegionStatus) > 0 {
+		regions := make([]string, 0, len(status.RegionStatus))
+		for region := range status.RegionStatus {
+			regions = append(regions, region)
+		}
+		fmt.Fprintf(os.Stdout, "Type:              Multi-Region\n")
+		fmt.Fprintf(os.Stdout, "Regions:           %d (%v)\n", len(regions), regions)
+	} else {
+		fmt.Fprintf(os.Stdout, "Region:            %s\n", status.Region)
+	}
 	fmt.Fprintf(os.Stdout, "\n")
 
 	// Display timestamps
@@ -131,28 +142,78 @@ func runSweepStatus(ctx context.Context, sweepID string) error {
 	fmt.Fprintf(os.Stdout, "\n")
 
 	// Display progress
-	fmt.Fprintf(os.Stdout, "Progress:\n")
+	fmt.Fprintf(os.Stdout, "Progress (Global):\n")
 	fmt.Fprintf(os.Stdout, "  Total Parameters:  %d\n", status.TotalParams)
 	fmt.Fprintf(os.Stdout, "  Launched:          %d (%.1f%%)\n", status.Launched, float64(status.Launched)/float64(status.TotalParams)*100)
-	fmt.Fprintf(os.Stdout, "  Next to Launch:    %d\n", status.NextToLaunch)
+
+	if !status.MultiRegion {
+		// Only show NextToLaunch for single-region sweeps (legacy)
+		fmt.Fprintf(os.Stdout, "  Next to Launch:    %d\n", status.NextToLaunch)
+	}
 	fmt.Fprintf(os.Stdout, "  Failed:            %d\n", status.Failed)
 
 	// Calculate and display estimated completion time
-	if status.Status == "RUNNING" && status.Launched > 0 && status.NextToLaunch < status.TotalParams {
+	if status.Status == "RUNNING" && status.Launched > 0 {
 		elapsed := updatedAt.Sub(createdAt)
 		avgTimePerLaunch := elapsed / time.Duration(status.Launched)
-		remaining := status.TotalParams - status.NextToLaunch
 
-		// Account for max concurrent limiting
-		remainingBatches := (remaining + status.MaxConcurrent - 1) / status.MaxConcurrent
-		estimatedRemaining := time.Duration(remainingBatches) * avgTimePerLaunch * time.Duration(status.MaxConcurrent)
-		estimatedCompletion := time.Now().Add(estimatedRemaining)
+		var remaining int
+		if status.MultiRegion {
+			// Count remaining from RegionStatus
+			for _, rs := range status.RegionStatus {
+				remaining += len(rs.NextToLaunch)
+			}
+		} else {
+			remaining = status.TotalParams - status.NextToLaunch
+		}
 
-		fmt.Fprintf(os.Stdout, "  Est. Completion:   %s (in %s)\n",
-			estimatedCompletion.Format("3:04 PM MST"),
-			formatDuration(estimatedRemaining))
+		if remaining > 0 {
+			// Account for max concurrent limiting
+			remainingBatches := (remaining + status.MaxConcurrent - 1) / status.MaxConcurrent
+			estimatedRemaining := time.Duration(remainingBatches) * avgTimePerLaunch * time.Duration(status.MaxConcurrent)
+			estimatedCompletion := time.Now().Add(estimatedRemaining)
+
+			fmt.Fprintf(os.Stdout, "  Est. Completion:   %s (in %s)\n",
+				estimatedCompletion.Format("3:04 PM MST"),
+				formatDuration(estimatedRemaining))
+		}
 	}
 	fmt.Fprintf(os.Stdout, "\n")
+
+	// Display regional breakdown for multi-region sweeps
+	if status.MultiRegion && len(status.RegionStatus) > 0 {
+		fmt.Fprintf(os.Stdout, "Regional Breakdown:\n")
+
+		// Sort regions for consistent display
+		regions := make([]string, 0, len(status.RegionStatus))
+		for region := range status.RegionStatus {
+			regions = append(regions, region)
+		}
+		// Simple sort using a loop (avoiding imports)
+		for i := 0; i < len(regions); i++ {
+			for j := i + 1; j < len(regions); j++ {
+				if regions[i] > regions[j] {
+					regions[i], regions[j] = regions[j], regions[i]
+				}
+			}
+		}
+
+		for _, region := range regions {
+			rs := status.RegionStatus[region]
+			total := len(rs.NextToLaunch) + rs.Launched + rs.Failed
+			pending := len(rs.NextToLaunch)
+
+			fmt.Fprintf(os.Stdout, "  %-13s  %d/%d launched, %d active, %d pending, %d failed\n",
+				region+":",
+				rs.Launched,
+				total,
+				rs.ActiveCount,
+				pending,
+				rs.Failed,
+			)
+		}
+		fmt.Fprintf(os.Stdout, "\n")
+	}
 
 	// Display configuration
 	fmt.Fprintf(os.Stdout, "Configuration:\n")
@@ -189,8 +250,15 @@ func runSweepStatus(ctx context.Context, sweepID string) error {
 	// Display instance details (limited to most recent 10)
 	if len(status.Instances) > 0 {
 		fmt.Fprintf(os.Stdout, "Recent Instances (showing last 10):\n")
-		fmt.Fprintf(os.Stdout, "%-5s %-20s %-15s %-20s\n", "Index", "Instance ID", "State", "Launched At")
-		fmt.Fprintf(os.Stdout, "%-5s %-20s %-15s %-20s\n", "-----", "--------------------", "---------------", "--------------------")
+
+		if status.MultiRegion {
+			// Show region column for multi-region sweeps
+			fmt.Fprintf(os.Stdout, "%-5s %-13s %-20s %-15s %-20s\n", "Index", "Region", "Instance ID", "State", "Launched At")
+			fmt.Fprintf(os.Stdout, "%-5s %-13s %-20s %-15s %-20s\n", "-----", "-------------", "--------------------", "---------------", "--------------------")
+		} else {
+			fmt.Fprintf(os.Stdout, "%-5s %-20s %-15s %-20s\n", "Index", "Instance ID", "State", "Launched At")
+			fmt.Fprintf(os.Stdout, "%-5s %-20s %-15s %-20s\n", "-----", "--------------------", "---------------", "--------------------")
+		}
 
 		// Show last 10 instances
 		startIdx := 0
@@ -201,12 +269,23 @@ func runSweepStatus(ctx context.Context, sweepID string) error {
 		for _, inst := range status.Instances[startIdx:] {
 			launchedAt, _ := time.Parse(time.RFC3339, inst.LaunchedAt)
 			stateDisplay := colorizeInstanceState(inst.State)
-			fmt.Fprintf(os.Stdout, "%-5d %-20s %-15s %-20s\n",
-				inst.Index,
-				inst.InstanceID,
-				stateDisplay,
-				launchedAt.Format("2006-01-02 15:04:05"),
-			)
+
+			if status.MultiRegion {
+				fmt.Fprintf(os.Stdout, "%-5d %-13s %-20s %-15s %-20s\n",
+					inst.Index,
+					inst.Region,
+					inst.InstanceID,
+					stateDisplay,
+					launchedAt.Format("2006-01-02 15:04:05"),
+				)
+			} else {
+				fmt.Fprintf(os.Stdout, "%-5d %-20s %-15s %-20s\n",
+					inst.Index,
+					inst.InstanceID,
+					stateDisplay,
+					launchedAt.Format("2006-01-02 15:04:05"),
+				)
+			}
 		}
 		fmt.Fprintf(os.Stdout, "\n")
 	}

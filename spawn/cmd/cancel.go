@@ -1,8 +1,10 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -59,7 +61,16 @@ func runCancel(cmd *cobra.Command, args []string) error {
 	// Display current status
 	fmt.Fprintf(os.Stderr, "\n   Sweep Name: %s\n", state.SweepName)
 	fmt.Fprintf(os.Stderr, "   Status: %s\n", state.Status)
-	fmt.Fprintf(os.Stderr, "   Region: %s\n", state.Region)
+	if state.MultiRegion && len(state.RegionStatus) > 0 {
+		regions := make([]string, 0, len(state.RegionStatus))
+		for region := range state.RegionStatus {
+			regions = append(regions, region)
+		}
+		fmt.Fprintf(os.Stderr, "   Type: Multi-Region\n")
+		fmt.Fprintf(os.Stderr, "   Regions: %v\n", regions)
+	} else {
+		fmt.Fprintf(os.Stderr, "   Region: %s\n", state.Region)
+	}
 	fmt.Fprintf(os.Stderr, "   Progress: %d/%d launched\n", state.Launched, state.TotalParams)
 
 	// Check if already cancelled or completed
@@ -72,30 +83,63 @@ func runCancel(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// Count instances to terminate
-	instancesToTerminate := []string{}
+	// Group instances by region for multi-region sweeps
+	instancesByRegion := make(map[string][]string)
 	for _, inst := range state.Instances {
 		if inst.InstanceID != "" && (inst.State == "pending" || inst.State == "running") {
-			instancesToTerminate = append(instancesToTerminate, inst.InstanceID)
+			region := inst.Region
+			if region == "" {
+				// Fall back to sweep region for legacy instances
+				region = state.Region
+			}
+			instancesByRegion[region] = append(instancesByRegion[region], inst.InstanceID)
 		}
 	}
 
-	fmt.Fprintf(os.Stderr, "\n🔍 Found %d instances to terminate\n\n", len(instancesToTerminate))
+	totalToTerminate := 0
+	for _, instances := range instancesByRegion {
+		totalToTerminate += len(instances)
+	}
+
+	fmt.Fprintf(os.Stderr, "\n🔍 Found %d instances to terminate", totalToTerminate)
+	if state.MultiRegion && len(instancesByRegion) > 1 {
+		fmt.Fprintf(os.Stderr, " across %d regions", len(instancesByRegion))
+	}
+	fmt.Fprintf(os.Stderr, "\n\n")
 
 	// Terminate instances if any
-	if len(instancesToTerminate) > 0 {
+	if totalToTerminate > 0 {
 		fmt.Fprintf(os.Stderr, "⚡ Terminating instances...\n")
 
-		// Use dev account credentials directly (user should be authenticated to the target account)
-		devCfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(state.Region))
-		if err != nil {
-			return fmt.Errorf("failed to load dev account config: %w", err)
-		}
+		if state.MultiRegion && len(instancesByRegion) > 1 {
+			// Multi-region: terminate concurrently per region
+			if err := terminateMultiRegion(ctx, instancesByRegion); err != nil {
+				return fmt.Errorf("failed to terminate instances: %w", err)
+			}
+		} else {
+			// Single region: use existing logic
+			region := state.Region
+			if len(instancesByRegion) == 1 {
+				for r := range instancesByRegion {
+					region = r
+				}
+			}
 
-		if err := sweep.TerminateSweepInstancesDirect(ctx, devCfg, instancesToTerminate); err != nil {
-			return fmt.Errorf("failed to terminate instances: %w", err)
+			devCfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(region))
+			if err != nil {
+				return fmt.Errorf("failed to load dev account config: %w", err)
+			}
+
+			instances := []string{}
+			for _, instList := range instancesByRegion {
+				instances = append(instances, instList...)
+			}
+
+			if err := sweep.TerminateSweepInstancesDirect(ctx, devCfg, instances); err != nil {
+				return fmt.Errorf("failed to terminate instances: %w", err)
+			}
+			fmt.Fprintf(os.Stderr, "   Terminated %d instances in %s\n", len(instances), region)
 		}
-		fmt.Fprintf(os.Stderr, "   Terminated %d instances\n", len(instancesToTerminate))
 	}
 
 	// Update sweep status to CANCELLED and set cancel flag
@@ -109,10 +153,56 @@ func runCancel(cmd *cobra.Command, args []string) error {
 
 	fmt.Fprintf(os.Stderr, "\n✅ Sweep cancelled successfully!\n")
 	fmt.Fprintf(os.Stderr, "   Sweep ID: %s\n", cancelSweepID)
-	if len(instancesToTerminate) > 0 {
-		fmt.Fprintf(os.Stderr, "   Terminated: %d instances\n", len(instancesToTerminate))
+	if totalToTerminate > 0 {
+		fmt.Fprintf(os.Stderr, "   Terminated: %d instances\n", totalToTerminate)
 	}
 	fmt.Fprintf(os.Stderr, "\n")
 
 	return nil
+}
+
+// terminateMultiRegion terminates instances across multiple regions concurrently
+func terminateMultiRegion(ctx context.Context, instancesByRegion map[string][]string) error {
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	var firstErr error
+
+	for region, instances := range instancesByRegion {
+		if len(instances) == 0 {
+			continue
+		}
+
+		wg.Add(1)
+		go func(r string, instList []string) {
+			defer wg.Done()
+
+			fmt.Fprintf(os.Stderr, "   Terminating %d instances in %s...\n", len(instList), r)
+
+			// Load regional config
+			regionalCfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(r))
+			if err != nil {
+				mu.Lock()
+				if firstErr == nil {
+					firstErr = fmt.Errorf("failed to load config for %s: %w", r, err)
+				}
+				mu.Unlock()
+				return
+			}
+
+			// Terminate instances in this region
+			if err := sweep.TerminateSweepInstancesDirect(ctx, regionalCfg, instList); err != nil {
+				mu.Lock()
+				if firstErr == nil {
+					firstErr = fmt.Errorf("failed to terminate in %s: %w", r, err)
+				}
+				mu.Unlock()
+				return
+			}
+
+			fmt.Fprintf(os.Stderr, "   ✓ Terminated %d instances in %s\n", len(instList), r)
+		}(region, instances)
+	}
+
+	wg.Wait()
+	return firstErr
 }
