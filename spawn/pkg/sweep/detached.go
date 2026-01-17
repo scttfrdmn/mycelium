@@ -27,31 +27,44 @@ const (
 
 // SweepRecord represents the DynamoDB record structure
 type SweepRecord struct {
-	SweepID         string          `dynamodbav:"sweep_id"`
-	SweepName       string          `dynamodbav:"sweep_name"`
-	UserID          string          `dynamodbav:"user_id"`
-	CreatedAt       string          `dynamodbav:"created_at"`
-	UpdatedAt       string          `dynamodbav:"updated_at"`
-	CompletedAt     string          `dynamodbav:"completed_at,omitempty"`
-	S3ParamsKey     string          `dynamodbav:"s3_params_key"`
-	MaxConcurrent   int             `dynamodbav:"max_concurrent"`
-	LaunchDelay     string          `dynamodbav:"launch_delay"`
-	TotalParams     int             `dynamodbav:"total_params"`
-	Region          string          `dynamodbav:"region"`
-	AWSAccountID    string          `dynamodbav:"aws_account_id"`
-	Status          string          `dynamodbav:"status"`
-	CancelRequested bool            `dynamodbav:"cancel_requested"`
-	EstimatedCost   float64         `dynamodbav:"estimated_cost,omitempty"`
-	NextToLaunch    int             `dynamodbav:"next_to_launch"`
-	Launched        int             `dynamodbav:"launched"`
-	Failed          int             `dynamodbav:"failed"`
-	ErrorMessage    string          `dynamodbav:"error_message,omitempty"`
-	Instances       []SweepInstance `dynamodbav:"instances"`
+	SweepID         string                      `dynamodbav:"sweep_id"`
+	SweepName       string                      `dynamodbav:"sweep_name"`
+	UserID          string                      `dynamodbav:"user_id"`
+	CreatedAt       string                      `dynamodbav:"created_at"`
+	UpdatedAt       string                      `dynamodbav:"updated_at"`
+	CompletedAt     string                      `dynamodbav:"completed_at,omitempty"`
+	S3ParamsKey     string                      `dynamodbav:"s3_params_key"`
+	MaxConcurrent   int                         `dynamodbav:"max_concurrent"`
+	LaunchDelay     string                      `dynamodbav:"launch_delay"`
+	TotalParams     int                         `dynamodbav:"total_params"`
+	Region          string                      `dynamodbav:"region"`
+	AWSAccountID    string                      `dynamodbav:"aws_account_id"`
+	Status          string                      `dynamodbav:"status"`
+	CancelRequested bool                        `dynamodbav:"cancel_requested"`
+	EstimatedCost   float64                     `dynamodbav:"estimated_cost,omitempty"`
+	NextToLaunch    int                         `dynamodbav:"next_to_launch"`
+	Launched        int                         `dynamodbav:"launched"`
+	Failed          int                         `dynamodbav:"failed"`
+	ErrorMessage    string                      `dynamodbav:"error_message,omitempty"`
+	Instances       []SweepInstance             `dynamodbav:"instances"`
+
+	// Multi-region support
+	MultiRegion     bool                        `dynamodbav:"multi_region"`
+	RegionStatus    map[string]*RegionProgress  `dynamodbav:"region_status,omitempty"`
+}
+
+// RegionProgress tracks per-region sweep progress
+type RegionProgress struct {
+	Launched      int   `dynamodbav:"launched"`
+	Failed        int   `dynamodbav:"failed"`
+	ActiveCount   int   `dynamodbav:"active_count"`
+	NextToLaunch  []int `dynamodbav:"next_to_launch"`
 }
 
 // SweepInstance tracks individual instance state
 type SweepInstance struct {
 	Index        int    `dynamodbav:"index"`
+	Region       string `dynamodbav:"region"`
 	InstanceID   string `dynamodbav:"instance_id"`
 	State        string `dynamodbav:"state"`
 	LaunchedAt   string `dynamodbav:"launched_at"`
@@ -63,6 +76,35 @@ type SweepInstance struct {
 type ParamFileFormat struct {
 	Defaults map[string]interface{}   `json:"defaults"`
 	Params   []map[string]interface{} `json:"params"`
+}
+
+// GroupParamsByRegion groups parameter sets by their target region
+func GroupParamsByRegion(params []map[string]interface{}, defaults map[string]interface{}) map[string][]int {
+	groups := make(map[string][]int)
+	defaultRegion := "us-east-1" // Fallback default
+
+	// Extract default region if specified
+	if r, ok := defaults["region"]; ok {
+		if regionStr, ok := r.(string); ok && regionStr != "" {
+			defaultRegion = regionStr
+		}
+	}
+
+	// Group each param by its region
+	for i, param := range params {
+		region := defaultRegion
+
+		// Check if this param specifies a region override
+		if r, ok := param["region"]; ok {
+			if regionStr, ok := r.(string); ok && regionStr != "" {
+				region = regionStr
+			}
+		}
+
+		groups[region] = append(groups[region], i)
+	}
+
+	return groups
 }
 
 // UploadParamsToS3 uploads parameter file to S3 and returns the S3 key

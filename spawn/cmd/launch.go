@@ -2458,6 +2458,26 @@ func launchSweepDetached(ctx context.Context, paramFormat *ParamFileFormat, base
 		EstimatedCost: costEstimate.TotalCost,
 	}
 
+	// Check if multi-region sweep
+	regionGroups := sweep.GroupParamsByRegion(sweepParamFormat.Params, sweepParamFormat.Defaults)
+	if len(regionGroups) > 1 {
+		record.MultiRegion = true
+		record.RegionStatus = make(map[string]*sweep.RegionProgress)
+
+		regions := make([]string, 0, len(regionGroups))
+		for region, indices := range regionGroups {
+			regions = append(regions, region)
+			record.RegionStatus[region] = &sweep.RegionProgress{
+				NextToLaunch: indices,
+				Launched:     0,
+				Failed:       0,
+				ActiveCount:  0,
+			}
+		}
+
+		fmt.Fprintf(os.Stderr, "🌍 Multi-region sweep detected: %v\n", regions)
+	}
+
 	err = sweep.CreateSweepRecord(ctx, infraCfg, record)
 	if err != nil {
 		return fmt.Errorf("failed to create sweep record: %w", err)
