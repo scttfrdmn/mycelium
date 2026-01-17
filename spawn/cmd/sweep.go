@@ -158,11 +158,20 @@ func buildLaunchConfigFromParams(defaults, params map[string]interface{}, sweepI
 			if s, ok := val.(string); ok {
 				config.DNSName = s
 			}
-		case "command", "user_command":
-			// Store command for later user-data injection
+		case "step":
+			// Workflow step name
 			if s, ok := val.(string); ok {
-				// We'll handle this in buildUserData
-				config.Tags = make(map[string]string)
+				if config.Tags == nil {
+					config.Tags = make(map[string]string)
+				}
+				config.Tags["spawn:step"] = s
+			}
+		case "command", "user_command":
+			// Store command for user-data execution
+			if s, ok := val.(string); ok {
+				if config.Tags == nil {
+					config.Tags = make(map[string]string)
+				}
 				config.Tags["spawn:command"] = s
 			}
 		case "user_data":

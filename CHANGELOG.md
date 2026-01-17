@@ -18,6 +18,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Supports defaults and params sections
   - Common in DevOps tooling
   - Example: `spawn sweep --file params.yaml --detach`
+- Workflow support with heterogeneous instance configurations (Issue #17)
+  - `step` field in parameter files to name workflow steps
+  - `command` field to specify per-step commands that execute automatically
+  - Different instance types per workflow step (e.g., t3.micro for unit tests, c5.large for e2e)
+  - Automatic command execution on instance startup with full parameter environment
+  - Command output logged to `/var/log/spawn-command.log`
+  - Background execution allows SSH access during long-running commands
+  - Works with JSON, YAML, and CSV parameter file formats
+  - Example workflows: CI/CD pipelines, ML training pipelines, data processing (ETL)
+  - Example: `spawn sweep --file workflow-ci-pipeline.yaml --detach`
 
 ## [0.7.0] - 2026-01-17
 

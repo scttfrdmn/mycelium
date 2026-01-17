@@ -1607,6 +1607,40 @@ EOFPARAMS
     chmod 644 /etc/profile.d/spawn-params.sh
 
     echo "✅ Parameter sweep environment configured (Index: $SWEEP_INDEX/$SWEEP_SIZE)"
+
+    # Execute workflow command if specified
+    WORKFLOW_COMMAND=$(aws ec2 describe-tags --region $REGION \
+        --filters "Name=resource-id,Values=$INSTANCE_ID" "Name=key,Values=spawn:command" \
+        --query 'Tags[0].Value' --output text 2>/dev/null || echo "None")
+
+    if [ "$WORKFLOW_COMMAND" != "None" ] && [ -n "$WORKFLOW_COMMAND" ]; then
+        STEP_NAME=$(aws ec2 describe-tags --region $REGION \
+            --filters "Name=resource-id,Values=$INSTANCE_ID" "Name=key,Values=spawn:step" \
+            --query 'Tags[0].Value' --output text 2>/dev/null || echo "")
+
+        if [ -n "$STEP_NAME" ]; then
+            echo "▶️  Executing workflow step: $STEP_NAME"
+        else
+            echo "▶️  Executing command from parameter sweep"
+        fi
+
+        # Source parameter environment before running command
+        source /etc/profile.d/spawn-params.sh
+
+        # Create command execution script
+        cat > /tmp/spawn-command.sh <<'EOFCMD'
+#!/bin/bash
+set -e
+EOFCMD
+        echo "$WORKFLOW_COMMAND" >> /tmp/spawn-command.sh
+        chmod +x /tmp/spawn-command.sh
+
+        # Execute command as local user in background
+        # Log output to both file and console
+        su - local -c '/tmp/spawn-command.sh' 2>&1 | tee /var/log/spawn-command.log &
+
+        echo "✅ Command execution started (logs: /var/log/spawn-command.log)"
+    fi
 fi
 
 # Create login banner (MOTD) with spore configuration
