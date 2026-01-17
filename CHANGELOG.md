@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- CSV file format support for parameter files (Issue #18)
+  - Header row defines parameter names
+  - Automatic type detection (boolean, integer, float, string)
+  - Compatible with Excel, Google Sheets, and database exports
+  - Example: `spawn sweep --file params.csv --detach`
+- YAML file format support for parameter files (Issue #19)
+  - More readable than JSON for complex configurations
+  - Supports defaults and params sections
+  - Common in DevOps tooling
+  - Example: `spawn sweep --file params.yaml --detach`
+
 ## [0.7.0] - 2026-01-17
 
 ### Added

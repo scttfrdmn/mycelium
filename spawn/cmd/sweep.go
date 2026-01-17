@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/scttfrdmn/mycelium/spawn/pkg/aws"
+	paramparser "github.com/scttfrdmn/mycelium/spawn/pkg/params"
 )
 
 // SweepConfig represents a parameter sweep configuration
@@ -55,23 +56,19 @@ type ParamFileFormat struct {
 	Params   []map[string]interface{} `json:"params"`
 }
 
-// parseParamFile reads and parses a JSON parameter file
+// parseParamFile reads and parses a parameter file (JSON, YAML, or CSV)
 func parseParamFile(path string) (*ParamFileFormat, error) {
-	data, err := os.ReadFile(path)
+	// Use the params package parser which supports JSON, YAML, and CSV
+	result, err := paramparser.ParseParamFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read parameter file: %w", err)
+		return nil, err
 	}
 
-	var format ParamFileFormat
-	if err := json.Unmarshal(data, &format); err != nil {
-		return nil, fmt.Errorf("failed to parse JSON parameter file: %w", err)
-	}
-
-	if format.Params == nil || len(format.Params) == 0 {
-		return nil, fmt.Errorf("parameter file must contain at least one parameter set in 'params' array")
-	}
-
-	return &format, nil
+	// Convert to cmd.ParamFileFormat (same structure)
+	return &ParamFileFormat{
+		Defaults: result.Defaults,
+		Params:   result.Params,
+	}, nil
 }
 
 // buildLaunchConfigFromParams merges defaults with parameter overrides
