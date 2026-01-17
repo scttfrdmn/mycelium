@@ -28,6 +28,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Works with JSON, YAML, and CSV parameter file formats
   - Example workflows: CI/CD pipelines, ML training pipelines, data processing (ETL)
   - Example: `spawn sweep --file workflow-ci-pipeline.yaml --detach`
+- Result collection and aggregation for parameter sweeps (Issue #22)
+  - `spawn collect-results --sweep-id` command to collect results from all sweep instances
+  - Automatic download from S3 standard location: `s3://spawn-results-<account>-<region>/sweeps/<sweep-id>/<index>/results.json`
+  - Support for custom S3 prefix via `--s3-prefix` flag
+  - Multiple output formats: JSON, JSON Lines (JSONL), CSV
+  - Metric-based ranking with `--metric` flag (e.g., `--metric accuracy`)
+  - Filter top N results with `--best` flag (e.g., `--best 5` for top 5)
+  - Automatic sorting by metric (descending - higher is better)
+  - CSV output includes all parameters and metrics as columns
+  - JSON output preserves full result structure with metadata
+  - Example: `spawn collect-results --sweep-id sweep-123 --metric accuracy --best 5 --output top5.json`
+  - Use case: ML hyperparameter search - identify best model configurations
 
 ## [0.7.0] - 2026-01-17
 
