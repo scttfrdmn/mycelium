@@ -37,15 +37,33 @@ type FSxConfig struct {
 
 // CreateFSxLustreFilesystem creates an FSx for Lustre filesystem with S3 backing
 func (c *Client) CreateFSxLustreFilesystem(ctx context.Context, config FSxConfig) (*FSxInfo, error) {
-	// 1. Ensure S3 bucket exists (auto-create if specified)
+	// 1. Construct import/export paths early (needed for S3 bucket tags)
+	importPath := config.ImportPath
+	if importPath == "" && config.S3Bucket != "" {
+		importPath = fmt.Sprintf("s3://%s/", config.S3Bucket)
+	}
+
+	exportPath := config.ExportPath
+	if exportPath == "" && config.S3Bucket != "" {
+		exportPath = fmt.Sprintf("s3://%s/", config.S3Bucket)
+	}
+
+	// 2. Ensure S3 bucket exists with FSx configuration tags (auto-create if specified)
 	if config.AutoCreateBucket {
-		err := c.CreateS3BucketIfNotExists(ctx, config.S3Bucket, config.Region)
+		err := c.CreateS3BucketWithTags(ctx, S3BucketConfig{
+			BucketName:      config.S3Bucket,
+			Region:          config.Region,
+			StackName:       config.StackName,
+			StorageCapacity: config.StorageCapacity,
+			ImportPath:      importPath,
+			ExportPath:      exportPath,
+		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to create S3 bucket: %w", err)
 		}
 	}
 
-	// 2. Get subnet ID (use default VPC if not specified)
+	// 3. Get subnet ID (use default VPC if not specified)
 	subnetID := config.SubnetID
 	if subnetID == "" {
 		vpcID, err := c.GetDefaultVPC(ctx, config.Region)
@@ -63,17 +81,6 @@ func (c *Client) CreateFSxLustreFilesystem(ctx context.Context, config FSxConfig
 		}
 
 		subnetID = subnets[0]
-	}
-
-	// 3. Construct import/export paths
-	importPath := config.ImportPath
-	if importPath == "" && config.S3Bucket != "" {
-		importPath = fmt.Sprintf("s3://%s/", config.S3Bucket)
-	}
-
-	exportPath := config.ExportPath
-	if exportPath == "" && config.S3Bucket != "" {
-		exportPath = fmt.Sprintf("s3://%s/", config.S3Bucket)
 	}
 
 	// 4. Create FSx filesystem with DRA
@@ -282,11 +289,17 @@ func (c *Client) RecallFSxFilesystem(ctx context.Context, stackName, region stri
 		}
 	}
 
+	// 3. If no active filesystem found, check S3 buckets for configuration
 	if foundConfig == nil {
-		return nil, fmt.Errorf("no FSx filesystem found with stack name: %s", stackName)
+		var err error
+		foundConfig, err = c.GetFSxConfigFromS3Bucket(ctx, stackName, region)
+		if err != nil {
+			return nil, fmt.Errorf("no FSx filesystem or S3 bucket found with stack name %s: %w", stackName, err)
+		}
 	}
 
-	// 3. Create new filesystem with same configuration
+	// 4. Create new filesystem with same configuration
+	foundConfig.AutoCreateBucket = false // Bucket should already exist
 	return c.CreateFSxLustreFilesystem(ctx, *foundConfig)
 }
 

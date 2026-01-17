@@ -41,8 +41,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Automatic Lustre client installation and filesystem mounting
   - Works with single instances, job arrays, and MPI clusters
   - Tags for tracking S3-backed filesystems for recall workflow
+- FSx recall workflow enhancements (Issue #35, Milestone 4 of #29)
+  - Enhanced S3 bucket tagging with FSx configuration for recall after deletion
+  - S3 buckets tagged with stack name, storage capacity, import/export paths
+  - `GetFSxConfigFromS3Bucket` function retrieves configuration from S3 bucket tags
+  - `RecallFSxFilesystem` now falls back to S3 bucket tags if filesystem deleted
+  - Enables true ephemeral compute: create → populate → export → delete → recall from S3
+  - Recall works even after FSx filesystem is completely deleted
+  - No DynamoDB required - configuration persists in S3 bucket tags
 - Future considerations documented in issues:
-  - Issue #35: FSx recall workflow for ephemeral compute (Milestone 4 of #29)
   - Issue #36: FSx management commands (Milestone 5 of #29)
   - Issue #30: MPI compatibility with AMI creation workflow
 
