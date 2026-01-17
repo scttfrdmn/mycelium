@@ -1,0 +1,14 @@
+{
+  "defaults": {
+    "instance_type": "t3.micro",
+    "region": "us-east-1",
+    "ttl": "1h",
+    "spot": true
+  },
+  "params": [
+    { "name": "test-east-1" },
+    { "name": "test-east-2" },
+    { "name": "test-west", "region": "us-west-2" },
+    { "name": "test-eu", "region": "eu-west-1" }
+  ]
+}

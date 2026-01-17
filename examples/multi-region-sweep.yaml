@@ -1,0 +1,66 @@
+# Multi-Region Parameter Sweep Example
+#
+# This example demonstrates launching instances across multiple AWS regions
+# in a single parameter sweep with global max concurrent limit.
+#
+# Usage:
+#   spawn sweep --file examples/multi-region-sweep.yaml --max-concurrent 10 --detach
+#
+# Features:
+#   - Concurrent launches across all specified regions
+#   - Global max concurrent limit enforced (not per-region)
+#   - Fair distribution algorithm: fairShare = globalAvailable / regionsWithWork
+#   - Resilient to region access restrictions (marks params as failed, continues)
+#
+# Example output:
+#   Regional Breakdown:
+#     us-east-1:  20/50 launched, 3 active, 27 pending, 0 failed
+#     us-west-2:  15/50 launched, 4 active, 32 pending, 0 failed
+#     eu-west-1:  10/50 launched, 3 active, 37 pending, 0 failed
+
+defaults:
+  instance_type: t3.micro
+  region: us-east-1
+  ttl: 2h
+  spot: true
+  key_name: spawn-key
+  ami: ami-0c55b159cbfafe1f0  # Amazon Linux 2023 (update for your region)
+
+params:
+  # US East (Virginia) - 5 instances
+  - name: benchmark-east-1
+  - name: benchmark-east-2
+  - name: benchmark-east-3
+  - name: benchmark-east-4
+  - name: benchmark-east-5
+
+  # US West (Oregon) - 5 instances
+  - name: benchmark-west-1
+    region: us-west-2
+  - name: benchmark-west-2
+    region: us-west-2
+  - name: benchmark-west-3
+    region: us-west-2
+  - name: benchmark-west-4
+    region: us-west-2
+  - name: benchmark-west-5
+    region: us-west-2
+
+  # EU West (Ireland) - 5 instances
+  - name: benchmark-eu-1
+    region: eu-west-1
+  - name: benchmark-eu-2
+    region: eu-west-1
+  - name: benchmark-eu-3
+    region: eu-west-1
+  - name: benchmark-eu-4
+    region: eu-west-1
+  - name: benchmark-eu-5
+    region: eu-west-1
+
+# Notes:
+# - AMI IDs must be valid for each region (update per-region if needed)
+# - Ensure IAM role (spawn-sweep-orchestrator) has access to all regions
+# - Check for AWS Organization SCPs that may restrict region access
+# - Use spawn status --sweep-id <id> to monitor progress
+# - Use spawn cancel --sweep-id <id> to terminate all instances

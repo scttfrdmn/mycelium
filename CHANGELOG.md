@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Multi-region parameter sweep support (Issue #24)
+  - Launch instances across multiple AWS regions in a single sweep
+  - Per-parameter region specification via `region` field in parameter file
+  - Global max concurrent limit with fair distribution across regions
+  - Fair share algorithm: `fairShare = max(1, globalAvailable / regionsWithWork)`
+  - Regional client pool in Lambda orchestrator for concurrent region access
+  - Enhanced `spawn status --sweep-id` with regional breakdown display
+  - Shows per-region progress: launched/active/pending/failed counts
+  - Enhanced `spawn cancel --sweep-id` with concurrent regional termination
+  - Resilient to AWS region restrictions (SCP policies, IAM restrictions)
+  - Auto-detects restricted regions, marks params as failed, continues with accessible regions
+  - Backward compatible: single-region sweeps work unchanged
+  - Example: See `examples/multi-region-sweep.yaml` and `examples/multi-region-minimal.json`
+  - Use case: Global latency testing, multi-region availability testing, geo-distributed workloads
+
 ## [0.8.0] - 2026-01-17
 
 ### Added
