@@ -1,0 +1,311 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/aws/aws-sdk-go-v2/config"
+)
+
+const (
+	dynamoSweepTable = "spawn-sweep-orchestration"
+)
+
+// handleListSweeps handles GET /api/sweeps
+func handleListSweeps(ctx context.Context, cfg aws.Config, userID string) (events.APIGatewayProxyResponse, error) {
+	startTime := time.Now()
+
+	// Query DynamoDB for user's sweeps
+	dynamodbClient := dynamodb.NewFromConfig(cfg)
+
+	// Scan table (TODO: Add GSI on user_id for better performance)
+	scanInput := &dynamodb.ScanInput{
+		TableName: aws.String(dynamoSweepTable),
+		FilterExpression: aws.String("user_id = :user_id"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":user_id": &types.AttributeValueMemberS{Value: userID},
+		},
+	}
+
+	result, err := dynamodbClient.Scan(ctx, scanInput)
+	if err != nil {
+		return errorResponse(500, fmt.Sprintf("Failed to query sweeps: %v", err)), nil
+	}
+
+	// Unmarshal sweeps
+	var sweeps []SweepInfo
+	for _, item := range result.Items {
+		var sweep SweepRecord
+		if err := attributevalue.UnmarshalMap(item, &sweep); err != nil {
+			continue
+		}
+
+		createdAt, _ := time.Parse(time.RFC3339, sweep.CreatedAt)
+		updatedAt, _ := time.Parse(time.RFC3339, sweep.UpdatedAt)
+		completedAt, _ := time.Parse(time.RFC3339, sweep.CompletedAt)
+
+		sweepInfo := SweepInfo{
+			SweepID:       sweep.SweepID,
+			SweepName:     sweep.SweepName,
+			Status:        sweep.Status,
+			TotalParams:   sweep.TotalParams,
+			Launched:      sweep.Launched,
+			Failed:        sweep.Failed,
+			Region:        sweep.Region,
+			CreatedAt:     createdAt,
+			UpdatedAt:     updatedAt,
+			EstimatedCost: sweep.EstimatedCost,
+		}
+
+		if !completedAt.IsZero() {
+			sweepInfo.CompletedAt = &completedAt
+			sweepInfo.DurationSeconds = int(completedAt.Sub(createdAt).Seconds())
+		}
+
+		sweeps = append(sweeps, sweepInfo)
+	}
+
+	elapsed := time.Since(startTime)
+	fmt.Printf("Listed %d sweeps in %v\n", len(sweeps), elapsed)
+
+	// Build response
+	response := SweepAPIResponse{
+		Success:     true,
+		TotalSweeps: len(sweeps),
+		Sweeps:      sweeps,
+	}
+
+	return successResponse(response)
+}
+
+// handleGetSweep handles GET /api/sweeps/{id}
+func handleGetSweep(ctx context.Context, cfg aws.Config, sweepID, userID string) (events.APIGatewayProxyResponse, error) {
+	// Query DynamoDB for sweep
+	dynamodbClient := dynamodb.NewFromConfig(cfg)
+
+	getInput := &dynamodb.GetItemInput{
+		TableName: aws.String(dynamoSweepTable),
+		Key: map[string]types.AttributeValue{
+			"sweep_id": &types.AttributeValueMemberS{Value: sweepID},
+		},
+	}
+
+	result, err := dynamodbClient.GetItem(ctx, getInput)
+	if err != nil {
+		return errorResponse(500, fmt.Sprintf("Failed to get sweep: %v", err)), nil
+	}
+
+	if result.Item == nil {
+		return errorResponse(404, "Sweep not found"), nil
+	}
+
+	var sweep SweepRecord
+	if err := attributevalue.UnmarshalMap(result.Item, &sweep); err != nil {
+		return errorResponse(500, fmt.Sprintf("Failed to unmarshal sweep: %v", err)), nil
+	}
+
+	// Verify user owns this sweep
+	if sweep.UserID != userID {
+		return errorResponse(403, "Access denied"), nil
+	}
+
+	// Build detailed sweep info
+	createdAt, _ := time.Parse(time.RFC3339, sweep.CreatedAt)
+	updatedAt, _ := time.Parse(time.RFC3339, sweep.UpdatedAt)
+	completedAt, _ := time.Parse(time.RFC3339, sweep.CompletedAt)
+
+	sweepInfo := SweepDetailInfo{
+		SweepID:         sweep.SweepID,
+		SweepName:       sweep.SweepName,
+		Status:          sweep.Status,
+		TotalParams:     sweep.TotalParams,
+		Launched:        sweep.Launched,
+		Failed:          sweep.Failed,
+		Region:          sweep.Region,
+		CreatedAt:       createdAt,
+		UpdatedAt:       updatedAt,
+		EstimatedCost:   sweep.EstimatedCost,
+		MaxConcurrent:   sweep.MaxConcurrent,
+		LaunchDelay:     sweep.LaunchDelay,
+		NextToLaunch:    sweep.NextToLaunch,
+		CancelRequested: sweep.CancelRequested,
+	}
+
+	if !completedAt.IsZero() {
+		sweepInfo.CompletedAt = &completedAt
+		sweepInfo.DurationSeconds = int(completedAt.Sub(createdAt).Seconds())
+	}
+
+	// Convert instances
+	for _, inst := range sweep.Instances {
+		launchedAt, _ := time.Parse(time.RFC3339, inst.LaunchedAt)
+		terminatedAt, _ := time.Parse(time.RFC3339, inst.TerminatedAt)
+
+		instanceInfo := SweepInstanceInfo{
+			Index:        inst.Index,
+			InstanceID:   inst.InstanceID,
+			State:        inst.State,
+			LaunchedAt:   launchedAt,
+			ErrorMessage: inst.ErrorMessage,
+		}
+
+		if !terminatedAt.IsZero() {
+			instanceInfo.TerminatedAt = &terminatedAt
+		}
+
+		sweepInfo.Instances = append(sweepInfo.Instances, instanceInfo)
+	}
+
+	// Build response
+	response := SweepDetailAPIResponse{
+		Success: true,
+		Sweep:   sweepInfo,
+	}
+
+	return successResponse(response)
+}
+
+// handleCancelSweep handles POST /api/sweeps/{id}/cancel
+func handleCancelSweep(ctx context.Context, cfg aws.Config, sweepID, userID string) (events.APIGatewayProxyResponse, error) {
+	// Get sweep details
+	dynamodbClient := dynamodb.NewFromConfig(cfg)
+
+	getInput := &dynamodb.GetItemInput{
+		TableName: aws.String(dynamoSweepTable),
+		Key: map[string]types.AttributeValue{
+			"sweep_id": &types.AttributeValueMemberS{Value: sweepID},
+		},
+	}
+
+	result, err := dynamodbClient.GetItem(ctx, getInput)
+	if err != nil {
+		return errorResponse(500, fmt.Sprintf("Failed to get sweep: %v", err)), nil
+	}
+
+	if result.Item == nil {
+		return errorResponse(404, "Sweep not found"), nil
+	}
+
+	var sweep SweepRecord
+	if err := attributevalue.UnmarshalMap(result.Item, &sweep); err != nil {
+		return errorResponse(500, fmt.Sprintf("Failed to unmarshal sweep: %v", err)), nil
+	}
+
+	// Verify user owns this sweep
+	if sweep.UserID != userID {
+		return errorResponse(403, "Access denied"), nil
+	}
+
+	// Check if already in terminal state
+	if sweep.Status == "COMPLETED" || sweep.Status == "CANCELLED" || sweep.Status == "FAILED" {
+		return errorResponse(400, fmt.Sprintf("Sweep is already %s", sweep.Status)), nil
+	}
+
+	// Update sweep status to cancelled
+	now := time.Now().Format(time.RFC3339)
+	updateInput := &dynamodb.UpdateItemInput{
+		TableName: aws.String(dynamoSweepTable),
+		Key: map[string]types.AttributeValue{
+			"sweep_id": &types.AttributeValueMemberS{Value: sweepID},
+		},
+		UpdateExpression: aws.String("SET #status = :status, cancel_requested = :cancel_requested, completed_at = :completed_at, updated_at = :updated_at"),
+		ExpressionAttributeNames: map[string]string{
+			"#status": "status",
+		},
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":status":           &types.AttributeValueMemberS{Value: "CANCELLED"},
+			":cancel_requested": &types.AttributeValueMemberBOOL{Value: true},
+			":completed_at":     &types.AttributeValueMemberS{Value: now},
+			":updated_at":       &types.AttributeValueMemberS{Value: now},
+		},
+	}
+
+	_, err = dynamodbClient.UpdateItem(ctx, updateInput)
+	if err != nil {
+		return errorResponse(500, fmt.Sprintf("Failed to update sweep: %v", err)), nil
+	}
+
+	// Terminate running instances using cross-account role
+	var instanceIDs []string
+	for _, inst := range sweep.Instances {
+		if inst.State == "running" && inst.InstanceID != "" {
+			instanceIDs = append(instanceIDs, inst.InstanceID)
+		}
+	}
+
+	if len(instanceIDs) > 0 {
+		err = terminateSweepInstancesCrossAccount(ctx, cfg, sweep.AWSAccountID, sweep.Region, instanceIDs)
+		if err != nil {
+			fmt.Printf("Warning: Failed to terminate instances: %v\n", err)
+			// Don't fail the request - sweep is still marked as cancelled
+		} else {
+			fmt.Printf("Terminated %d instances\n", len(instanceIDs))
+		}
+	}
+
+	// Build response
+	response := CancelSweepResponse{
+		Success:            true,
+		Message:            "Sweep cancelled successfully",
+		InstancesTerminated: len(instanceIDs),
+	}
+
+	return successResponse(response)
+}
+
+// terminateSweepInstancesCrossAccount terminates instances using cross-account role assumption
+func terminateSweepInstancesCrossAccount(ctx context.Context, cfg aws.Config, accountID, region string, instanceIDs []string) error {
+	if len(instanceIDs) == 0 {
+		return nil
+	}
+
+	// Assume cross-account role
+	stsClient := sts.NewFromConfig(cfg)
+	roleArn := fmt.Sprintf("arn:aws:iam::%s:role/SpawnSweepCrossAccountRole", accountID)
+
+	assumeResult, err := stsClient.AssumeRole(ctx, &sts.AssumeRoleInput{
+		RoleArn:         aws.String(roleArn),
+		RoleSessionName: aws.String("dashboard-cancel-" + time.Now().Format("20060102-150405")),
+		DurationSeconds: aws.Int32(900), // 15 minutes
+	})
+	if err != nil {
+		return fmt.Errorf("failed to assume role: %w", err)
+	}
+
+	// Create EC2 client with assumed role credentials
+	creds := assumeResult.Credentials
+	ec2Cfg, err := config.LoadDefaultConfig(ctx,
+		config.WithRegion(region),
+		config.WithCredentialsProvider(aws.CredentialsProviderFunc(func(ctx context.Context) (aws.Credentials, error) {
+			return aws.Credentials{
+				AccessKeyID:     *creds.AccessKeyId,
+				SecretAccessKey: *creds.SecretAccessKey,
+				SessionToken:    *creds.SessionToken,
+				Source:          "AssumeRole",
+			}, nil
+		})),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create config: %w", err)
+	}
+
+	ec2Client := ec2.NewFromConfig(ec2Cfg)
+
+	// Terminate instances
+	_, err = ec2Client.TerminateInstances(ctx, &ec2.TerminateInstancesInput{
+		InstanceIds: instanceIDs,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to terminate instances: %w", err)
+	}
+
+	return nil
+}

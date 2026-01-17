@@ -51,6 +51,25 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 		}
 		return handleGetInstance(ctx, cfg, instanceID, accountBase36, userID)
 
+	case path == "/api/sweeps" && method == "GET":
+		return handleListSweeps(ctx, cfg, userID)
+
+	case path == "/api/sweeps/" && method == "GET":
+		// Extract sweep ID from path
+		sweepID := request.PathParameters["id"]
+		if sweepID == "" {
+			return errorResponse(400, "Sweep ID is required"), nil
+		}
+		return handleGetSweep(ctx, cfg, sweepID, userID)
+
+	case path == "/api/sweeps//cancel" && method == "POST":
+		// Extract sweep ID from path
+		sweepID := request.PathParameters["id"]
+		if sweepID == "" {
+			return errorResponse(400, "Sweep ID is required"), nil
+		}
+		return handleCancelSweep(ctx, cfg, sweepID, userID)
+
 	case path == "/api/user/profile" && method == "GET":
 		return handleGetUserProfile(ctx, cfg, userID, accountID, accountBase36)
 

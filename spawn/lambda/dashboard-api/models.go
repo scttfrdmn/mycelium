@@ -49,6 +49,79 @@ type UserProfile struct {
 	LastAccess     time.Time `json:"last_access"`
 }
 
+// Sweep API Response structures
+
+// SweepAPIResponse is the response for /api/sweeps
+type SweepAPIResponse struct {
+	Success     bool       `json:"success"`
+	Message     string     `json:"message,omitempty"`
+	Error       string     `json:"error,omitempty"`
+	TotalSweeps int        `json:"total_sweeps"`
+	Sweeps      []SweepInfo `json:"sweeps"`
+}
+
+// SweepDetailAPIResponse is the response for /api/sweeps/{id}
+type SweepDetailAPIResponse struct {
+	Success bool           `json:"success"`
+	Message string         `json:"message,omitempty"`
+	Error   string         `json:"error,omitempty"`
+	Sweep   SweepDetailInfo `json:"sweep"`
+}
+
+// CancelSweepResponse is the response for /api/sweeps/{id}/cancel
+type CancelSweepResponse struct {
+	Success             bool   `json:"success"`
+	Message             string `json:"message"`
+	InstancesTerminated int    `json:"instances_terminated"`
+}
+
+// SweepInfo represents sweep summary information
+type SweepInfo struct {
+	SweepID         string     `json:"sweep_id"`
+	SweepName       string     `json:"sweep_name"`
+	Status          string     `json:"status"`
+	TotalParams     int        `json:"total_params"`
+	Launched        int        `json:"launched"`
+	Failed          int        `json:"failed"`
+	Region          string     `json:"region"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+	CompletedAt     *time.Time `json:"completed_at,omitempty"`
+	EstimatedCost   float64    `json:"estimated_cost,omitempty"`
+	DurationSeconds int        `json:"duration_seconds,omitempty"`
+}
+
+// SweepDetailInfo represents detailed sweep information
+type SweepDetailInfo struct {
+	SweepID         string              `json:"sweep_id"`
+	SweepName       string              `json:"sweep_name"`
+	Status          string              `json:"status"`
+	TotalParams     int                 `json:"total_params"`
+	Launched        int                 `json:"launched"`
+	Failed          int                 `json:"failed"`
+	Region          string              `json:"region"`
+	CreatedAt       time.Time           `json:"created_at"`
+	UpdatedAt       time.Time           `json:"updated_at"`
+	CompletedAt     *time.Time          `json:"completed_at,omitempty"`
+	EstimatedCost   float64             `json:"estimated_cost,omitempty"`
+	DurationSeconds int                 `json:"duration_seconds,omitempty"`
+	MaxConcurrent   int                 `json:"max_concurrent"`
+	LaunchDelay     string              `json:"launch_delay"`
+	NextToLaunch    int                 `json:"next_to_launch"`
+	CancelRequested bool                `json:"cancel_requested"`
+	Instances       []SweepInstanceInfo `json:"instances"`
+}
+
+// SweepInstanceInfo represents instance info within a sweep
+type SweepInstanceInfo struct {
+	Index        int        `json:"index"`
+	InstanceID   string     `json:"instance_id"`
+	State        string     `json:"state"`
+	LaunchedAt   time.Time  `json:"launched_at"`
+	TerminatedAt *time.Time `json:"terminated_at,omitempty"`
+	ErrorMessage string     `json:"error_message,omitempty"`
+}
+
 // DynamoDB structures
 
 // UserAccountRecord represents a record in the spawn-user-accounts DynamoDB table
@@ -59,4 +132,38 @@ type UserAccountRecord struct {
 	Email         string `dynamodbav:"email,omitempty"`
 	CreatedAt     string `dynamodbav:"created_at"`
 	LastAccess    string `dynamodbav:"last_access"`
+}
+
+// SweepRecord represents a record in the spawn-sweep-orchestration DynamoDB table
+type SweepRecord struct {
+	SweepID         string          `dynamodbav:"sweep_id"`
+	SweepName       string          `dynamodbav:"sweep_name"`
+	UserID          string          `dynamodbav:"user_id"`
+	CreatedAt       string          `dynamodbav:"created_at"`
+	UpdatedAt       string          `dynamodbav:"updated_at"`
+	CompletedAt     string          `dynamodbav:"completed_at,omitempty"`
+	S3ParamsKey     string          `dynamodbav:"s3_params_key"`
+	MaxConcurrent   int             `dynamodbav:"max_concurrent"`
+	LaunchDelay     string          `dynamodbav:"launch_delay"`
+	TotalParams     int             `dynamodbav:"total_params"`
+	Region          string          `dynamodbav:"region"`
+	AWSAccountID    string          `dynamodbav:"aws_account_id"`
+	Status          string          `dynamodbav:"status"`
+	CancelRequested bool            `dynamodbav:"cancel_requested"`
+	EstimatedCost   float64         `dynamodbav:"estimated_cost,omitempty"`
+	NextToLaunch    int             `dynamodbav:"next_to_launch"`
+	Launched        int             `dynamodbav:"launched"`
+	Failed          int             `dynamodbav:"failed"`
+	ErrorMessage    string          `dynamodbav:"error_message,omitempty"`
+	Instances       []SweepInstance `dynamodbav:"instances"`
+}
+
+// SweepInstance tracks individual instance state in DynamoDB
+type SweepInstance struct {
+	Index        int    `dynamodbav:"index"`
+	InstanceID   string `dynamodbav:"instance_id"`
+	State        string `dynamodbav:"state"`
+	LaunchedAt   string `dynamodbav:"launched_at"`
+	TerminatedAt string `dynamodbav:"terminated_at,omitempty"`
+	ErrorMessage string `dynamodbav:"error_message,omitempty"`
 }
