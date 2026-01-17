@@ -23,6 +23,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	ststypes "github.com/aws/aws-sdk-go-v2/service/sts/types"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/availability"
 )
 
 const (
@@ -31,6 +32,31 @@ const (
 	pollInterval    = 10 * time.Second
 	crossAccountRole = "arn:aws:iam::%s:role/SpawnSweepCrossAccountRole"
 )
+
+// Capacity error codes from EC2 API
+var capacityErrorCodes = []string{
+	"InsufficientInstanceCapacity",
+	"MaxSpotInstanceCountExceeded",
+	"SpotMaxPriceTooLow",
+	"InsufficientFreeAddressesInSubnet",
+	"InstanceLimitExceeded",
+}
+
+// isCapacityError checks if an error is a capacity-related error
+func isCapacityError(err error) (bool, string) {
+	if err == nil {
+		return false, ""
+	}
+
+	errStr := err.Error()
+	for _, code := range capacityErrorCodes {
+		if strings.Contains(errStr, code) {
+			return true, code
+		}
+	}
+
+	return false, ""
+}
 
 // SweepEvent is the Lambda input event
 type SweepEvent struct {
@@ -62,8 +88,9 @@ type SweepRecord struct {
 	Instances       []SweepInstance             `dynamodbav:"instances"`
 
 	// Multi-region support
-	MultiRegion     bool                        `dynamodbav:"multi_region"`
-	RegionStatus    map[string]*RegionProgress  `dynamodbav:"region_status,omitempty"`
+	MultiRegion      bool                        `dynamodbav:"multi_region"`
+	RegionStatus     map[string]*RegionProgress  `dynamodbav:"region_status,omitempty"`
+	DistributionMode string                      `dynamodbav:"distribution_mode,omitempty"` // "balanced" or "opportunistic"
 }
 
 // RegionProgress tracks per-region sweep progress
@@ -493,11 +520,28 @@ func launchInstance(ctx context.Context, ec2Client *ec2.Client, state *SweepReco
 	// Launch
 	result, err := ec2Client.RunInstances(ctx, input)
 	if err != nil {
+		// Track availability stats for failure (async)
+		isCapacity, errorCode := isCapacityError(err)
+		go func() {
+			trackCtx := context.Background()
+			if trackErr := availability.RecordFailure(trackCtx, dynamodbClient, state.Region, instanceType, isCapacity, errorCode); trackErr != nil {
+				log.Printf("Failed to record availability failure for %s/%s: %v", state.Region, instanceType, trackErr)
+			}
+		}()
+
 		return fmt.Errorf("run instances failed: %w", err)
 	}
 
 	instanceID := *result.Instances[0].InstanceId
 	log.Printf("Launched instance %s for param %d", instanceID, paramIndex)
+
+	// Track availability stats for success (async)
+	go func() {
+		trackCtx := context.Background()
+		if trackErr := availability.RecordSuccess(trackCtx, dynamodbClient, state.Region, instanceType); trackErr != nil {
+			log.Printf("Failed to record availability success for %s/%s: %v", state.Region, instanceType, trackErr)
+		}
+	}()
 
 	// Record instance
 	state.Instances = append(state.Instances, SweepInstance{
@@ -843,6 +887,67 @@ func countActiveInstancesInRegion(ctx context.Context, ec2Client *ec2.Client, st
 	return activeCount, nil
 }
 
+// sortRegionsByAvailability sorts regions based on availability stats for opportunistic mode
+func sortRegionsByAvailability(ctx context.Context, regions []string, state *SweepRecord, params *ParamFileFormat) []string {
+	// Balanced mode: keep existing alphabetical order
+	if state.DistributionMode != "opportunistic" {
+		return regions
+	}
+
+	// Extract instance type from defaults (common across sweep)
+	instanceType := getStringParam(params.Defaults, "instance_type", "")
+	if instanceType == "" {
+		log.Printf("Warning: No instance_type in defaults, using balanced mode")
+		return regions
+	}
+
+	// Load availability stats for each region
+	type regionScore struct {
+		region string
+		score  float64
+	}
+	scores := make([]regionScore, 0, len(regions))
+
+	for _, region := range regions {
+		stats, err := availability.GetStats(ctx, dynamodbClient, region, instanceType)
+		if err != nil {
+			log.Printf("Warning: Failed to get availability stats for %s/%s: %v", region, instanceType, err)
+			// Include region with neutral score on error
+			scores = append(scores, regionScore{region, 0.5})
+			continue
+		}
+
+		// Skip regions in backoff
+		if stats.BackoffUntil != "" {
+			backoffUntil, err := time.Parse(time.RFC3339, stats.BackoffUntil)
+			if err == nil && time.Now().Before(backoffUntil) {
+				log.Printf("Skipping region %s: in backoff until %s", region, stats.BackoffUntil)
+				continue
+			}
+		}
+
+		// Calculate score
+		score := availability.CalculateScore(stats)
+		scores = append(scores, regionScore{region, score})
+		log.Printf("Region %s availability score: %.2f (success: %d, failure: %d)",
+			region, score, stats.SuccessCount, stats.FailureCount)
+	}
+
+	// Sort descending by score (highest availability first)
+	sort.Slice(scores, func(i, j int) bool {
+		return scores[i].score > scores[j].score
+	})
+
+	// Return sorted region list
+	result := make([]string, len(scores))
+	for i, s := range scores {
+		result[i] = s.region
+	}
+
+	log.Printf("Opportunistic mode: sorted regions by availability: %v", result)
+	return result
+}
+
 // launchAcrossRegions launches instances across regions with fair distribution
 func launchAcrossRegions(ctx context.Context, orchestrator *RegionalOrchestrator, state *SweepRecord, params *ParamFileFormat, activeByRegion map[string]int, globalAvailable int, launchDelay time.Duration) error {
 	// Count regions with pending work
@@ -861,14 +966,20 @@ func launchAcrossRegions(ctx context.Context, orchestrator *RegionalOrchestrator
 	fairShare := max(1, globalAvailable/regionsWithWork)
 	log.Printf("Fair share: %d instances per region (%d regions with work)", fairShare, regionsWithWork)
 
-	// Sort regions for deterministic ordering
+	// Collect regions with pending work
 	regions := make([]string, 0, len(orchestrator.ec2Clients))
 	for region := range orchestrator.ec2Clients {
 		if len(state.RegionStatus[region].NextToLaunch) > 0 {
 			regions = append(regions, region)
 		}
 	}
-	sort.Strings(regions)
+
+	// Sort regions: alphabetically for balanced mode, by availability for opportunistic mode
+	if state.DistributionMode == "opportunistic" {
+		regions = sortRegionsByAvailability(ctx, regions, state, params)
+	} else {
+		sort.Strings(regions)
+	}
 
 	// Launch instances concurrently per region
 	var wg sync.WaitGroup
@@ -986,11 +1097,28 @@ func launchInstanceInRegion(ctx context.Context, ec2Client *ec2.Client, state *S
 	// Launch
 	result, err := ec2Client.RunInstances(ctx, input)
 	if err != nil {
+		// Track availability stats for failure (async)
+		isCapacity, errorCode := isCapacityError(err)
+		go func() {
+			trackCtx := context.Background()
+			if trackErr := availability.RecordFailure(trackCtx, dynamodbClient, region, instanceType, isCapacity, errorCode); trackErr != nil {
+				log.Printf("Failed to record availability failure for %s/%s: %v", region, instanceType, trackErr)
+			}
+		}()
+
 		return fmt.Errorf("run instances failed: %w", err)
 	}
 
 	instanceID := *result.Instances[0].InstanceId
 	log.Printf("Launched instance %s in %s for param %d", instanceID, region, paramIndex)
+
+	// Track availability stats for success (async)
+	go func() {
+		trackCtx := context.Background()
+		if trackErr := availability.RecordSuccess(trackCtx, dynamodbClient, region, instanceType); trackErr != nil {
+			log.Printf("Failed to record availability success for %s/%s: %v", region, instanceType, trackErr)
+		}
+	}()
 
 	// Record instance
 	state.Instances = append(state.Instances, SweepInstance{

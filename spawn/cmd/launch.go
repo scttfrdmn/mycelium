@@ -107,6 +107,7 @@ var (
 	sweepName        string
 	estimateOnly     bool
 	autoYes          bool
+	distributionMode string
 
 	// IAM
 	iamRole            string
@@ -210,6 +211,7 @@ func init() {
 	launchCmd.Flags().StringVar(&sweepName, "sweep-name", "", "Human-readable sweep identifier (auto-generated if empty)")
 	launchCmd.Flags().BoolVar(&estimateOnly, "estimate-only", false, "Show cost estimate and exit without launching")
 	launchCmd.Flags().BoolVarP(&autoYes, "yes", "y", false, "Auto-approve cost estimate (skip confirmation)")
+	launchCmd.Flags().StringVar(&distributionMode, "mode", "balanced", "Distribution mode: balanced (fair share) or opportunistic (prioritize available regions)")
 
 	// IAM
 	launchCmd.Flags().StringVar(&iamRole, "iam-role", "", "IAM role name (creates if doesn't exist)")
@@ -2476,6 +2478,14 @@ func launchSweepDetached(ctx context.Context, paramFormat *ParamFileFormat, base
 		}
 
 		fmt.Fprintf(os.Stderr, "🌍 Multi-region sweep detected: %v\n", regions)
+	}
+
+	// Set distribution mode (only applies to multi-region sweeps)
+	if record.MultiRegion {
+		record.DistributionMode = distributionMode
+		if distributionMode == "opportunistic" {
+			fmt.Fprintf(os.Stderr, "📊 Distribution mode: opportunistic (prioritize available regions)\n")
+		}
 	}
 
 	err = sweep.CreateSweepRecord(ctx, infraCfg, record)

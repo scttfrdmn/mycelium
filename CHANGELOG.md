@@ -22,6 +22,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Backward compatible: single-region sweeps work unchanged
   - Example: See `examples/multi-region-sweep.yaml` and `examples/multi-region-minimal.json`
   - Use case: Global latency testing, multi-region availability testing, geo-distributed workloads
+- Availability tracking and opportunistic distribution mode (Issue #39)
+  - Passive availability statistics collection from launch success/failure
+  - DynamoDB table `spawn-availability-stats` tracks success rates per region+instance_type
+  - Capacity error detection: InsufficientInstanceCapacity, MaxSpotInstanceCountExceeded, etc.
+  - Exponential backoff for capacity-constrained regions (5min → 10min → 20min → 1hr max)
+  - Two distribution modes for multi-region sweeps:
+    - `balanced` (default): Fair share across all regions (existing behavior)
+    - `opportunistic`: Prioritize regions with proven capacity and recent success
+  - Availability scoring: 80% success rate + 20% recency weight
+  - `spawn availability --instance-type <type> --regions <regions>` command to view stats
+  - Automatic 7-day TTL on stats (configurable via table settings)
+  - Async tracking to avoid slowing launches
+  - Use case: Maximize successful launches, spot instances, capacity-constrained scenarios
+  - Example: `spawn sweep --file params.yaml --mode opportunistic --detach`
 
 ## [0.8.0] - 2026-01-17
 

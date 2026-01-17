@@ -159,8 +159,9 @@ type SweepRecord struct {
 	Instances       []SweepInstance             `dynamodbav:"instances"`
 
 	// Multi-region support
-	MultiRegion     bool                        `dynamodbav:"multi_region"`
-	RegionStatus    map[string]*RegionProgress  `dynamodbav:"region_status,omitempty"`
+	MultiRegion      bool                        `dynamodbav:"multi_region"`
+	RegionStatus     map[string]*RegionProgress  `dynamodbav:"region_status,omitempty"`
+	DistributionMode string                      `dynamodbav:"distribution_mode,omitempty"` // "balanced" or "opportunistic"
 }
 
 // RegionProgress tracks per-region sweep progress
