@@ -712,6 +712,69 @@ footer {
     color: var(--text-secondary);
 }
 
+/* Sweeps Table */
+.sweeps-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+}
+
+.sweeps-table thead {
+    background: var(--bg-card);
+    border-bottom: 2px solid var(--border);
+}
+
+.sweeps-table th {
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 0.5px;
+}
+
+.sweeps-table th:nth-child(1) { width: 25%; } /* Name */
+.sweeps-table th:nth-child(2) { width: 12%; } /* Status */
+.sweeps-table th:nth-child(3) { width: 18%; } /* Progress */
+.sweeps-table th:nth-child(4) { width: 12%; } /* Region */
+.sweeps-table th:nth-child(5) { width: 13%; } /* Created */
+.sweeps-table th:nth-child(6) { width: 10%; } /* Cost */
+.sweeps-table th:nth-child(7) { width: 10%; } /* Actions */
+
+.sweeps-table tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.2s ease;
+}
+
+.sweeps-table tbody tr:last-child {
+    border-bottom: none;
+}
+
+.sweeps-table tbody tr:hover {
+    background: rgba(79, 195, 247, 0.08);
+}
+
+.sweeps-table td {
+    padding: 1rem;
+    color: var(--text-primary);
+    vertical-align: middle;
+}
+
+/* Dashboard Tabs */
+.dashboard-tab {
+    transition: all 0.2s;
+}
+
+.dashboard-tab:hover {
+    color: var(--accent-blue) !important;
+}
+
+.dashboard-tab.active {
+    color: var(--accent-blue) !important;
+    border-bottom: 3px solid var(--accent-blue) !important;
+}
+
 /* Text Muted */
 :root {
     --text-muted: #6c757d;

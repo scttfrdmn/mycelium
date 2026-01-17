@@ -463,7 +463,7 @@ async function refreshDashboard() {
     }
 
     try {
-        await loadDashboard();
+        await refreshCurrentDashboardView();
         updateLastRefreshedTime();
     } finally {
         if (btn) {
@@ -493,7 +493,7 @@ function startAutoRefresh() {
     // Refresh every 30 seconds
     dashboardRefreshInterval = setInterval(async () => {
         console.log('Auto-refreshing dashboard...');
-        await loadDashboard();
+        await refreshCurrentDashboardView();
         updateLastRefreshedTime();
     }, 30000);
 
@@ -1069,6 +1069,394 @@ function populateRegionFilter(instances) {
     // Restore selection
     regionFilter.value = currentValue;
 }
+
+// ==================== SWEEP MANAGEMENT ====================
+
+// Current dashboard state
+let currentDashboardTab = 'instances';
+let allSweepsCache = [];
+let sweepSortState = { column: null, direction: 'asc' };
+
+// Tab switching
+function switchDashboardTab(tab) {
+    currentDashboardTab = tab;
+
+    // Update tab buttons
+    const instancesTab = document.getElementById('tab-instances');
+    const sweepsTab = document.getElementById('tab-sweeps');
+    const instancesContent = document.getElementById('instances-tab-content');
+    const sweepsContent = document.getElementById('sweeps-tab-content');
+
+    if (tab === 'instances') {
+        instancesTab.classList.add('active');
+        instancesTab.style.borderBottom = '3px solid var(--accent-blue)';
+        instancesTab.style.color = 'var(--accent-blue)';
+        sweepsTab.classList.remove('active');
+        sweepsTab.style.borderBottom = '3px solid transparent';
+        sweepsTab.style.color = 'var(--text-muted)';
+
+        instancesContent.style.display = 'block';
+        sweepsContent.style.display = 'none';
+
+        loadDashboard();
+    } else if (tab === 'sweeps') {
+        sweepsTab.classList.add('active');
+        sweepsTab.style.borderBottom = '3px solid var(--accent-blue)';
+        sweepsTab.style.color = 'var(--accent-blue)';
+        instancesTab.classList.remove('active');
+        instancesTab.style.borderBottom = '3px solid transparent';
+        instancesTab.style.color = 'var(--text-muted)';
+
+        sweepsContent.style.display = 'block';
+        instancesContent.style.display = 'none';
+
+        loadSweeps();
+    }
+}
+
+// Refresh current view
+async function refreshCurrentDashboardView() {
+    if (currentDashboardTab === 'instances') {
+        await loadDashboard();
+    } else if (currentDashboardTab === 'sweeps') {
+        await loadSweeps();
+    }
+}
+
+// Load sweeps from API
+async function loadSweeps() {
+    const tbody = document.getElementById('sweeps-tbody');
+    const errorDiv = document.getElementById('sweeps-error');
+    const loadingDiv = document.getElementById('sweeps-loading');
+
+    try {
+        if (loadingDiv) loadingDiv.style.display = 'block';
+        if (errorDiv) errorDiv.style.display = 'none';
+        if (tbody) tbody.innerHTML = '';
+
+        // Call Lambda API endpoint
+        const apiEndpoint = 'https://api.spore.host/api/sweeps';
+
+        const response = await fetch(apiEndpoint, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                // Authentication will be added by auth.js interceptor
+            },
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            throw new Error(`API returned ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        if (loadingDiv) loadingDiv.style.display = 'none';
+
+        if (data.success && data.sweeps && data.sweeps.length > 0) {
+            allSweepsCache = data.sweeps;
+            applySweepFilters();
+            updateLastRefreshedTime();
+        } else {
+            allSweepsCache = [];
+            if (tbody) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" style="text-align: center; padding: 3rem;">
+                            <div style="max-width: 600px; margin: 0 auto;">
+                                <div style="font-size: 3rem; margin-bottom: 1rem;">📊</div>
+                                <h3 style="color: var(--accent-blue); margin-bottom: 1rem;">No Sweeps Yet</h3>
+                                <p style="color: var(--text-secondary); margin-bottom: 2rem; line-height: 1.8;">
+                                    Parameter sweeps let you launch multiple instances with different configurations. They'll appear here automatically.
+                                </p>
+                                <div style="background: rgba(79, 195, 247, 0.08); border: 1px solid rgba(79, 195, 247, 0.3); border-radius: 8px; padding: 1.5rem; text-align: left;">
+                                    <h4 style="color: var(--accent-blue); margin-bottom: 1rem; text-align: center;">🚀 Launch Your First Sweep</h4>
+                                    <pre style="background: var(--bg-dark); padding: 1rem; border-radius: 4px; overflow-x: auto;">spawn sweep --file params.json --detach</pre>
+                                    <p style="text-align: center; margin-top: 1rem; color: var(--text-muted); font-size: 0.9rem;">
+                                        The <code>--detach</code> flag runs the sweep in Lambda so you can close your terminal.
+                                    </p>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+    } catch (error) {
+        console.error('Failed to load sweeps:', error);
+
+        if (loadingDiv) loadingDiv.style.display = 'none';
+
+        if (errorDiv) {
+            errorDiv.style.display = 'block';
+            const errorMessage = error.message || 'Unknown error';
+            errorDiv.innerHTML = `<strong>Error:</strong> ${errorMessage}`;
+        }
+
+        if (tbody) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" style="text-align: center; padding: 2rem; color: var(--accent-red);">
+                        Failed to load sweeps. Please try again.
+                    </td>
+                </tr>
+            `;
+        }
+    }
+}
+
+// Render sweeps table
+function renderSweepsTable(sweeps) {
+    const tbody = document.getElementById('sweeps-tbody');
+    if (!tbody) return;
+
+    if (sweeps.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                    No sweeps match your filters.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = sweeps.map(sweep => {
+        const statusIcon = getSweepStatusIcon(sweep.status);
+        const progress = `${sweep.launched}/${sweep.total_params}`;
+        const progressPercent = sweep.total_params > 0 ? (sweep.launched / sweep.total_params * 100) : 0;
+        const failedText = sweep.failed > 0 ? ` (${sweep.failed} failed)` : '';
+        const createdTime = formatRelativeTime(new Date(sweep.created_at));
+        const costText = sweep.estimated_cost > 0 ? `$${sweep.estimated_cost.toFixed(2)}` : 'N/A';
+
+        // Action buttons
+        let actionButtons = '';
+        if (sweep.status === 'RUNNING') {
+            actionButtons = `
+                <button onclick="cancelSweep('${sweep.sweep_id}')"
+                        style="padding: 0.4rem 0.8rem; background: var(--accent-red); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85rem; transition: opacity 0.2s;"
+                        onmouseover="this.style.opacity='0.8'"
+                        onmouseout="this.style.opacity='1'">
+                    ❌ Cancel
+                </button>
+            `;
+        } else {
+            actionButtons = `<span style="color: var(--text-muted); font-size: 0.85rem;">—</span>`;
+        }
+
+        return `
+            <tr data-sweep-id="${sweep.sweep_id}">
+                <td>
+                    <div style="font-weight: 500;">${sweep.sweep_name || sweep.sweep_id}</div>
+                    <div style="font-size: 0.85rem; color: var(--text-muted); font-family: monospace; margin-top: 0.2rem;">${sweep.sweep_id}</div>
+                </td>
+                <td>
+                    <span style="display: inline-flex; align-items: center; gap: 0.4rem;">
+                        <span style="font-size: 1.2rem;">${statusIcon}</span>
+                        <span>${sweep.status}</span>
+                    </span>
+                </td>
+                <td>
+                    <div style="margin-bottom: 0.3rem;">${progress}${failedText}</div>
+                    <div style="width: 100%; background: var(--bg-dark); border-radius: 4px; height: 6px; overflow: hidden;">
+                        <div style="width: ${progressPercent}%; background: var(--accent-blue); height: 100%; transition: width 0.3s;"></div>
+                    </div>
+                </td>
+                <td>${sweep.region}</td>
+                <td title="${new Date(sweep.created_at).toLocaleString()}">${createdTime}</td>
+                <td>${costText}</td>
+                <td>${actionButtons}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// Get status icon
+function getSweepStatusIcon(status) {
+    switch (status.toUpperCase()) {
+        case 'RUNNING':
+        case 'INITIALIZING':
+            return '🚀';
+        case 'COMPLETED':
+            return '✅';
+        case 'FAILED':
+            return '❌';
+        case 'CANCELLED':
+            return '⚠️';
+        default:
+            return '❓';
+    }
+}
+
+// Format relative time
+function formatRelativeTime(date) {
+    const now = new Date();
+    const diff = now - date;
+    const seconds = Math.floor(diff / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (seconds < 60) return 'just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    if (days < 7) return `${days}d ago`;
+    return date.toLocaleDateString();
+}
+
+// Apply sweep filters
+function applySweepFilters() {
+    const searchInput = document.getElementById('sweep-search-input');
+    const statusFilter = document.getElementById('sweep-status-filter');
+
+    const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
+    const statusValue = statusFilter ? statusFilter.value : '';
+
+    let filtered = allSweepsCache.filter(sweep => {
+        // Search filter
+        if (searchTerm) {
+            const name = (sweep.sweep_name || '').toLowerCase();
+            const id = sweep.sweep_id.toLowerCase();
+            if (!name.includes(searchTerm) && !id.includes(searchTerm)) {
+                return false;
+            }
+        }
+
+        // Status filter
+        if (statusValue && sweep.status !== statusValue) {
+            return false;
+        }
+
+        return true;
+    });
+
+    // Apply sorting
+    if (sweepSortState.column) {
+        filtered = sortSweeps(filtered, sweepSortState.column, sweepSortState.direction);
+    }
+
+    renderSweepsTable(filtered);
+}
+
+// Sort sweeps
+function sortSweeps(sweeps, column, direction) {
+    return sweeps.sort((a, b) => {
+        let aVal, bVal;
+
+        switch (column) {
+            case 'name':
+                aVal = (a.sweep_name || a.sweep_id).toLowerCase();
+                bVal = (b.sweep_name || b.sweep_id).toLowerCase();
+                break;
+            case 'status':
+                aVal = a.status;
+                bVal = b.status;
+                break;
+            case 'progress':
+                aVal = a.total_params > 0 ? (a.launched / a.total_params) : 0;
+                bVal = b.total_params > 0 ? (b.launched / b.total_params) : 0;
+                break;
+            case 'region':
+                aVal = a.region;
+                bVal = b.region;
+                break;
+            case 'created':
+                aVal = new Date(a.created_at).getTime();
+                bVal = new Date(b.created_at).getTime();
+                break;
+            case 'cost':
+                aVal = a.estimated_cost || 0;
+                bVal = b.estimated_cost || 0;
+                break;
+            default:
+                return 0;
+        }
+
+        if (aVal < bVal) return direction === 'asc' ? -1 : 1;
+        if (aVal > bVal) return direction === 'asc' ? 1 : -1;
+        return 0;
+    });
+}
+
+// Clear sweep filters
+function clearSweepFilters() {
+    const searchInput = document.getElementById('sweep-search-input');
+    const statusFilter = document.getElementById('sweep-status-filter');
+
+    if (searchInput) searchInput.value = '';
+    if (statusFilter) statusFilter.value = '';
+
+    applySweepFilters();
+}
+
+// Sort sweeps table
+function sortSweepsTable(column) {
+    // Update sort state
+    if (sweepSortState.column === column) {
+        sweepSortState.direction = sweepSortState.direction === 'asc' ? 'desc' : 'asc';
+    } else {
+        sweepSortState.column = column;
+        sweepSortState.direction = 'asc';
+    }
+
+    // Update sort indicators
+    ['name', 'status', 'progress', 'region', 'created', 'cost'].forEach(col => {
+        const indicator = document.getElementById(`sweep-sort-${col}`);
+        if (indicator) {
+            if (col === column) {
+                indicator.textContent = sweepSortState.direction === 'asc' ? '▲' : '▼';
+            } else {
+                indicator.textContent = '';
+            }
+        }
+    });
+
+    // Sort filtered results
+    applySweepFilters();
+}
+
+// Cancel sweep
+async function cancelSweep(sweepId) {
+    if (!confirm('Are you sure you want to cancel this sweep? Running instances will be terminated.')) {
+        return;
+    }
+
+    try {
+        const apiEndpoint = `https://api.spore.host/api/sweeps/${sweepId}/cancel`;
+
+        const response = await fetch(apiEndpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            throw new Error(`API returned ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        if (data.success) {
+            alert(`Sweep cancelled successfully. Terminated ${data.instances_terminated} instance(s).`);
+            await loadSweeps();
+        } else {
+            throw new Error(data.error || 'Failed to cancel sweep');
+        }
+    } catch (error) {
+        console.error('Failed to cancel sweep:', error);
+        alert(`Failed to cancel sweep: ${error.message}`);
+    }
+}
+
+// Auto-refresh sweeps (every 10 seconds if on sweeps tab)
+setInterval(() => {
+    if (currentDashboardTab === 'sweeps' && document.getElementById('sweeps-tab-content').style.display !== 'none') {
+        loadSweeps();
+    }
+}, 10000);
 
 // Export for use in other scripts
 if (typeof module !== 'undefined' && module.exports) {

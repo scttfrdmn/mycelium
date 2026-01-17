@@ -239,7 +239,20 @@ tar -xzf spawn_*_$(uname -s)_$(uname -m).tar.gz
                     </button>
                 </div>
             </div>
-            <p class="dashboard-subtitle">View and monitor your spawned instances across all regions</p>
+
+            <!-- Dashboard Tabs -->
+            <div class="dashboard-tabs" style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem; border-bottom: 2px solid var(--border);">
+                <button onclick="switchDashboardTab('instances')" id="tab-instances" class="dashboard-tab active" style="padding: 0.75rem 1.5rem; background: none; border: none; border-bottom: 3px solid var(--accent-blue); color: var(--accent-blue); cursor: pointer; font-size: 1rem; font-weight: 600; transition: all 0.2s;">
+                    🖥️ Instances
+                </button>
+                <button onclick="switchDashboardTab('sweeps')" id="tab-sweeps" class="dashboard-tab" style="padding: 0.75rem 1.5rem; background: none; border: none; border-bottom: 3px solid transparent; color: var(--text-muted); cursor: pointer; font-size: 1rem; font-weight: 600; transition: all 0.2s;">
+                    📊 Sweeps
+                </button>
+            </div>
+
+            <!-- Instances Tab Content -->
+            <div id="instances-tab-content" class="dashboard-tab-content">
+                <p class="dashboard-subtitle">View and monitor your spawned instances across all regions</p>
 
             <!-- Table Controls -->
             <div class="table-controls" style="margin-bottom: 1rem; padding: 1rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;">
@@ -297,6 +310,66 @@ tar -xzf spawn_*_$(uname -s)_$(uname -m).tar.gz
                 <p style="margin: 0; color: var(--text-muted); font-size: 0.9rem;">
                     <strong>💡 Tip:</strong> Spores refresh automatically. Launch with <code>spawn launch</code> and they'll appear here within 30 seconds.
                 </p>
+            </div>
+            </div>
+
+            <!-- Sweeps Tab Content -->
+            <div id="sweeps-tab-content" class="dashboard-tab-content" style="display: none;">
+                <p class="dashboard-subtitle">View and monitor your parameter sweeps</p>
+
+                <!-- Sweep Filters -->
+                <div class="table-controls" style="margin-bottom: 1rem; padding: 1rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;">
+                    <div style="display: grid; grid-template-columns: 1fr auto auto; gap: 1rem; align-items: center;">
+                        <input type="text" id="sweep-search-input" placeholder="🔍 Search by name or ID..." style="padding: 0.6rem 1rem; background: var(--bg-dark); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.9rem;" oninput="applySweepFilters()">
+
+                        <select id="sweep-status-filter" style="padding: 0.6rem 1rem; background: var(--bg-dark); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.9rem; cursor: pointer;" onchange="applySweepFilters()">
+                            <option value="">All Statuses</option>
+                            <option value="RUNNING">Running</option>
+                            <option value="COMPLETED">Completed</option>
+                            <option value="FAILED">Failed</option>
+                            <option value="CANCELLED">Cancelled</option>
+                        </select>
+
+                        <button onclick="clearSweepFilters()" style="padding: 0.6rem 1rem; background: var(--bg-dark); border: 1px solid var(--border); border-radius: 6px; color: var(--text-secondary); font-size: 0.9rem; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='var(--accent-blue)'" onmouseout="this.style.borderColor='var(--border)'">
+                            Clear Filters
+                        </button>
+                    </div>
+                </div>
+
+                <div id="sweeps-loading" style="display: none; text-align: center; padding: 2rem; color: var(--text-muted);">
+                    Loading sweeps...
+                </div>
+
+                <div id="sweeps-error" style="display: none; padding: 1rem; margin: 1rem 0; background: rgba(255, 100, 100, 0.1); border: 1px solid rgba(255, 100, 100, 0.3); border-radius: 8px; color: var(--accent-red);"></div>
+
+                <div class="table-container">
+                    <table class="sweeps-table">
+                        <thead>
+                            <tr>
+                                <th onclick="sortSweepsTable('name')" style="cursor: pointer; user-select: none;">Name <span id="sweep-sort-name" style="color: var(--text-muted); font-size: 0.8rem;"></span></th>
+                                <th onclick="sortSweepsTable('status')" style="cursor: pointer; user-select: none;">Status <span id="sweep-sort-status" style="color: var(--text-muted); font-size: 0.8rem;"></span></th>
+                                <th onclick="sortSweepsTable('progress')" style="cursor: pointer; user-select: none;">Progress <span id="sweep-sort-progress" style="color: var(--text-muted); font-size: 0.8rem;"></span></th>
+                                <th onclick="sortSweepsTable('region')" style="cursor: pointer; user-select: none;">Region <span id="sweep-sort-region" style="color: var(--text-muted); font-size: 0.8rem;"></span></th>
+                                <th onclick="sortSweepsTable('created')" style="cursor: pointer; user-select: none;">Created <span id="sweep-sort-created" style="color: var(--text-muted); font-size: 0.8rem;"></span></th>
+                                <th onclick="sortSweepsTable('cost')" style="cursor: pointer; user-select: none;">Est. Cost <span id="sweep-sort-cost" style="color: var(--text-muted); font-size: 0.8rem;"></span></th>
+                                <th style="width: 100px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sweeps-tbody">
+                            <tr>
+                                <td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                                    Loading sweeps...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div style="margin-top: 1.5rem; padding: 1rem; background: rgba(100, 150, 255, 0.05); border: 1px solid rgba(100, 150, 255, 0.2); border-radius: 8px;">
+                    <p style="margin: 0; color: var(--text-muted); font-size: 0.9rem;">
+                        <strong>💡 Tip:</strong> Launch sweeps with <code>spawn sweep --detach</code> to run them in Lambda. Use <code>spawn list-sweeps</code> to view from CLI.
+                    </p>
+                </div>
             </div>
         </section>
 
