@@ -88,10 +88,13 @@ func RecordSuccess(ctx context.Context, client *dynamodb.Client, region, instanc
 			"last_success = :now, " +
 			"updated_at = :now, " +
 			"ttl_timestamp = :ttl, " +
-			"region = :region, " +
+			"#region = :region, " +
 			"instance_type = :instance_type, " +
 			"consecutive_fails = :zero " +
 			"REMOVE backoff_until"),
+		ExpressionAttributeNames: map[string]string{
+			"#region": "region",
+		},
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":zero":          &types.AttributeValueMemberN{Value: "0"},
 			":one":           &types.AttributeValueMemberN{Value: "1"},
@@ -131,8 +134,12 @@ func RecordFailure(ctx context.Context, client *dynamodb.Client, region, instanc
 		"last_error_code = :error_code, " +
 		"updated_at = :now, " +
 		"ttl_timestamp = :ttl, " +
-		"region = :region, " +
+		"#region = :region, " +
 		"instance_type = :instance_type"
+
+	exprNames := map[string]string{
+		"#region": "region",
+	}
 
 	exprValues := map[string]types.AttributeValue{
 		":zero":          &types.AttributeValueMemberN{Value: "0"},
@@ -155,6 +162,7 @@ func RecordFailure(ctx context.Context, client *dynamodb.Client, region, instanc
 			"stat_id": &types.AttributeValueMemberS{Value: statID},
 		},
 		UpdateExpression:          aws.String(updateExpr),
+		ExpressionAttributeNames:  exprNames,
 		ExpressionAttributeValues: exprValues,
 	})
 
