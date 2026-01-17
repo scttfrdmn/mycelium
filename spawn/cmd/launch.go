@@ -22,6 +22,7 @@ import (
 	"github.com/scttfrdmn/mycelium/spawn/pkg/aws"
 	spawnconfig "github.com/scttfrdmn/mycelium/spawn/pkg/config"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/input"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/locality"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/platform"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/pricing"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/progress"
@@ -120,6 +121,7 @@ var (
 	quiet            bool
 	waitForRunning   bool
 	waitForSSH       bool
+	skipRegionCheck  bool
 )
 
 var launchCmd = &cobra.Command{
@@ -222,6 +224,7 @@ func init() {
 	launchCmd.Flags().BoolVar(&quiet, "quiet", false, "Minimal output")
 	launchCmd.Flags().BoolVar(&waitForRunning, "wait-for-running", true, "Wait until running")
 	launchCmd.Flags().BoolVar(&waitForSSH, "wait-for-ssh", true, "Wait until SSH is ready")
+	launchCmd.Flags().BoolVar(&skipRegionCheck, "skip-region-check", false, "Skip data locality region mismatch warnings")
 
 	// Register completions for flags
 	launchCmd.RegisterFlagCompletionFunc("region", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
@@ -914,6 +917,54 @@ func launchWithProgress(ctx context.Context, awsClient *aws.Client, config *aws.
 		time.Sleep(300 * time.Millisecond)
 	} else {
 		prog.Skip("FSx Lustre filesystem")
+	}
+
+	// Step 4.6: Check data locality (region mismatches)
+	if !skipRegionCheck && (efsID != "" || fsxID != "") {
+		prog.Start("Checking data locality")
+
+		fsxIDForCheck := ""
+		if fsxID != "" {
+			fsxIDForCheck = fsxID
+		} else if fsxInfo != nil {
+			fsxIDForCheck = fsxInfo.FileSystemID
+		}
+
+		awsCfg, err := awsClient.GetConfig(ctx)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "⚠️  Warning: Failed to check data locality: %v\n", err)
+			prog.Complete("Checking data locality")
+			time.Sleep(300 * time.Millisecond)
+		} else {
+			warning, err := locality.CheckDataLocality(ctx, awsCfg, config.Region, efsID, fsxIDForCheck)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "⚠️  Warning: Failed to check data locality: %v\n", err)
+				prog.Complete("Checking data locality")
+				time.Sleep(300 * time.Millisecond)
+			} else if warning.HasMismatches {
+			prog.Complete("Checking data locality")
+			time.Sleep(300 * time.Millisecond)
+
+			// Display warning
+			fmt.Fprintf(os.Stderr, "%s", warning.FormatWarning())
+
+			// Prompt for confirmation unless auto-approved
+			if !autoYes {
+				fmt.Fprintf(os.Stderr, "   Continue with cross-region launch? [y/N]: ")
+				var response string
+				fmt.Scanln(&response)
+				response = strings.ToLower(strings.TrimSpace(response))
+				if response != "y" && response != "yes" {
+					fmt.Fprintf(os.Stderr, "\n❌ Launch cancelled\n")
+					return nil
+				}
+				fmt.Fprintf(os.Stderr, "\n")
+			}
+			} else {
+				prog.Complete("Checking data locality")
+				time.Sleep(300 * time.Millisecond)
+			}
+		}
 	}
 
 	// Step 5: Build user data

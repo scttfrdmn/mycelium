@@ -84,6 +84,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Pricing data for 60+ instance types across 8 AWS regions
   - Automatic cost calculation based on instance type, region, and TTL
   - Prevents surprise AWS bills by showing costs upfront
+- Data locality warnings for EFS and FSx (Issue #38)
+  - Automatic region detection for EFS and FSx filesystems
+  - Warns when launching instances in different region than storage
+  - Shows cross-region data transfer costs ($0.02-0.08/GB depending on regions)
+  - Estimates latency penalty (50-150ms for cross-region access)
+  - Provides recommendations to launch in same region as storage
+  - `--skip-region-check` flag to bypass warnings
+  - Works with `--yes` flag for automated workflows
+  - Helps prevent unexpected data transfer charges
 
 ### Fixed
 - Lambda orchestrator cancellation race condition (Issue #26)
