@@ -93,6 +93,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `--skip-region-check` flag to bypass warnings
   - Works with `--yes` flag for automated workflows
   - Helps prevent unexpected data transfer charges
+- Dashboard sweep management integration (Issue #23)
+  - Tabbed interface in web dashboard (Instances | Sweeps)
+  - GET /api/sweeps - List user's parameter sweeps from DynamoDB
+  - GET /api/sweeps/{id} - View detailed sweep information
+  - POST /api/sweeps/{id}/cancel - Cancel running sweeps and terminate instances
+  - Real-time auto-refresh (10s for sweeps, 30s for instances)
+  - Status filtering (RUNNING, COMPLETED, FAILED, CANCELLED)
+  - Search by sweep name or ID
+  - Sortable columns (name, status, progress, region, created, cost)
+  - Progress bars with launched/total/failed counts
+  - Cancel button with confirmation for running sweeps
+  - Cross-account instance termination via IAM role assumption
+  - User isolation via userID filtering in DynamoDB
+  - Responsive table layout with status icons
 
 ### Fixed
 - Lambda orchestrator cancellation race condition (Issue #26)
