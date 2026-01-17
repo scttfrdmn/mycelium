@@ -18,8 +18,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Leader/worker coordination (index 0 runs mpirun)
   - S3 lifecycle policy for automatic MPI SSH key cleanup (1 day expiration)
   - Works seamlessly with existing job array infrastructure
+- EFS (Elastic File System) mounting support (Issue #32, Milestone 1 of #29)
+  - `spawn launch --efs-id` flag to mount existing EFS filesystem
+  - `--efs-mount-point` flag to customize mount location (default: /efs)
+  - Automatic NFS client installation and fstab configuration
+  - Works with single instances, job arrays, and MPI clusters
+  - All instances in job array share the same EFS filesystem
 - Future considerations documented in issues:
-  - Issue #29: Shared storage support (FSx Lustre, EFS, FSx ONTAP)
+  - Issue #33: EFS tuning options and performance profiles (Milestone 2 of #29)
+  - Issue #34: FSx Lustre creation with S3 backing (Milestone 3 of #29)
+  - Issue #35: FSx recall workflow for ephemeral compute (Milestone 4 of #29)
+  - Issue #36: FSx management commands (Milestone 5 of #29)
   - Issue #30: MPI compatibility with AMI creation workflow
 
 ## [0.5.0] - 2026-01-16

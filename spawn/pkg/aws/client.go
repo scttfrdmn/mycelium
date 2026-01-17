@@ -99,6 +99,10 @@ type LaunchConfig struct {
 	SweepSize   int               // Total number of parameter sets in the sweep
 	Parameters  map[string]string // Parameter key-value pairs for PARAM_* env vars and tags
 
+	// Shared storage settings
+	EFSID         string // EFS filesystem ID to mount (fs-xxx)
+	EFSMountPoint string // EFS mount point (default: /efs)
+
 	// Metadata
 	Name string
 	Tags map[string]string
@@ -1099,4 +1103,9 @@ func (c *Client) GetDefaultVPC(ctx context.Context, region string) (string, erro
 	}
 
 	return *result.Vpcs[0].VpcId, nil
+}
+
+// GetEFSDNSName constructs the EFS DNS name from filesystem ID and region
+func GetEFSDNSName(filesystemID, region string) string {
+	return fmt.Sprintf("%s.efs.%s.amazonaws.com", filesystemID, region)
 }

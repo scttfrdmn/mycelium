@@ -77,6 +77,10 @@ var (
 	mpiProcessesPerNode int
 	mpiCommand          string
 
+	// Shared storage
+	efsID         string
+	efsMountPoint string
+
 	// Parameter sweep
 	paramFile        string
 	params           string
@@ -159,6 +163,10 @@ func init() {
 	launchCmd.Flags().BoolVar(&mpiEnabled, "mpi", false, "Enable MPI cluster setup (requires --count > 1)")
 	launchCmd.Flags().IntVar(&mpiProcessesPerNode, "mpi-processes-per-node", 0, "MPI processes per node (default: vCPU count)")
 	launchCmd.Flags().StringVar(&mpiCommand, "mpi-command", "", "Command to run via mpirun (alternative to --command)")
+
+	// Shared storage
+	launchCmd.Flags().StringVar(&efsID, "efs-id", "", "EFS filesystem ID to mount (fs-xxx)")
+	launchCmd.Flags().StringVar(&efsMountPoint, "efs-mount-point", "/efs", "EFS mount point (default: /efs)")
 
 	// Parameter sweep
 	launchCmd.Flags().StringVar(&paramFile, "param-file", "", "Path to parameter sweep file (JSON/YAML/CSV)")
@@ -808,6 +816,23 @@ func launchWithProgress(ctx context.Context, awsClient *aws.Client, config *aws.
 	if err != nil {
 		return fmt.Errorf("failed to build user data: %w", err)
 	}
+
+	// Add storage mounting if EFS enabled (single instance)
+	if efsID != "" {
+		storageConfig := userdata.StorageConfig{
+			EFSEnabled:       true,
+			EFSFilesystemDNS: aws.GetEFSDNSName(efsID, config.Region),
+			EFSMountPoint:    efsMountPoint,
+		}
+
+		storageScript, err := userdata.GenerateStorageUserData(storageConfig)
+		if err != nil {
+			return fmt.Errorf("failed to generate storage user-data: %w", err)
+		}
+
+		userDataScript += "\n" + storageScript
+	}
+
 	config.UserData = base64.StdEncoding.EncodeToString([]byte(userDataScript))
 
 	// Validate MPI requirements
@@ -982,6 +1007,12 @@ func buildLaunchConfig(truffleInput *input.TruffleInput) (*aws.LaunchConfig, err
 	}
 	if name != "" {
 		config.Name = name
+	}
+	if efsID != "" {
+		config.EFSID = efsID
+	}
+	if efsMountPoint != "" {
+		config.EFSMountPoint = efsMountPoint
 	}
 
 	return config, nil
@@ -1718,8 +1749,8 @@ func launchJobArray(ctx context.Context, awsClient *aws.Client, baseConfig *aws.
 				instanceConfig.DNSName = fmt.Sprintf("%s-%d", baseConfig.DNSName, index)
 			}
 
-			// Append MPI user-data if MPI is enabled
-			if mpiEnabled {
+			// Append MPI and/or storage user-data if enabled
+			if mpiEnabled || efsID != "" {
 				// Decode base user-data
 				baseUserDataBytes, err := base64.StdEncoding.DecodeString(instanceConfig.UserData)
 				if err != nil {
@@ -1730,27 +1761,51 @@ func launchJobArray(ctx context.Context, awsClient *aws.Client, baseConfig *aws.
 					return
 				}
 
-				// Generate MPI user-data for this instance
-				mpiConfig := userdata.MPIConfig{
-					Region:              baseConfig.Region,
-					JobArrayID:          jobArrayID,
-					JobArrayIndex:       index,
-					JobArraySize:        count,
-					MPIProcessesPerNode: mpiProcessesPerNode,
-					MPICommand:          mpiCommand,
-				}
+				combinedUserData := string(baseUserDataBytes)
 
-				mpiScript, err := userdata.GenerateMPIUserData(mpiConfig)
-				if err != nil {
-					results <- launchResult{
-						index: index,
-						err:   fmt.Errorf("failed to generate MPI user-data: %w", err),
+				// Add MPI user-data if enabled
+				if mpiEnabled {
+					// Generate MPI user-data for this instance
+					mpiConfig := userdata.MPIConfig{
+						Region:              baseConfig.Region,
+						JobArrayID:          jobArrayID,
+						JobArrayIndex:       index,
+						JobArraySize:        count,
+						MPIProcessesPerNode: mpiProcessesPerNode,
+						MPICommand:          mpiCommand,
 					}
-					return
+
+					mpiScript, err := userdata.GenerateMPIUserData(mpiConfig)
+					if err != nil {
+						results <- launchResult{
+							index: index,
+							err:   fmt.Errorf("failed to generate MPI user-data: %w", err),
+						}
+						return
+					}
+
+					combinedUserData += "\n" + mpiScript
 				}
 
-				// Combine base user-data + MPI script
-				combinedUserData := string(baseUserDataBytes) + "\n" + mpiScript
+				// Add storage user-data if EFS enabled
+				if efsID != "" {
+					storageConfig := userdata.StorageConfig{
+						EFSEnabled:       true,
+						EFSFilesystemDNS: aws.GetEFSDNSName(efsID, baseConfig.Region),
+						EFSMountPoint:    efsMountPoint,
+					}
+
+					storageScript, err := userdata.GenerateStorageUserData(storageConfig)
+					if err != nil {
+						results <- launchResult{
+							index: index,
+							err:   fmt.Errorf("failed to generate storage user-data: %w", err),
+						}
+						return
+					}
+
+					combinedUserData += "\n" + storageScript
+				}
 
 				// Re-encode
 				instanceConfig.UserData = base64.StdEncoding.EncodeToString([]byte(combinedUserData))
