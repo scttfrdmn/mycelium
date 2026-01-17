@@ -59,6 +59,7 @@ spawn --instance-type m7i.large --region us-east-1 --ttl 8h
 - **🔧 Laptop-Independent**: Works even when laptop is off
 - **♿ Accessibility**: Screen reader support with --accessibility flag
 - **🔢 Job Arrays**: Launch coordinated instance groups for MPI, distributed training, parameter sweeps ([docs](JOB_ARRAYS.md))
+- **🧮 MPI Support**: First-class Message Passing Interface support with automatic OpenMPI setup, passwordless SSH, and hostfile generation ([docs](MPI_GUIDE.md))
 - **💾 AMI Management**: Create and manage custom AMIs for reusable software stacks ([docs](AMI_MANAGEMENT.md))
 - **🔐 IAM Instance Profiles**: Secure AWS service access without credentials, 13 built-in policy templates ([docs](IAM_INSTANCE_PROFILES_STATUS.md))
 - **☁️ Detached Mode**: Lambda-orchestrated parameter sweeps that survive laptop disconnection ([docs](PARAMETER_SWEEPS.md))
