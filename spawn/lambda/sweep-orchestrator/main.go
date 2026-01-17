@@ -37,24 +37,25 @@ type SweepEvent struct {
 
 // SweepRecord is the DynamoDB record structure
 type SweepRecord struct {
-	SweepID       string          `dynamodbav:"sweep_id"`
-	SweepName     string          `dynamodbav:"sweep_name"`
-	UserID        string          `dynamodbav:"user_id"`
-	CreatedAt     string          `dynamodbav:"created_at"`
-	UpdatedAt     string          `dynamodbav:"updated_at"`
-	CompletedAt   string          `dynamodbav:"completed_at,omitempty"`
-	S3ParamsKey   string          `dynamodbav:"s3_params_key"`
-	MaxConcurrent int             `dynamodbav:"max_concurrent"`
-	LaunchDelay   string          `dynamodbav:"launch_delay"`
-	TotalParams   int             `dynamodbav:"total_params"`
-	Region        string          `dynamodbav:"region"`
-	AWSAccountID  string          `dynamodbav:"aws_account_id"`
-	Status        string          `dynamodbav:"status"`
-	NextToLaunch  int             `dynamodbav:"next_to_launch"`
-	Launched      int             `dynamodbav:"launched"`
-	Failed        int             `dynamodbav:"failed"`
-	ErrorMessage  string          `dynamodbav:"error_message,omitempty"`
-	Instances     []SweepInstance `dynamodbav:"instances"`
+	SweepID         string          `dynamodbav:"sweep_id"`
+	SweepName       string          `dynamodbav:"sweep_name"`
+	UserID          string          `dynamodbav:"user_id"`
+	CreatedAt       string          `dynamodbav:"created_at"`
+	UpdatedAt       string          `dynamodbav:"updated_at"`
+	CompletedAt     string          `dynamodbav:"completed_at,omitempty"`
+	S3ParamsKey     string          `dynamodbav:"s3_params_key"`
+	MaxConcurrent   int             `dynamodbav:"max_concurrent"`
+	LaunchDelay     string          `dynamodbav:"launch_delay"`
+	TotalParams     int             `dynamodbav:"total_params"`
+	Region          string          `dynamodbav:"region"`
+	AWSAccountID    string          `dynamodbav:"aws_account_id"`
+	Status          string          `dynamodbav:"status"`
+	CancelRequested bool            `dynamodbav:"cancel_requested"`
+	NextToLaunch    int             `dynamodbav:"next_to_launch"`
+	Launched        int             `dynamodbav:"launched"`
+	Failed          int             `dynamodbav:"failed"`
+	ErrorMessage    string          `dynamodbav:"error_message,omitempty"`
+	Instances       []SweepInstance `dynamodbav:"instances"`
 }
 
 // SweepInstance tracks individual instance state
@@ -285,6 +286,20 @@ func runPollingLoop(ctx context.Context, state *SweepRecord, params *ParamFileFo
 	launchDelay := parseDuration(state.LaunchDelay)
 
 	for {
+		// Reload state from DynamoDB to check for cancellation
+		currentState, err := loadSweepState(ctx, state.SweepID)
+		if err != nil {
+			log.Printf("Failed to reload sweep state: %v", err)
+		} else if currentState.CancelRequested {
+			log.Println("Cancellation requested, stopping orchestration")
+			state.Status = "CANCELLED"
+			state.CompletedAt = time.Now().Format(time.RFC3339)
+			if err := saveSweepState(ctx, state); err != nil {
+				log.Printf("Failed to save cancelled state: %v", err)
+			}
+			return nil
+		}
+
 		// Check timeout
 		if time.Now().After(deadline) {
 			// Double-check status before reinvoking (safety guard)

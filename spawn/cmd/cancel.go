@@ -98,8 +98,9 @@ func runCancel(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(os.Stderr, "   Terminated %d instances\n", len(instancesToTerminate))
 	}
 
-	// Update sweep status to CANCELLED
+	// Update sweep status to CANCELLED and set cancel flag
 	fmt.Fprintf(os.Stderr, "\n📝 Updating sweep status to CANCELLED...\n")
+	state.CancelRequested = true
 	state.Status = "CANCELLED"
 	state.CompletedAt = time.Now().Format(time.RFC3339)
 	if err := sweep.SaveSweepState(ctx, cfg, state); err != nil {

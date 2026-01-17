@@ -67,6 +67,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Future considerations documented in issues:
   - Issue #30: MPI compatibility with AMI creation workflow
 
+### Fixed
+- Lambda orchestrator cancellation race condition (Issue #26)
+  - Added `cancel_requested` flag to SweepRecord structure
+  - Lambda polling loop now checks for cancellation request every iteration
+  - Prevents Lambda from overwriting CANCELLED status back to RUNNING
+  - Ensures sweep stops orchestration immediately when cancelled by user
+  - Deployed to production (Account 966362334030, Lambda: spawn-sweep-orchestrator)
+
 ## [0.5.0] - 2026-01-16
 
 ### Added

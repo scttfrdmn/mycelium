@@ -27,24 +27,25 @@ const (
 
 // SweepRecord represents the DynamoDB record structure
 type SweepRecord struct {
-	SweepID       string          `dynamodbav:"sweep_id"`
-	SweepName     string          `dynamodbav:"sweep_name"`
-	UserID        string          `dynamodbav:"user_id"`
-	CreatedAt     string          `dynamodbav:"created_at"`
-	UpdatedAt     string          `dynamodbav:"updated_at"`
-	CompletedAt   string          `dynamodbav:"completed_at,omitempty"`
-	S3ParamsKey   string          `dynamodbav:"s3_params_key"`
-	MaxConcurrent int             `dynamodbav:"max_concurrent"`
-	LaunchDelay   string          `dynamodbav:"launch_delay"`
-	TotalParams   int             `dynamodbav:"total_params"`
-	Region        string          `dynamodbav:"region"`
-	AWSAccountID  string          `dynamodbav:"aws_account_id"`
-	Status        string          `dynamodbav:"status"`
-	NextToLaunch  int             `dynamodbav:"next_to_launch"`
-	Launched      int             `dynamodbav:"launched"`
-	Failed        int             `dynamodbav:"failed"`
-	ErrorMessage  string          `dynamodbav:"error_message,omitempty"`
-	Instances     []SweepInstance `dynamodbav:"instances"`
+	SweepID         string          `dynamodbav:"sweep_id"`
+	SweepName       string          `dynamodbav:"sweep_name"`
+	UserID          string          `dynamodbav:"user_id"`
+	CreatedAt       string          `dynamodbav:"created_at"`
+	UpdatedAt       string          `dynamodbav:"updated_at"`
+	CompletedAt     string          `dynamodbav:"completed_at,omitempty"`
+	S3ParamsKey     string          `dynamodbav:"s3_params_key"`
+	MaxConcurrent   int             `dynamodbav:"max_concurrent"`
+	LaunchDelay     string          `dynamodbav:"launch_delay"`
+	TotalParams     int             `dynamodbav:"total_params"`
+	Region          string          `dynamodbav:"region"`
+	AWSAccountID    string          `dynamodbav:"aws_account_id"`
+	Status          string          `dynamodbav:"status"`
+	CancelRequested bool            `dynamodbav:"cancel_requested"`
+	NextToLaunch    int             `dynamodbav:"next_to_launch"`
+	Launched        int             `dynamodbav:"launched"`
+	Failed          int             `dynamodbav:"failed"`
+	ErrorMessage    string          `dynamodbav:"error_message,omitempty"`
+	Instances       []SweepInstance `dynamodbav:"instances"`
 }
 
 // SweepInstance tracks individual instance state
