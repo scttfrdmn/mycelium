@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Leader/worker coordination (index 0 runs mpirun)
   - S3 lifecycle policy for automatic MPI SSH key cleanup (1 day expiration)
   - Works seamlessly with existing job array infrastructure
+- MPI compatibility with AMI creation workflow (Issue #30)
+  - `--skip-mpi-install` flag to skip MPI installation on custom AMIs
+  - Auto-detection of pre-installed MPI (checks for mpirun in PATH)
+  - MPI environment configuration always runs (even if MPI pre-installed)
+  - Supports custom MPI implementations (Intel MPI, MPICH, custom OpenMPI builds)
+  - SSH setup and hostfile generation work identically with base or custom AMIs
+  - Enables fast cluster launch: pre-install MPI in AMI, save 2-3 minutes per cluster
 - EFS (Elastic File System) mounting support (Issue #32-33, Milestones 1-2 of #29)
   - `spawn launch --efs-id` flag to mount existing EFS filesystem
   - `--efs-mount-point` flag to customize mount location (default: /efs)

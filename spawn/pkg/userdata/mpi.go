@@ -14,6 +14,7 @@ type MPIConfig struct {
 	JobArraySize        int
 	MPIProcessesPerNode int
 	MPICommand          string
+	SkipInstall         bool
 }
 
 // GenerateMPIUserData generates the MPI setup script for inclusion in user-data
@@ -33,7 +34,19 @@ func GenerateMPIUserData(config MPIConfig) (string, error) {
 
 const mpiUserDataTemplate = `
 # MPI Setup
-yum install -y openmpi openmpi-devel
+{{if not .SkipInstall}}
+# Check if MPI is already installed
+if ! command -v mpirun &> /dev/null; then
+  echo "Installing OpenMPI..."
+  yum install -y openmpi openmpi-devel
+else
+  echo "MPI already installed, skipping installation"
+fi
+{{else}}
+echo "Skipping MPI installation (--skip-mpi-install specified)"
+{{end}}
+
+# Configure MPI environment (always run, even if pre-installed)
 cat >> /etc/profile.d/mpi.sh <<'EOF'
 export PATH=/usr/lib64/openmpi/bin:$PATH
 export LD_LIBRARY_PATH=/usr/lib64/openmpi/lib:$LD_LIBRARY_PATH

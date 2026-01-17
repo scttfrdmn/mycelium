@@ -77,6 +77,7 @@ var (
 	mpiEnabled          bool
 	mpiProcessesPerNode int
 	mpiCommand          string
+	mpiSkipInstall      bool
 
 	// Shared storage
 	efsID           string
@@ -176,6 +177,7 @@ func init() {
 	launchCmd.Flags().BoolVar(&mpiEnabled, "mpi", false, "Enable MPI cluster setup (requires --count > 1)")
 	launchCmd.Flags().IntVar(&mpiProcessesPerNode, "mpi-processes-per-node", 0, "MPI processes per node (default: vCPU count)")
 	launchCmd.Flags().StringVar(&mpiCommand, "mpi-command", "", "Command to run via mpirun (alternative to --command)")
+	launchCmd.Flags().BoolVar(&mpiSkipInstall, "skip-mpi-install", false, "Skip MPI installation (use with custom AMIs that have MPI pre-installed)")
 
 	// Shared storage
 	launchCmd.Flags().StringVar(&efsID, "efs-id", "", "EFS filesystem ID to mount (fs-xxx)")
@@ -1962,6 +1964,7 @@ func launchJobArray(ctx context.Context, awsClient *aws.Client, baseConfig *aws.
 						JobArraySize:        count,
 						MPIProcessesPerNode: mpiProcessesPerNode,
 						MPICommand:          mpiCommand,
+						SkipInstall:         mpiSkipInstall,
 					}
 
 					mpiScript, err := userdata.GenerateMPIUserData(mpiConfig)
