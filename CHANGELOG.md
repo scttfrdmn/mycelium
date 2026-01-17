@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-01-17
+
 ### Added
 - Sweep management command (Issue #27)
   - `spawn list-sweeps` command to list all parameter sweeps from DynamoDB
@@ -16,6 +18,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - JSON output: `--json`
   - Table display with status icons, progress, and relative timestamps
   - Shows sweep ID, name, status, progress (launched/total), region, and creation time
+- Data locality warnings for EFS and FSx (Issue #38)
+  - Automatic region detection for EFS and FSx filesystems
+  - Warns when launching instances in different region than storage
+  - Shows cross-region data transfer costs ($0.02-0.08/GB depending on regions)
+  - Estimates latency penalty (50-150ms for cross-region access)
+  - Provides recommendations to launch in same region as storage
+  - `--skip-region-check` flag to bypass warnings
+  - Works with `--yes` flag for automated workflows
+  - Helps prevent unexpected data transfer charges
+- Dashboard sweep management integration (Issue #23)
+  - Tabbed interface in web dashboard (Instances | Sweeps)
+  - GET /api/sweeps - List user's parameter sweeps from DynamoDB
+  - GET /api/sweeps/{id} - View detailed sweep information
+  - POST /api/sweeps/{id}/cancel - Cancel running sweeps and terminate instances
+  - Real-time auto-refresh (10s for sweeps, 30s for instances)
+  - Status filtering (RUNNING, COMPLETED, FAILED, CANCELLED)
+  - Search by sweep name or ID
+  - Sortable columns (name, status, progress, region, created, cost)
+  - Progress bars with launched/total/failed counts
+  - Cancel button with confirmation for running sweeps
+  - Cross-account instance termination via IAM role assumption
+  - User isolation via userID filtering in DynamoDB
+  - Responsive table layout with status icons
+
+### Fixed
+- Lambda orchestrator cancellation race condition (Issue #26)
+  - Added `cancel_requested` flag to SweepRecord structure
+  - Lambda polling loop now checks for cancellation request every iteration
+  - Prevents Lambda from overwriting CANCELLED status back to RUNNING
+  - Ensures sweep stops orchestration immediately when cancelled by user
+  - Deployed to production (Account 966362334030, Lambda: spawn-sweep-orchestrator)
+
+## [0.6.0] - 2026-01-16
+
+### Added
 - MPI (Message Passing Interface) support for distributed computing (Issue #28)
   - `spawn launch --mpi` flag to enable MPI cluster setup
   - `--mpi-processes-per-node` flag to control MPI process slots (defaults to vCPU count)
@@ -72,8 +109,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `--yes` flag to skip confirmation prompts
   - Displays filesystem status, capacity, S3 backing, and cost estimates
   - Auto-discovers filesystem region across multiple AWS regions
-- Future considerations documented in issues:
-  - Issue #30: MPI compatibility with AMI creation workflow
 - Cost estimation for parameter sweeps (Issue #25)
   - Pre-launch cost breakdown display for detached sweeps
   - Shows estimated costs for EC2 compute, Lambda orchestration, and S3 storage
@@ -84,37 +119,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Pricing data for 60+ instance types across 8 AWS regions
   - Automatic cost calculation based on instance type, region, and TTL
   - Prevents surprise AWS bills by showing costs upfront
-- Data locality warnings for EFS and FSx (Issue #38)
-  - Automatic region detection for EFS and FSx filesystems
-  - Warns when launching instances in different region than storage
-  - Shows cross-region data transfer costs ($0.02-0.08/GB depending on regions)
-  - Estimates latency penalty (50-150ms for cross-region access)
-  - Provides recommendations to launch in same region as storage
-  - `--skip-region-check` flag to bypass warnings
-  - Works with `--yes` flag for automated workflows
-  - Helps prevent unexpected data transfer charges
-- Dashboard sweep management integration (Issue #23)
-  - Tabbed interface in web dashboard (Instances | Sweeps)
-  - GET /api/sweeps - List user's parameter sweeps from DynamoDB
-  - GET /api/sweeps/{id} - View detailed sweep information
-  - POST /api/sweeps/{id}/cancel - Cancel running sweeps and terminate instances
-  - Real-time auto-refresh (10s for sweeps, 30s for instances)
-  - Status filtering (RUNNING, COMPLETED, FAILED, CANCELLED)
-  - Search by sweep name or ID
-  - Sortable columns (name, status, progress, region, created, cost)
-  - Progress bars with launched/total/failed counts
-  - Cancel button with confirmation for running sweeps
-  - Cross-account instance termination via IAM role assumption
-  - User isolation via userID filtering in DynamoDB
-  - Responsive table layout with status icons
-
-### Fixed
-- Lambda orchestrator cancellation race condition (Issue #26)
-  - Added `cancel_requested` flag to SweepRecord structure
-  - Lambda polling loop now checks for cancellation request every iteration
-  - Prevents Lambda from overwriting CANCELLED status back to RUNNING
-  - Ensures sweep stops orchestration immediately when cancelled by user
-  - Deployed to production (Account 966362334030, Lambda: spawn-sweep-orchestrator)
 
 ## [0.5.0] - 2026-01-16
 
@@ -305,7 +309,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Scoop configuration to use "scoops" (plural)
 - Archive structure to avoid directory conflicts
 
-[unreleased]: https://github.com/scttfrdmn/mycelium/compare/v0.5.0...HEAD
+[unreleased]: https://github.com/scttfrdmn/mycelium/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/scttfrdmn/mycelium/compare/v0.6.0...v0.7.0
+[0.6.0]: https://github.com/scttfrdmn/mycelium/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/scttfrdmn/mycelium/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/scttfrdmn/mycelium/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/scttfrdmn/mycelium/compare/v0.2.0...v0.3.0
