@@ -49,8 +49,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Enables true ephemeral compute: create → populate → export → delete → recall from S3
   - Recall works even after FSx filesystem is completely deleted
   - No DynamoDB required - configuration persists in S3 bucket tags
+- FSx management commands (Issue #36, Milestone 5 of #29)
+  - `spawn fsx list` - List all spawn-managed FSx filesystems across regions
+  - `spawn fsx info <fs-id>` - Show detailed filesystem information
+  - `spawn fsx delete <fs-id>` - Delete filesystem with confirmation prompt
+  - `--export-first` flag for delete command (with manual export instructions)
+  - `--yes` flag to skip confirmation prompts
+  - Displays filesystem status, capacity, S3 backing, and cost estimates
+  - Auto-discovers filesystem region across multiple AWS regions
 - Future considerations documented in issues:
-  - Issue #36: FSx management commands (Milestone 5 of #29)
   - Issue #30: MPI compatibility with AMI creation workflow
 
 ## [0.5.0] - 2026-01-16
