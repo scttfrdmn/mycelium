@@ -126,6 +126,12 @@ func handler(ctx context.Context, event SweepEvent) error {
 		return fmt.Errorf("failed to download parameters: %w", err)
 	}
 
+	// Check if sweep is already in terminal state (prevents recursive loop)
+	if state.Status == "COMPLETED" || state.Status == "FAILED" || state.Status == "CANCELLED" {
+		log.Printf("Sweep already in terminal state: %s. Exiting without reinvocation.", state.Status)
+		return nil
+	}
+
 	// Setup shared resources if INITIALIZING
 	if state.Status == "INITIALIZING" {
 		log.Println("Setting up shared resources...")
@@ -281,6 +287,12 @@ func runPollingLoop(ctx context.Context, state *SweepRecord, params *ParamFileFo
 	for {
 		// Check timeout
 		if time.Now().After(deadline) {
+			// Double-check status before reinvoking (safety guard)
+			if state.Status == "COMPLETED" || state.Status == "FAILED" || state.Status == "CANCELLED" {
+				log.Printf("Sweep in terminal state %s, not reinvoking", state.Status)
+				return nil
+			}
+
 			log.Println("Approaching Lambda timeout, re-invoking...")
 			if err := saveSweepState(ctx, state); err != nil {
 				log.Printf("Failed to save state before re-invocation: %v", err)
