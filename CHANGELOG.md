@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-01-17
+
 ### Added
 - CSV file format support for parameter files (Issue #18)
   - Header row defines parameter names
@@ -343,7 +345,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Scoop configuration to use "scoops" (plural)
 - Archive structure to avoid directory conflicts
 
-[unreleased]: https://github.com/scttfrdmn/mycelium/compare/v0.7.0...HEAD
+[unreleased]: https://github.com/scttfrdmn/mycelium/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/scttfrdmn/mycelium/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/scttfrdmn/mycelium/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/scttfrdmn/mycelium/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/scttfrdmn/mycelium/compare/v0.4.0...v0.5.0
