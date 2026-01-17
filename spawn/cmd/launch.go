@@ -23,6 +23,7 @@ import (
 	spawnconfig "github.com/scttfrdmn/mycelium/spawn/pkg/config"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/input"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/platform"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/pricing"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/progress"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/storage"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/sweep"
@@ -103,6 +104,8 @@ var (
 	launchDelay      string
 	detach           bool
 	sweepName        string
+	estimateOnly     bool
+	autoYes          bool
 
 	// IAM
 	iamRole            string
@@ -203,6 +206,8 @@ func init() {
 	launchCmd.Flags().StringVar(&launchDelay, "launch-delay", "0s", "Delay between instance launches (e.g., 5s)")
 	launchCmd.Flags().BoolVar(&detach, "detach", false, "Run sweep orchestration in Lambda (survives disconnect)")
 	launchCmd.Flags().StringVar(&sweepName, "sweep-name", "", "Human-readable sweep identifier (auto-generated if empty)")
+	launchCmd.Flags().BoolVar(&estimateOnly, "estimate-only", false, "Show cost estimate and exit without launching")
+	launchCmd.Flags().BoolVarP(&autoYes, "yes", "y", false, "Auto-approve cost estimate (skip confirmation)")
 
 	// IAM
 	launchCmd.Flags().StringVar(&iamRole, "iam-role", "", "IAM role name (creates if doesn't exist)")
@@ -2315,6 +2320,37 @@ func launchSweepDetached(ctx context.Context, paramFormat *ParamFileFormat, base
 		fmt.Fprintf(os.Stderr, "✓ All parameter sets validated\n\n")
 	}
 
+	// Estimate cost
+	fmt.Fprintf(os.Stderr, "💰 Estimating cost...\n")
+	costEstimate, err := pricing.EstimateSweepCost(&pricing.ParamFileFormat{
+		Defaults: paramFormat.Defaults,
+		Params:   paramFormat.Params,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to estimate cost: %w", err)
+	}
+
+	fmt.Fprintf(os.Stderr, "\n%s\n\n", costEstimate.Display())
+
+	// If estimate-only, exit here
+	if estimateOnly {
+		fmt.Fprintf(os.Stderr, "✅ Cost estimate complete (--estimate-only specified)\n")
+		return nil
+	}
+
+	// If not auto-approved, prompt for confirmation
+	if !autoYes {
+		fmt.Fprintf(os.Stderr, "Launch sweep? [Y/n]: ")
+		var response string
+		fmt.Scanln(&response)
+		response = strings.ToLower(strings.TrimSpace(response))
+		if response != "" && response != "y" && response != "yes" {
+			fmt.Fprintf(os.Stderr, "\n❌ Launch cancelled by user\n")
+			return nil
+		}
+		fmt.Fprintf(os.Stderr, "\n")
+	}
+
 	// Upload parameters to S3
 	fmt.Fprintf(os.Stderr, "📤 Uploading parameters to S3...\n")
 	s3Key, err := sweep.UploadParamsToS3(ctx, infraCfg, sweepParamFormat, sweepID, "us-east-1")
@@ -2334,6 +2370,7 @@ func launchSweepDetached(ctx context.Context, paramFormat *ParamFileFormat, base
 		TotalParams:   len(paramFormat.Params),
 		Region:        sweepRegion,
 		AWSAccountID:  accountID,
+		EstimatedCost: costEstimate.TotalCost,
 	}
 
 	err = sweep.CreateSweepRecord(ctx, infraCfg, record)

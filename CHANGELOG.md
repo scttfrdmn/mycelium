@@ -66,6 +66,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Auto-discovers filesystem region across multiple AWS regions
 - Future considerations documented in issues:
   - Issue #30: MPI compatibility with AMI creation workflow
+- Cost estimation for parameter sweeps (Issue #25)
+  - Pre-launch cost breakdown display for detached sweeps
+  - Shows estimated costs for EC2 compute, Lambda orchestration, and S3 storage
+  - `--estimate-only` flag to show cost estimate without launching
+  - `-y/--yes` flag to auto-approve and skip confirmation prompt
+  - Confirmation prompt asks user to approve before launching
+  - Estimated cost stored in DynamoDB sweep record
+  - Pricing data for 60+ instance types across 8 AWS regions
+  - Automatic cost calculation based on instance type, region, and TTL
+  - Prevents surprise AWS bills by showing costs upfront
 
 ### Fixed
 - Lambda orchestrator cancellation race condition (Issue #26)
