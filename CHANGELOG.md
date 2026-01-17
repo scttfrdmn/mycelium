@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Sweep management command (Issue #27)
+  - `spawn list-sweeps` command to list all parameter sweeps from DynamoDB
+  - Filter by status: `--status RUNNING`, `--status COMPLETED`, etc.
+  - Filter by date: `--since 2026-01-15`
+  - Limit results: `--last 10`
+  - JSON output: `--json`
+  - Table display with status icons, progress, and relative timestamps
+  - Shows sweep ID, name, status, progress (launched/total), region, and creation time
 - MPI (Message Passing Interface) support for distributed computing (Issue #28)
   - `spawn launch --mpi` flag to enable MPI cluster setup
   - `--mpi-processes-per-node` flag to control MPI process slots (defaults to vCPU count)
