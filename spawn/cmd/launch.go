@@ -24,6 +24,7 @@ import (
 	"github.com/scttfrdmn/mycelium/spawn/pkg/input"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/platform"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/progress"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/storage"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/sweep"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/userdata"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/wizard"
@@ -78,8 +79,10 @@ var (
 	mpiCommand          string
 
 	// Shared storage
-	efsID         string
-	efsMountPoint string
+	efsID           string
+	efsMountPoint   string
+	efsProfile      string
+	efsMountOptions string
 
 	// Parameter sweep
 	paramFile        string
@@ -167,6 +170,8 @@ func init() {
 	// Shared storage
 	launchCmd.Flags().StringVar(&efsID, "efs-id", "", "EFS filesystem ID to mount (fs-xxx)")
 	launchCmd.Flags().StringVar(&efsMountPoint, "efs-mount-point", "/efs", "EFS mount point (default: /efs)")
+	launchCmd.Flags().StringVar(&efsProfile, "efs-profile", "general", "EFS performance profile: general, max-io, max-throughput, burst")
+	launchCmd.Flags().StringVar(&efsMountOptions, "efs-mount-options", "", "Custom EFS mount options (overrides profile)")
 
 	// Parameter sweep
 	launchCmd.Flags().StringVar(&paramFile, "param-file", "", "Path to parameter sweep file (JSON/YAML/CSV)")
@@ -819,10 +824,16 @@ func launchWithProgress(ctx context.Context, awsClient *aws.Client, config *aws.
 
 	// Add storage mounting if EFS enabled (single instance)
 	if efsID != "" {
+		mountOptions, err := getEFSMountOptions()
+		if err != nil {
+			return fmt.Errorf("failed to get EFS mount options: %w", err)
+		}
+
 		storageConfig := userdata.StorageConfig{
 			EFSEnabled:       true,
 			EFSFilesystemDNS: aws.GetEFSDNSName(efsID, config.Region),
 			EFSMountPoint:    efsMountPoint,
+			EFSMountOptions:  mountOptions,
 		}
 
 		storageScript, err := userdata.GenerateStorageUserData(storageConfig)
@@ -938,6 +949,32 @@ func launchWithProgress(ctx context.Context, awsClient *aws.Client, config *aws.
 	}
 
 	return nil
+}
+
+func getEFSMountOptions() (string, error) {
+	// Custom mount options override profile
+	if efsMountOptions != "" {
+		opts, err := storage.ParseCustomOptions(efsMountOptions)
+		if err != nil {
+			return "", fmt.Errorf("failed to parse custom mount options: %w", err)
+		}
+		return opts.ToMountString(), nil
+	}
+
+	// Validate profile
+	if efsProfile != "" {
+		if err := storage.ValidateProfile(efsProfile); err != nil {
+			return "", err
+		}
+	}
+
+	// Get mount options from profile
+	opts, err := storage.GetEFSProfile(storage.EFSProfile(efsProfile))
+	if err != nil {
+		return "", fmt.Errorf("failed to get EFS profile: %w", err)
+	}
+
+	return opts.ToMountString(), nil
 }
 
 func buildLaunchConfig(truffleInput *input.TruffleInput) (*aws.LaunchConfig, error) {
@@ -1789,10 +1826,20 @@ func launchJobArray(ctx context.Context, awsClient *aws.Client, baseConfig *aws.
 
 				// Add storage user-data if EFS enabled
 				if efsID != "" {
+					mountOptions, err := getEFSMountOptions()
+					if err != nil {
+						results <- launchResult{
+							index: index,
+							err:   fmt.Errorf("failed to get EFS mount options: %w", err),
+						}
+						return
+					}
+
 					storageConfig := userdata.StorageConfig{
 						EFSEnabled:       true,
 						EFSFilesystemDNS: aws.GetEFSDNSName(efsID, baseConfig.Region),
 						EFSMountPoint:    efsMountPoint,
+						EFSMountOptions:  mountOptions,
 					}
 
 					storageScript, err := userdata.GenerateStorageUserData(storageConfig)

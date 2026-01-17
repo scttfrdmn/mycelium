@@ -16,6 +16,7 @@ type StorageConfig struct {
 	EFSEnabled       bool
 	EFSFilesystemDNS string
 	EFSMountPoint    string
+	EFSMountOptions  string // NFS mount options (e.g., "nfsvers=4.1,rsize=1048576,...")
 }
 
 // GenerateStorageUserData generates storage mounting script
@@ -47,8 +48,8 @@ echo "export FSX_MOUNT={{.FSxMountPoint}}" >> /etc/profile.d/fsx.sh
 # EFS mounting
 yum install -y nfs-utils
 mkdir -p {{.EFSMountPoint}}
-mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 {{.EFSFilesystemDNS}}:/ {{.EFSMountPoint}}
-echo "{{.EFSFilesystemDNS}}:/ {{.EFSMountPoint}} nfs4 nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,_netdev 0 0" >> /etc/fstab
+mount -t nfs4 -o {{.EFSMountOptions}} {{.EFSFilesystemDNS}}:/ {{.EFSMountPoint}}
+echo "{{.EFSFilesystemDNS}}:/ {{.EFSMountPoint}} nfs4 {{.EFSMountOptions}} 0 0" >> /etc/fstab
 echo "export EFS_MOUNT={{.EFSMountPoint}}" >> /etc/profile.d/efs.sh
 {{end}}
 `

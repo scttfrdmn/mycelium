@@ -18,9 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Leader/worker coordination (index 0 runs mpirun)
   - S3 lifecycle policy for automatic MPI SSH key cleanup (1 day expiration)
   - Works seamlessly with existing job array infrastructure
-- EFS (Elastic File System) mounting support (Issue #32, Milestone 1 of #29)
+- EFS (Elastic File System) mounting support (Issue #32-33, Milestones 1-2 of #29)
   - `spawn launch --efs-id` flag to mount existing EFS filesystem
   - `--efs-mount-point` flag to customize mount location (default: /efs)
+  - `--efs-profile` flag for performance profiles: general, max-io, max-throughput, burst
+  - `--efs-mount-options` flag for custom NFS mount options (overrides profile)
+  - Performance profiles optimize for different workloads (many small files, large sequential I/O, burst patterns)
   - Automatic NFS client installation and fstab configuration
   - Works with single instances, job arrays, and MPI clusters
   - All instances in job array share the same EFS filesystem
