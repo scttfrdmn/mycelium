@@ -1230,6 +1230,11 @@ function renderSweepsTable(sweeps) {
         const createdTime = formatRelativeTime(new Date(sweep.created_at));
         const costText = sweep.estimated_cost > 0 ? `$${sweep.estimated_cost.toFixed(2)}` : 'N/A';
 
+        // Region display: show count for multi-region, single region otherwise
+        const regionInfo = sweep.multi_region && sweep.region_status
+            ? `${Object.keys(sweep.region_status).length} regions`
+            : sweep.region;
+
         // Action buttons
         let actionButtons = '';
         if (sweep.status === 'RUNNING') {
@@ -1263,7 +1268,7 @@ function renderSweepsTable(sweeps) {
                         <div style="width: ${progressPercent}%; background: var(--accent-blue); height: 100%; transition: width 0.3s;"></div>
                     </div>
                 </td>
-                <td>${sweep.region}</td>
+                <td>${regionInfo}</td>
                 <td title="${new Date(sweep.created_at).toLocaleString()}">${createdTime}</td>
                 <td>${costText}</td>
                 <td>${actionButtons}</td>

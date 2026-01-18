@@ -114,13 +114,15 @@ type SweepDetailInfo struct {
 
 // SweepInstanceInfo represents instance info within a sweep
 type SweepInstanceInfo struct {
-	Index        int        `json:"index"`
-	Region       string     `json:"region"`
-	InstanceID   string     `json:"instance_id"`
-	State        string     `json:"state"`
-	LaunchedAt   time.Time  `json:"launched_at"`
-	TerminatedAt *time.Time `json:"terminated_at,omitempty"`
-	ErrorMessage string     `json:"error_message,omitempty"`
+	Index         int        `json:"index"`
+	Region        string     `json:"region"`
+	InstanceID    string     `json:"instance_id"`
+	RequestedType string     `json:"requested_type,omitempty"` // Pattern specified
+	ActualType    string     `json:"actual_type,omitempty"`    // Type actually launched
+	State         string     `json:"state"`
+	LaunchedAt    time.Time  `json:"launched_at"`
+	TerminatedAt  *time.Time `json:"terminated_at,omitempty"`
+	ErrorMessage  string     `json:"error_message,omitempty"`
 }
 
 // DynamoDB structures
@@ -143,9 +145,10 @@ type SweepRecord struct {
 	CreatedAt       string                      `dynamodbav:"created_at"`
 	UpdatedAt       string                      `dynamodbav:"updated_at"`
 	CompletedAt     string                      `dynamodbav:"completed_at,omitempty"`
-	S3ParamsKey     string                      `dynamodbav:"s3_params_key"`
-	MaxConcurrent   int                         `dynamodbav:"max_concurrent"`
-	LaunchDelay     string                      `dynamodbav:"launch_delay"`
+	S3ParamsKey            string                      `dynamodbav:"s3_params_key"`
+	MaxConcurrent          int                         `dynamodbav:"max_concurrent"`
+	MaxConcurrentPerRegion int                         `dynamodbav:"max_concurrent_per_region,omitempty"`
+	LaunchDelay            string                      `dynamodbav:"launch_delay"`
 	TotalParams     int                         `dynamodbav:"total_params"`
 	Region          string                      `dynamodbav:"region"`
 	AWSAccountID    string                      `dynamodbav:"aws_account_id"`

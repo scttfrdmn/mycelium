@@ -98,16 +98,17 @@ var (
 	fsxMountPoint      string
 
 	// Parameter sweep
-	paramFile        string
-	params           string
-	cartesian        bool
-	maxConcurrent    int
-	launchDelay      string
-	detach           bool
-	sweepName        string
-	estimateOnly     bool
-	autoYes          bool
-	distributionMode string
+	paramFile              string
+	params                 string
+	cartesian              bool
+	maxConcurrent          int
+	maxConcurrentPerRegion int
+	launchDelay            string
+	detach                 bool
+	sweepName              string
+	estimateOnly           bool
+	autoYes                bool
+	distributionMode       string
 
 	// IAM
 	iamRole            string
@@ -206,6 +207,7 @@ func init() {
 	launchCmd.Flags().StringVar(&params, "params", "", "Inline JSON parameters for sweep")
 	launchCmd.Flags().BoolVar(&cartesian, "cartesian", false, "Generate cartesian product of parameter lists")
 	launchCmd.Flags().IntVar(&maxConcurrent, "max-concurrent", 0, "Max instances running simultaneously (0 = unlimited)")
+	launchCmd.Flags().IntVar(&maxConcurrentPerRegion, "max-concurrent-per-region", 0, "Max instances running simultaneously per region (0 = unlimited)")
 	launchCmd.Flags().StringVar(&launchDelay, "launch-delay", "0s", "Delay between instance launches (e.g., 5s)")
 	launchCmd.Flags().BoolVar(&detach, "detach", false, "Run sweep orchestration in Lambda (survives disconnect)")
 	launchCmd.Flags().StringVar(&sweepName, "sweep-name", "", "Human-readable sweep identifier (auto-generated if empty)")
@@ -251,6 +253,17 @@ func runLaunch(cmd *cobra.Command, args []string) error {
 		platform.EnableWindowsColors()
 	}
 
+	// Check for parameter sweep mode FIRST (before wizard/config logic)
+	if paramFile != "" || params != "" {
+		// Parameter sweep launch path - config will be built inside launchParameterSweep
+		// Create minimal config for sweep orchestration
+		config := &aws.LaunchConfig{
+			Region:       region,
+			InstanceType: instanceType, // May be empty, that's ok for sweeps
+		}
+		return launchParameterSweep(ctx, config, plat)
+	}
+
 	var config *aws.LaunchConfig
 
 	// Determine mode: wizard, pipe, or flags
@@ -283,12 +296,6 @@ func runLaunch(cmd *cobra.Command, args []string) error {
 	// Validate
 	if config.InstanceType == "" {
 		return i18n.Te("error.instance_type_required", nil)
-	}
-
-	// Check for parameter sweep mode
-	if paramFile != "" || params != "" {
-		// Parameter sweep launch path
-		return launchParameterSweep(ctx, config, plat)
 	}
 
 	// Auto-detect region if not specified
@@ -2370,7 +2377,11 @@ func launchSweepDetached(ctx context.Context, paramFormat *ParamFileFormat, base
 	}
 
 	// Load dev account config to get account ID
-	devCfg, err := config.LoadDefaultConfig(ctx)
+	// IMPORTANT: Always use mycelium-dev profile for target account ID
+	// regardless of what AWS_PROFILE is set in environment
+	devCfg, err := config.LoadDefaultConfig(ctx,
+		config.WithSharedConfigProfile("mycelium-dev"),
+	)
 	if err != nil {
 		return fmt.Errorf("failed to load AWS config: %w", err)
 	}
@@ -2449,20 +2460,28 @@ func launchSweepDetached(ctx context.Context, paramFormat *ParamFileFormat, base
 	// Create DynamoDB record
 	fmt.Fprintf(os.Stderr, "💾 Creating sweep orchestration record...\n")
 	record := &sweep.SweepRecord{
-		SweepID:       sweepID,
-		SweepName:     sweepName,
-		S3ParamsKey:   s3Key,
-		MaxConcurrent: maxConcurrent,
-		LaunchDelay:   launchDelay,
-		TotalParams:   len(paramFormat.Params),
-		Region:        sweepRegion,
-		AWSAccountID:  accountID,
-		EstimatedCost: costEstimate.TotalCost,
+		SweepID:                sweepID,
+		SweepName:              sweepName,
+		S3ParamsKey:            s3Key,
+		MaxConcurrent:          maxConcurrent,
+		MaxConcurrentPerRegion: maxConcurrentPerRegion,
+		LaunchDelay:            launchDelay,
+		TotalParams:            len(paramFormat.Params),
+		Region:                 sweepRegion,
+		AWSAccountID:           accountID,
+		EstimatedCost:          costEstimate.TotalCost,
 	}
 
 	// Check if multi-region sweep
 	regionGroups := sweep.GroupParamsByRegion(sweepParamFormat.Params, sweepParamFormat.Defaults)
-	if len(regionGroups) > 1 {
+	if len(regionGroups) == 1 {
+		// Single region - use that as the sweep region
+		for region := range regionGroups {
+			record.Region = region
+			break
+		}
+	} else if len(regionGroups) > 1 {
+		// Multi-region sweep
 		record.MultiRegion = true
 		record.RegionStatus = make(map[string]*sweep.RegionProgress)
 

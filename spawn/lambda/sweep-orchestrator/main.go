@@ -72,9 +72,10 @@ type SweepRecord struct {
 	CreatedAt       string                      `dynamodbav:"created_at"`
 	UpdatedAt       string                      `dynamodbav:"updated_at"`
 	CompletedAt     string                      `dynamodbav:"completed_at,omitempty"`
-	S3ParamsKey     string                      `dynamodbav:"s3_params_key"`
-	MaxConcurrent   int                         `dynamodbav:"max_concurrent"`
-	LaunchDelay     string                      `dynamodbav:"launch_delay"`
+	S3ParamsKey            string                      `dynamodbav:"s3_params_key"`
+	MaxConcurrent          int                         `dynamodbav:"max_concurrent"`
+	MaxConcurrentPerRegion int                         `dynamodbav:"max_concurrent_per_region,omitempty"`
+	LaunchDelay            string                      `dynamodbav:"launch_delay"`
 	TotalParams     int                         `dynamodbav:"total_params"`
 	Region          string                      `dynamodbav:"region"`
 	AWSAccountID    string                      `dynamodbav:"aws_account_id"`
@@ -95,21 +96,25 @@ type SweepRecord struct {
 
 // RegionProgress tracks per-region sweep progress
 type RegionProgress struct {
-	Launched      int   `dynamodbav:"launched"`
-	Failed        int   `dynamodbav:"failed"`
-	ActiveCount   int   `dynamodbav:"active_count"`
-	NextToLaunch  []int `dynamodbav:"next_to_launch"`
+	Launched           int     `dynamodbav:"launched"`
+	Failed             int     `dynamodbav:"failed"`
+	ActiveCount        int     `dynamodbav:"active_count"`
+	NextToLaunch       []int   `dynamodbav:"next_to_launch"`
+	TotalInstanceHours float64 `dynamodbav:"total_instance_hours,omitempty"`
+	EstimatedCost      float64 `dynamodbav:"estimated_cost,omitempty"`
 }
 
 // SweepInstance tracks individual instance state
 type SweepInstance struct {
-	Index        int    `dynamodbav:"index"`
-	Region       string `dynamodbav:"region"`
-	InstanceID   string `dynamodbav:"instance_id"`
-	State        string `dynamodbav:"state"`
-	LaunchedAt   string `dynamodbav:"launched_at"`
-	TerminatedAt string `dynamodbav:"terminated_at,omitempty"`
-	ErrorMessage string `dynamodbav:"error_message,omitempty"`
+	Index         int    `dynamodbav:"index"`
+	Region        string `dynamodbav:"region"`
+	InstanceID    string `dynamodbav:"instance_id"`
+	RequestedType string `dynamodbav:"requested_type,omitempty"` // Pattern specified (e.g., "c5.*")
+	ActualType    string `dynamodbav:"actual_type,omitempty"`    // Type actually launched
+	State         string `dynamodbav:"state"`
+	LaunchedAt    string `dynamodbav:"launched_at"`
+	TerminatedAt  string `dynamodbav:"terminated_at,omitempty"`
+	ErrorMessage  string `dynamodbav:"error_message,omitempty"`
 }
 
 // ParamFileFormat matches CLI parameter file structure
@@ -476,8 +481,42 @@ func countActiveInstances(ctx context.Context, ec2Client *ec2.Client, state *Swe
 }
 
 func launchInstance(ctx context.Context, ec2Client *ec2.Client, state *SweepRecord, config map[string]interface{}, paramIndex int) error {
+	instanceTypePattern := getStringParam(config, "instance_type", "t3.micro")
+
+	// Parse instance type pattern (supports "c5.large|c5.xlarge" or "c5.*")
+	instanceTypes, err := parseInstanceTypePattern(instanceTypePattern)
+	if err != nil {
+		return fmt.Errorf("invalid instance type pattern: %w", err)
+	}
+
+	var lastErr error
+	for _, instanceType := range instanceTypes {
+		log.Printf("Trying instance type %s for param %d", instanceType, paramIndex)
+
+		// Try launch with this type
+		err := tryLaunchInstanceSingleRegion(ctx, ec2Client, state, config, paramIndex, instanceType, instanceTypePattern)
+		if err == nil {
+			return nil // Success!
+		}
+
+		// Check if capacity error
+		isCapacity, errorCode := isCapacityError(err)
+		if isCapacity {
+			log.Printf("Capacity unavailable for %s: %s, trying next type", instanceType, errorCode)
+			lastErr = err
+			continue
+		}
+
+		// Non-capacity error (auth, AMI, config) - fail immediately
+		return err
+	}
+
+	return fmt.Errorf("all instance types exhausted: %w", lastErr)
+}
+
+// tryLaunchInstanceSingleRegion attempts to launch with specific instance type (single-region sweeps)
+func tryLaunchInstanceSingleRegion(ctx context.Context, ec2Client *ec2.Client, state *SweepRecord, config map[string]interface{}, paramIndex int, instanceType string, instanceTypePattern string) error {
 	// Extract launch configuration
-	instanceType := getStringParam(config, "instance_type", "t3.micro")
 	ami := getStringParam(config, "ami", "")
 	keyName := getStringParam(config, "key_name", "")
 	iamRole := getStringParam(config, "iam_role", "spawnd-role")
@@ -545,10 +584,13 @@ func launchInstance(ctx context.Context, ec2Client *ec2.Client, state *SweepReco
 
 	// Record instance
 	state.Instances = append(state.Instances, SweepInstance{
-		Index:      paramIndex,
-		InstanceID: instanceID,
-		State:      "pending",
-		LaunchedAt: time.Now().Format(time.RFC3339),
+		Index:         paramIndex,
+		Region:        state.Region,
+		InstanceID:    instanceID,
+		RequestedType: instanceTypePattern, // e.g., "c5.*" or "c5.large|m5.large"
+		ActualType:    instanceType,        // e.g., "c5.large"
+		State:         "pending",
+		LaunchedAt:    time.Now().Format(time.RFC3339),
 	})
 
 	return nil
@@ -605,6 +647,73 @@ func getBoolParam(params map[string]interface{}, key string, defaultValue bool) 
 	return defaultValue
 }
 
+// parseInstanceTypePattern parses instance type pattern into list
+// Supports:
+// - Single: "c5.large"
+// - Pipe list: "c5.large|c5.xlarge|m5.large"
+// - Wildcard: "c5.*" (expands to all c5 types, sorted small to large)
+func parseInstanceTypePattern(pattern string) ([]string, error) {
+	if pattern == "" {
+		return []string{"t3.micro"}, nil // Default
+	}
+
+	// If no wildcard or pipe, return as-is
+	if !strings.Contains(pattern, "|") && !strings.Contains(pattern, "*") {
+		return []string{pattern}, nil
+	}
+
+	// Pipe-separated list
+	if strings.Contains(pattern, "|") {
+		types := strings.Split(pattern, "|")
+		result := make([]string, 0, len(types))
+		for _, t := range types {
+			trimmed := strings.TrimSpace(t)
+			if trimmed != "" {
+				result = append(result, trimmed)
+			}
+		}
+		if len(result) == 0 {
+			return nil, fmt.Errorf("pipe-separated pattern resulted in empty list")
+		}
+		return result, nil
+	}
+
+	// Wildcard expansion (c5.*, m5.*)
+	if strings.Contains(pattern, "*") {
+		return expandWildcard(pattern)
+	}
+
+	return []string{pattern}, nil
+}
+
+// expandWildcard expands wildcard patterns to known instance types
+func expandWildcard(pattern string) ([]string, error) {
+	if !strings.HasSuffix(pattern, ".*") {
+		return nil, fmt.Errorf("wildcard must be in format 'family.*' (e.g., 'c5.*')")
+	}
+
+	// Extract family (e.g., "c5" from "c5.*")
+	family := strings.TrimSuffix(pattern, ".*")
+	if family == "" {
+		return nil, fmt.Errorf("empty instance family in wildcard pattern")
+	}
+
+	// Common instance sizes (small to large) for spot fallback
+	sizes := []string{
+		"nano", "micro", "small", "medium", "large", "xlarge",
+		"2xlarge", "4xlarge", "8xlarge", "12xlarge", "16xlarge",
+		"18xlarge", "24xlarge", "32xlarge", "48xlarge", "56xlarge",
+		"96xlarge", "112xlarge", "metal",
+	}
+
+	result := make([]string, 0, len(sizes))
+	for _, size := range sizes {
+		result = append(result, fmt.Sprintf("%s.%s", family, size))
+	}
+
+	return result, nil
+}
+
 func parseDuration(s string) time.Duration {
 	if s == "" {
 		return 0
@@ -614,6 +723,111 @@ func parseDuration(s string) time.Duration {
 		return 0
 	}
 	return d
+}
+
+// updateRegionalCosts calculates and updates instance hours and costs per region
+func updateRegionalCosts(state *SweepRecord) {
+	if !state.MultiRegion || len(state.RegionStatus) == 0 {
+		return
+	}
+
+	// Reset costs (we'll recalculate from scratch each time)
+	for _, regionStatus := range state.RegionStatus {
+		regionStatus.TotalInstanceHours = 0
+		regionStatus.EstimatedCost = 0
+	}
+
+	now := time.Now()
+
+	// Calculate costs for each instance
+	for _, inst := range state.Instances {
+		if inst.LaunchedAt == "" || inst.Region == "" {
+			continue
+		}
+
+		launchedAt, err := time.Parse(time.RFC3339, inst.LaunchedAt)
+		if err != nil {
+			log.Printf("Failed to parse launch time for instance %s: %v", inst.InstanceID, err)
+			continue
+		}
+
+		var endTime time.Time
+		if inst.TerminatedAt != "" {
+			endTime, err = time.Parse(time.RFC3339, inst.TerminatedAt)
+			if err != nil {
+				log.Printf("Failed to parse termination time for instance %s: %v", inst.InstanceID, err)
+				endTime = now // Use now as fallback
+			}
+		} else if inst.State == "terminated" || inst.State == "stopped" {
+			endTime = now // Assume terminated now if state shows terminated but no timestamp
+		} else {
+			endTime = now // Still running, use current time
+		}
+
+		hours := endTime.Sub(launchedAt).Hours()
+		if hours < 0 {
+			hours = 0
+		}
+
+		// Get pricing for actual instance type used (fallback to requested type if not set)
+		instanceType := inst.ActualType
+		if instanceType == "" {
+			instanceType = inst.RequestedType
+		}
+		if instanceType == "" {
+			instanceType = "t3.micro" // Fallback default
+		}
+
+		// Get hourly rate from pricing package
+		// Need to import pricing package in main.go imports
+		hourlyRate := getPricingRate(inst.Region, instanceType)
+		cost := hours * hourlyRate
+
+		// Accumulate to region
+		if regionStatus, ok := state.RegionStatus[inst.Region]; ok {
+			regionStatus.TotalInstanceHours += hours
+			regionStatus.EstimatedCost += cost
+		}
+	}
+
+	// Log updated costs
+	for region, status := range state.RegionStatus {
+		if status.EstimatedCost > 0 {
+			log.Printf("Region %s costs: $%.2f (%.1f instance-hours)", region, status.EstimatedCost, status.TotalInstanceHours)
+		}
+	}
+}
+
+// getPricingRate returns hourly rate for instance type in region
+// This is a simplified version - full pricing logic is in pkg/pricing
+func getPricingRate(region, instanceType string) float64 {
+	// Simplified pricing lookup
+	// Real implementation would use pkg/pricing.GetEC2HourlyRate()
+	// For now, use rough estimates
+	baseRates := map[string]float64{
+		"t3.micro":    0.0104,
+		"t3.small":    0.0208,
+		"t3.medium":   0.0416,
+		"t3.large":    0.0832,
+		"t3.xlarge":   0.1664,
+		"t3.2xlarge":  0.3328,
+		"m5.large":    0.096,
+		"m5.xlarge":   0.192,
+		"m5.2xlarge":  0.384,
+		"c5.large":    0.085,
+		"c5.xlarge":   0.17,
+		"c5.2xlarge":  0.34,
+		"c6i.large":   0.085,
+		"c6i.xlarge":  0.17,
+	}
+
+	rate, ok := baseRates[strings.ToLower(instanceType)]
+	if !ok {
+		// Default estimate for unknown types
+		return 0.10
+	}
+
+	return rate
 }
 
 func min(a, b int) int {
@@ -675,7 +889,7 @@ func initializeRegionalOrchestrator(ctx context.Context, state *SweepRecord) (*R
 		})
 		if err != nil {
 			log.Printf("WARNING: Region %s is not accessible: %v", region, err)
-			log.Printf("This may be due to account restrictions or SCP policies. Params in this region will be marked as failed.", region)
+			log.Printf("This may be due to account restrictions or SCP policies. Params in region %s will be marked as failed.", region)
 			if err := markRegionParamsFailed(ctx, state, region, fmt.Sprintf("Region access denied: %v", err)); err != nil {
 				log.Printf("Failed to mark region %s params as failed: %v", region, err)
 			}
@@ -774,6 +988,8 @@ func runMultiRegionPollingLoop(ctx context.Context, state *SweepRecord, params *
 			}
 
 			log.Println("Approaching Lambda timeout, re-invoking...")
+			// Update regional costs before re-invoking
+			updateRegionalCosts(state)
 			if err := saveSweepState(ctx, state); err != nil {
 				log.Printf("Failed to save state before re-invocation: %v", err)
 			}
@@ -812,6 +1028,8 @@ func runMultiRegionPollingLoop(ctx context.Context, state *SweepRecord, params *
 			log.Println("All instances launched and completed")
 			state.Status = "COMPLETED"
 			state.CompletedAt = time.Now().Format(time.RFC3339)
+			// Final cost update before completion
+			updateRegionalCosts(state)
 			if err := saveSweepState(ctx, state); err != nil {
 				return fmt.Errorf("failed to save completion state: %w", err)
 			}
@@ -998,6 +1216,16 @@ func launchAcrossRegions(ctx context.Context, orchestrator *RegionalOrchestrator
 			defer wg.Done()
 
 			toLaunch := min(fairShare, len(rs.NextToLaunch))
+
+			// Apply per-region concurrent limit if set
+			if state.MaxConcurrentPerRegion > 0 {
+				regionCapacity := state.MaxConcurrentPerRegion - activeByRegion[r]
+				if regionCapacity < 0 {
+					regionCapacity = 0
+				}
+				toLaunch = min(toLaunch, regionCapacity)
+			}
+
 			log.Printf("Region %s: launching %d instances", r, toLaunch)
 
 			for i := 0; i < toLaunch; i++ {
@@ -1051,10 +1279,45 @@ func launchAcrossRegions(ctx context.Context, orchestrator *RegionalOrchestrator
 	return saveSweepState(ctx, state)
 }
 
-// launchInstanceInRegion launches an instance in a specific region
+// launchInstanceInRegion launches an instance with fallback support
 func launchInstanceInRegion(ctx context.Context, ec2Client *ec2.Client, state *SweepRecord, config map[string]interface{}, paramIndex int, region string) error {
+	instanceTypePattern := getStringParam(config, "instance_type", "t3.micro")
+
+	// Parse instance type pattern (supports "c5.large|c5.xlarge" or "c5.*")
+	instanceTypes, err := parseInstanceTypePattern(instanceTypePattern)
+	if err != nil {
+		return fmt.Errorf("invalid instance type pattern: %w", err)
+	}
+
+	var lastErr error
+	for _, instanceType := range instanceTypes {
+		log.Printf("Trying instance type %s for param %d in %s", instanceType, paramIndex, region)
+
+		// Try launch with this type
+		err := tryLaunchInstance(ctx, ec2Client, state, config, paramIndex, region, instanceType, instanceTypePattern)
+		if err == nil {
+			return nil // Success!
+		}
+
+		// Check if capacity error
+		isCapacity, errorCode := isCapacityError(err)
+		if isCapacity {
+			log.Printf("Capacity unavailable for %s: %s, trying next type", instanceType, errorCode)
+			lastErr = err
+			continue
+		}
+
+		// Non-capacity error (auth, AMI, config) - fail immediately
+		return err
+	}
+
+	return fmt.Errorf("all instance types exhausted: %w", lastErr)
+}
+
+// tryLaunchInstance attempts to launch with specific instance type
+func tryLaunchInstance(ctx context.Context, ec2Client *ec2.Client, state *SweepRecord, config map[string]interface{}, paramIndex int, region string, instanceType string, instanceTypePattern string) error {
 	// Extract launch configuration
-	instanceType := getStringParam(config, "instance_type", "t3.micro")
+	// instanceType is provided as parameter
 	ami := getStringParam(config, "ami", "")
 	keyName := getStringParam(config, "key_name", "")
 	iamRole := getStringParam(config, "iam_role", "spawnd-role")
@@ -1122,11 +1385,13 @@ func launchInstanceInRegion(ctx context.Context, ec2Client *ec2.Client, state *S
 
 	// Record instance
 	state.Instances = append(state.Instances, SweepInstance{
-		Index:      paramIndex,
-		Region:     region,
-		InstanceID: instanceID,
-		State:      "pending",
-		LaunchedAt: time.Now().Format(time.RFC3339),
+		Index:         paramIndex,
+		Region:        region,
+		InstanceID:    instanceID,
+		RequestedType: instanceTypePattern, // e.g., "c5.*" or "c5.large|m5.large"
+		ActualType:    instanceType,        // e.g., "c5.large"
+		State:         "pending",
+		LaunchedAt:    time.Now().Format(time.RFC3339),
 	})
 
 	return nil

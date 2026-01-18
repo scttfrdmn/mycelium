@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -16,6 +17,7 @@ import (
 
 var (
 	statusSweepID string
+	statusJSON    bool
 )
 
 var statusCmd = &cobra.Command{
@@ -29,6 +31,7 @@ func init() {
 	rootCmd.AddCommand(statusCmd)
 
 	statusCmd.Flags().StringVar(&statusSweepID, "sweep-id", "", "Check parameter sweep status instead of instance status")
+	statusCmd.Flags().BoolVar(&statusJSON, "json", false, "Output status as JSON")
 
 	// Register completion for instance ID argument
 	statusCmd.ValidArgsFunction = completeInstanceID
@@ -99,10 +102,22 @@ func runSweepStatus(ctx context.Context, sweepID string) error {
 	}
 
 	// Query sweep status
-	fmt.Fprintf(os.Stderr, "🔍 Querying sweep status...\n\n")
+	if !statusJSON {
+		fmt.Fprintf(os.Stderr, "🔍 Querying sweep status...\n\n")
+	}
 	status, err := sweep.QuerySweepStatus(ctx, cfg, sweepID)
 	if err != nil {
 		return fmt.Errorf("failed to query sweep status: %w", err)
+	}
+
+	// If JSON output requested, marshal and print
+	if statusJSON {
+		jsonBytes, err := json.MarshalIndent(status, "", "  ")
+		if err != nil {
+			return fmt.Errorf("failed to marshal status to JSON: %w", err)
+		}
+		fmt.Println(string(jsonBytes))
+		return nil
 	}
 
 	// Display sweep information
@@ -198,6 +213,7 @@ func runSweepStatus(ctx context.Context, sweepID string) error {
 			}
 		}
 
+		totalCost := 0.0
 		for _, region := range regions {
 			rs := status.RegionStatus[region]
 			total := len(rs.NextToLaunch) + rs.Launched + rs.Failed
@@ -211,7 +227,24 @@ func runSweepStatus(ctx context.Context, sweepID string) error {
 				pending,
 				rs.Failed,
 			)
+
+			// Show costs if available
+			if rs.TotalInstanceHours > 0 || rs.EstimatedCost > 0 {
+				fmt.Fprintf(os.Stdout, "  %-13s  Cost: $%.2f (%.1f instance-hours)\n",
+					"",
+					rs.EstimatedCost,
+					rs.TotalInstanceHours,
+				)
+			}
+
+			totalCost += rs.EstimatedCost
 		}
+
+		// Show total cost if any
+		if totalCost > 0 {
+			fmt.Fprintf(os.Stdout, "\n  Total Estimated Cost: $%.2f\n", totalCost)
+		}
+
 		fmt.Fprintf(os.Stdout, "\n")
 	}
 

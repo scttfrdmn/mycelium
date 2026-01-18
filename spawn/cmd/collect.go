@@ -26,6 +26,7 @@ var (
 	collectS3Prefix   string
 	collectMetric     string
 	collectBestN      int
+	collectRegions    string
 )
 
 var collectCmd = &cobra.Command{
@@ -73,6 +74,7 @@ func init() {
 	collectCmd.Flags().StringVar(&collectS3Prefix, "s3-prefix", "", "Custom S3 prefix for results (default: auto-detect)")
 	collectCmd.Flags().StringVar(&collectMetric, "metric", "", "Metric to use for ranking results (e.g., accuracy, loss)")
 	collectCmd.Flags().IntVar(&collectBestN, "best", 0, "Show only top N results by metric (0 = all)")
+	collectCmd.Flags().StringVar(&collectRegions, "regions", "", "Comma-separated list of regions to collect from (default: all)")
 
 	collectCmd.MarkFlagRequired("sweep-id")
 }
@@ -114,21 +116,45 @@ func runCollectResults(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Total parameters: %d\n", sweepRecord.TotalParams)
 	fmt.Printf("Launched: %d, Failed: %d\n", sweepRecord.Launched, sweepRecord.Failed)
 
-	// Determine S3 prefix
-	s3Prefix := collectS3Prefix
-	if s3Prefix == "" {
-		// Default S3 prefix: s3://spawn-results-<account>-<region>/sweeps/<sweep-id>/
-		accountID := sweepRecord.AccountID
-		region := sweepRecord.Region
-		s3Prefix = fmt.Sprintf("s3://spawn-results-%s-%s/sweeps/%s/", accountID, region, collectSweepID)
+	// Get regions for sweep
+	regions := getRegionsForSweep(sweepRecord)
+
+	// Apply region filter if specified
+	if collectRegions != "" {
+		filterSet := make(map[string]bool)
+		for _, r := range strings.Split(collectRegions, ",") {
+			filterSet[strings.TrimSpace(r)] = true
+		}
+
+		filtered := []string{}
+		for _, r := range regions {
+			if filterSet[r] {
+				filtered = append(filtered, r)
+			}
+		}
+		regions = filtered
+		fmt.Printf("Filtering to regions: %v\n", regions)
 	}
 
-	fmt.Printf("Collecting results from: %s\n", s3Prefix)
+	if len(regions) == 0 {
+		return fmt.Errorf("no regions to collect from")
+	}
 
-	// Download results from S3
-	results, err := downloadSweepResults(ctx, cfg, sweepRecord, s3Prefix)
-	if err != nil {
-		return fmt.Errorf("failed to download results: %w", err)
+	// Collect results from all regions (or custom S3 prefix if specified)
+	var results []SweepResult
+	if collectS3Prefix != "" {
+		// Custom prefix overrides region-based collection
+		fmt.Printf("Collecting results from: %s\n", collectS3Prefix)
+		results, err = downloadSweepResults(ctx, cfg, sweepRecord, collectS3Prefix)
+		if err != nil {
+			return fmt.Errorf("failed to download results: %w", err)
+		}
+	} else {
+		// Collect from all regional S3 buckets concurrently
+		results, err = collectFromMultipleRegions(ctx, cfg, sweepRecord, regions, collectSweepID)
+		if err != nil {
+			return fmt.Errorf("failed to collect results: %w", err)
+		}
 	}
 
 	if len(results) == 0 {
@@ -238,7 +264,86 @@ func getSweepRecord(ctx context.Context, cfg aws.Config, sweepID string) (*Sweep
 		}
 	}
 
+	if v, ok := result.Item["multi_region"]; ok {
+		if b, ok := v.(*types.AttributeValueMemberBOOL); ok {
+			record.MultiRegion = b.Value
+		}
+	}
+
+	// Parse region_status if present
+	if v, ok := result.Item["region_status"]; ok {
+		if m, ok := v.(*types.AttributeValueMemberM); ok {
+			record.RegionStatus = make(map[string]*RegionProgress)
+			for region := range m.Value {
+				record.RegionStatus[region] = &RegionProgress{}
+			}
+		}
+	}
+
 	return &record, nil
+}
+
+// getRegionsForSweep extracts list of regions from sweep record
+func getRegionsForSweep(sweepRecord *SweepRecord) []string {
+	if !sweepRecord.MultiRegion || len(sweepRecord.RegionStatus) == 0 {
+		return []string{sweepRecord.Region}
+	}
+
+	// Extract regions from RegionStatus map
+	regions := make([]string, 0, len(sweepRecord.RegionStatus))
+	for region := range sweepRecord.RegionStatus {
+		regions = append(regions, region)
+	}
+
+	sort.Strings(regions) // Deterministic ordering
+	return regions
+}
+
+// collectFromMultipleRegions collects results from multiple regional S3 buckets concurrently
+func collectFromMultipleRegions(ctx context.Context, cfg aws.Config, sweepRecord *SweepRecord, regions []string, sweepID string) ([]SweepResult, error) {
+	type regionResult struct {
+		region  string
+		results []SweepResult
+		err     error
+	}
+
+	resultsChan := make(chan regionResult, len(regions))
+
+	// Launch goroutines to collect from each region
+	for _, region := range regions {
+		go func(r string) {
+			s3Prefix := fmt.Sprintf("s3://spawn-results-%s-%s/sweeps/%s/",
+				sweepRecord.AccountID, r, sweepID)
+
+			fmt.Printf("Collecting from %s...\n", r)
+
+			regionResults, err := downloadSweepResults(ctx, cfg, sweepRecord, s3Prefix)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "⚠️  Warning: Failed to collect from %s: %v\n", r, err)
+				resultsChan <- regionResult{region: r, results: nil, err: err}
+				return
+			}
+
+			// Mark results with region
+			for i := range regionResults {
+				regionResults[i].Region = r
+			}
+
+			fmt.Printf("✓ Collected %d results from %s\n", len(regionResults), r)
+			resultsChan <- regionResult{region: r, results: regionResults, err: nil}
+		}(region)
+	}
+
+	// Collect results from all regions
+	allResults := []SweepResult{}
+	for i := 0; i < len(regions); i++ {
+		rr := <-resultsChan
+		if rr.err == nil && rr.results != nil {
+			allResults = append(allResults, rr.results...)
+		}
+	}
+
+	return allResults, nil
 }
 
 // downloadSweepResults downloads result files from S3 for all sweep instances
@@ -503,12 +608,22 @@ func writeCSV(results []SweepResult, outputFile string) error {
 
 // SweepRecord is a simplified version for result collection
 type SweepRecord struct {
-	SweepID     string
-	SweepName   string
-	Status      string
-	AccountID   string
-	Region      string
-	TotalParams int
-	Launched    int
-	Failed      int
+	SweepID      string
+	SweepName    string
+	Status       string
+	AccountID    string
+	Region       string
+	TotalParams  int
+	Launched     int
+	Failed       int
+	MultiRegion  bool
+	RegionStatus map[string]*RegionProgress
+}
+
+// RegionProgress tracks per-region sweep progress
+type RegionProgress struct {
+	Launched     int
+	Failed       int
+	ActiveCount  int
+	NextToLaunch []int
 }
