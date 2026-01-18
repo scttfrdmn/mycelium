@@ -76,10 +76,13 @@ var (
 	command          string
 
 	// MPI
-	mpiEnabled          bool
-	mpiProcessesPerNode int
-	mpiCommand          string
-	mpiSkipInstall      bool
+	mpiEnabled             bool
+	mpiProcessesPerNode    int
+	mpiCommand             string
+	mpiSkipInstall         bool
+	mpiPlacementGroup      string
+	mpiAutoPlacementGroup  bool
+	efaEnabled             bool
 
 	// Shared storage
 	efsID           string
@@ -185,6 +188,9 @@ func init() {
 	launchCmd.Flags().IntVar(&mpiProcessesPerNode, "mpi-processes-per-node", 0, "MPI processes per node (default: vCPU count)")
 	launchCmd.Flags().StringVar(&mpiCommand, "mpi-command", "", "Command to run via mpirun (alternative to --command)")
 	launchCmd.Flags().BoolVar(&mpiSkipInstall, "skip-mpi-install", false, "Skip MPI installation (use with custom AMIs that have MPI pre-installed)")
+	launchCmd.Flags().StringVar(&mpiPlacementGroup, "placement-group", "", "AWS Placement Group for MPI instances (auto-created if not specified)")
+	launchCmd.Flags().BoolVar(&mpiAutoPlacementGroup, "auto-placement-group", true, "Automatically create placement group for MPI job arrays (default: true)")
+	launchCmd.Flags().BoolVar(&efaEnabled, "efa", false, "Enable Elastic Fabric Adapter for ultra-low latency MPI (requires supported instance types)")
 
 	// Shared storage
 	launchCmd.Flags().StringVar(&efsID, "efs-id", "", "EFS filesystem ID to mount (fs-xxx)")
@@ -1024,6 +1030,45 @@ func launchWithProgress(ctx context.Context, awsClient *aws.Client, config *aws.
 		}
 		if jobArrayName == "" {
 			return fmt.Errorf("--mpi requires --job-array-name")
+		}
+
+		// Validate instance type supports placement groups if enabled
+		if mpiAutoPlacementGroup || mpiPlacementGroup != "" {
+			if err := awsClient.ValidateInstanceTypeForPlacementGroup(ctx, config.InstanceType); err != nil {
+				return fmt.Errorf("placement group validation: %w", err)
+			}
+		}
+
+		// Create auto placement group if needed
+		if mpiAutoPlacementGroup && mpiPlacementGroup == "" {
+			mpiPlacementGroup = fmt.Sprintf("spawn-mpi-%s", jobArrayName)
+			fmt.Fprintf(os.Stderr, "Creating placement group: %s\n", mpiPlacementGroup)
+			if err := awsClient.CreatePlacementGroup(ctx, mpiPlacementGroup); err != nil {
+				return fmt.Errorf("create placement group: %w", err)
+			}
+		}
+
+		// Set placement group in config
+		if mpiPlacementGroup != "" {
+			config.PlacementGroup = mpiPlacementGroup
+		}
+
+		// Validate EFA requirements
+		if efaEnabled {
+			// EFA requires instance type validation
+			if err := awsClient.ValidateInstanceTypeForEFA(ctx, config.InstanceType); err != nil {
+				return fmt.Errorf("EFA validation: %w", err)
+			}
+
+			// EFA works best with placement groups
+			if !mpiAutoPlacementGroup && mpiPlacementGroup == "" {
+				fmt.Fprintf(os.Stderr, "⚠️  Warning: EFA works best with placement groups. Consider using --auto-placement-group\n")
+			} else {
+				fmt.Fprintf(os.Stderr, "✓ EFA enabled with placement group for optimal performance\n")
+			}
+
+			// Set EFA in config
+			config.EFAEnabled = true
 		}
 
 		// Add MPI tags to config
@@ -2064,6 +2109,7 @@ func launchJobArray(ctx context.Context, awsClient *aws.Client, baseConfig *aws.
 						MPIProcessesPerNode: mpiProcessesPerNode,
 						MPICommand:          mpiCommand,
 						SkipInstall:         mpiSkipInstall,
+						EFAEnabled:          efaEnabled,
 					}
 
 					mpiScript, err := userdata.GenerateMPIUserData(mpiConfig)

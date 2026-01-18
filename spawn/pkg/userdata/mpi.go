@@ -15,6 +15,7 @@ type MPIConfig struct {
 	MPIProcessesPerNode int
 	MPICommand          string
 	SkipInstall         bool
+	EFAEnabled          bool
 }
 
 // GenerateMPIUserData generates the MPI setup script for inclusion in user-data
@@ -44,6 +45,21 @@ else
 fi
 {{else}}
 echo "Skipping MPI installation (--skip-mpi-install specified)"
+{{end}}
+
+{{if .EFAEnabled}}
+# Install EFA driver
+echo "Installing EFA driver..."
+cd /tmp
+curl -O https://efa-installer.amazonaws.com/aws-efa-installer-latest.tar.gz
+tar -xf aws-efa-installer-latest.tar.gz
+cd aws-efa-installer
+./efa_installer.sh -y -g
+
+# Configure libfabric for EFA
+echo "export FI_PROVIDER=efa" >> /etc/profile.d/efa.sh
+echo "export FI_EFA_USE_DEVICE_RDMA=1" >> /etc/profile.d/efa.sh
+source /etc/profile.d/efa.sh
 {{end}}
 
 # Configure MPI environment (always run, even if pre-installed)

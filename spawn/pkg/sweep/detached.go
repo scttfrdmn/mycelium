@@ -53,6 +53,10 @@ type SweepRecord struct {
 	MultiRegion      bool                       `dynamodbav:"multi_region" json:"multi_region"`
 	RegionStatus     map[string]*RegionProgress `dynamodbav:"region_status,omitempty" json:"region_status,omitempty"`
 	DistributionMode string                     `dynamodbav:"distribution_mode,omitempty" json:"distribution_mode,omitempty"` // "balanced" or "opportunistic"
+
+	// MPI support
+	PlacementGroup string `dynamodbav:"placement_group,omitempty" json:"placement_group,omitempty"`
+	EFAEnabled     bool   `dynamodbav:"efa_enabled,omitempty" json:"efa_enabled,omitempty"`
 }
 
 // RegionProgress tracks per-region sweep progress

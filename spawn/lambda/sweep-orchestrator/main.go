@@ -92,6 +92,10 @@ type SweepRecord struct {
 	MultiRegion      bool                        `dynamodbav:"multi_region"`
 	RegionStatus     map[string]*RegionProgress  `dynamodbav:"region_status,omitempty"`
 	DistributionMode string                      `dynamodbav:"distribution_mode,omitempty"` // "balanced" or "opportunistic"
+
+	// MPI support
+	PlacementGroup string `dynamodbav:"placement_group,omitempty"`
+	EFAEnabled     bool   `dynamodbav:"efa_enabled,omitempty"`
 }
 
 // RegionProgress tracks per-region sweep progress
@@ -363,6 +367,12 @@ func runPollingLoop(ctx context.Context, state *SweepRecord, params *ParamFileFo
 			if err := saveSweepState(ctx, state); err != nil {
 				log.Printf("Failed to save cancelled state: %v", err)
 			}
+
+			// Clean up placement group if auto-created
+			if state.PlacementGroup != "" && strings.HasPrefix(state.PlacementGroup, "spawn-mpi-") {
+				go cleanupPlacementGroup(ctx, ec2Client, state.PlacementGroup)
+			}
+
 			return nil
 		}
 
@@ -438,6 +448,12 @@ func runPollingLoop(ctx context.Context, state *SweepRecord, params *ParamFileFo
 			if err := saveSweepState(ctx, state); err != nil {
 				return fmt.Errorf("failed to save completion state: %w", err)
 			}
+
+			// Clean up placement group if auto-created
+			if state.PlacementGroup != "" && strings.HasPrefix(state.PlacementGroup, "spawn-mpi-") {
+				go cleanupPlacementGroup(ctx, ec2Client, state.PlacementGroup)
+			}
+
 			return nil
 		}
 
@@ -975,6 +991,16 @@ func runMultiRegionPollingLoop(ctx context.Context, state *SweepRecord, params *
 				if err := saveSweepState(ctx, state); err != nil {
 					log.Printf("Failed to save cancelled state: %v", err)
 				}
+
+				// Clean up placement group if auto-created
+				if state.PlacementGroup != "" && strings.HasPrefix(state.PlacementGroup, "spawn-mpi-") {
+					// Use the first available EC2 client for cleanup
+					for _, client := range orchestrator.ec2Clients {
+						go cleanupPlacementGroup(ctx, client, state.PlacementGroup)
+						break
+					}
+				}
+
 				return nil
 			}
 		}
@@ -1033,6 +1059,16 @@ func runMultiRegionPollingLoop(ctx context.Context, state *SweepRecord, params *
 			if err := saveSweepState(ctx, state); err != nil {
 				return fmt.Errorf("failed to save completion state: %w", err)
 			}
+
+			// Clean up placement group if auto-created
+			if state.PlacementGroup != "" && strings.HasPrefix(state.PlacementGroup, "spawn-mpi-") {
+				// Use the first available EC2 client for cleanup (placement groups are region-specific)
+				for _, client := range orchestrator.ec2Clients {
+					go cleanupPlacementGroup(ctx, client, state.PlacementGroup)
+					break
+				}
+			}
+
 			return nil
 		}
 
@@ -1393,6 +1429,25 @@ func tryLaunchInstance(ctx context.Context, ec2Client *ec2.Client, state *SweepR
 		State:         "pending",
 		LaunchedAt:    time.Now().Format(time.RFC3339),
 	})
+
+	return nil
+}
+
+// cleanupPlacementGroup removes a spawn-managed placement group after sweep completion
+func cleanupPlacementGroup(ctx context.Context, ec2Client *ec2.Client, placementGroupName string) error {
+	// Wait for all instances to terminate before deleting placement group
+	time.Sleep(30 * time.Second)
+
+	_, err := ec2Client.DeletePlacementGroup(ctx, &ec2.DeletePlacementGroupInput{
+		GroupName: aws.String(placementGroupName),
+	})
+
+	if err != nil {
+		log.Printf("Warning: Failed to delete placement group %s: %v", placementGroupName, err)
+		// Non-fatal, placement groups are cheap to leave around
+	} else {
+		log.Printf("Deleted placement group: %s", placementGroupName)
+	}
 
 	return nil
 }

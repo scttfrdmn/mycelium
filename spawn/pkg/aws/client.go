@@ -56,19 +56,21 @@ func (c *Client) GetEnabledRegions(ctx context.Context) ([]string, error) {
 
 // LaunchConfig contains all settings for launching an instance
 type LaunchConfig struct {
-	InstanceType     string
-	Region           string
-	AvailabilityZone string
-	AMI              string
-	KeyName          string
+	InstanceType       string
+	Region             string
+	AvailabilityZone   string
+	AMI                string
+	KeyName            string
 	IamInstanceProfile string
-	SecurityGroupIDs []string
-	SubnetID         string
-	UserData         string
-	Spot             bool
-	SpotMaxPrice     string
-	ReservationID    string
-	Hibernate        bool
+	SecurityGroupIDs   []string
+	SubnetID           string
+	UserData           string
+	Spot               bool
+	SpotMaxPrice       string
+	ReservationID      string
+	Hibernate          bool
+	PlacementGroup     string
+	EFAEnabled         bool
 
 	// spawn-specific tags
 	TTL             string
@@ -176,7 +178,25 @@ func (c *Client) Launch(ctx context.Context, launchConfig LaunchConfig) (*Launch
 	}
 	
 	// Add network configuration
-	if launchConfig.SubnetID != "" {
+	if launchConfig.EFAEnabled {
+		// EFA requires specific network interface configuration
+		netInterface := types.InstanceNetworkInterfaceSpecification{
+			DeviceIndex:              aws.Int32(0),
+			AssociatePublicIpAddress: aws.Bool(true),
+			DeleteOnTermination:      aws.Bool(true),
+			InterfaceType:            aws.String("efa"), // EFA interface type
+		}
+
+		if launchConfig.SubnetID != "" {
+			netInterface.SubnetId = aws.String(launchConfig.SubnetID)
+		}
+
+		if len(launchConfig.SecurityGroupIDs) > 0 {
+			netInterface.Groups = launchConfig.SecurityGroupIDs
+		}
+
+		input.NetworkInterfaces = []types.InstanceNetworkInterfaceSpecification{netInterface}
+	} else if launchConfig.SubnetID != "" {
 		input.NetworkInterfaces = []types.InstanceNetworkInterfaceSpecification{
 			{
 				AssociatePublicIpAddress: aws.Bool(true),
@@ -189,12 +209,17 @@ func (c *Client) Launch(ctx context.Context, launchConfig LaunchConfig) (*Launch
 		input.SecurityGroupIds = launchConfig.SecurityGroupIDs
 	}
 	
-	// Add placement (AZ and reservation)
+	// Add placement (AZ, placement group, and reservation)
 	placement := &types.Placement{}
 	if launchConfig.AvailabilityZone != "" {
 		placement.AvailabilityZone = aws.String(launchConfig.AvailabilityZone)
 	}
-	input.Placement = placement
+	if launchConfig.PlacementGroup != "" {
+		placement.GroupName = aws.String(launchConfig.PlacementGroup)
+	}
+	if placement.AvailabilityZone != nil || placement.GroupName != nil {
+		input.Placement = placement
+	}
 	
 	// Add hibernation if enabled
 	if launchConfig.Hibernate {
