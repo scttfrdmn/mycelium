@@ -1,4 +1,4 @@
-.PHONY: all build build-spawn build-spored build-all clean install test
+.PHONY: all build build-spawn build-spored build-all clean install test test-coverage test-short
 
 # Version
 VERSION ?= 0.1.0
@@ -75,6 +75,25 @@ clean:
 test:
 	@echo "Running tests..."
 	go test -v ./...
+
+# Run tests with coverage
+test-coverage:
+	@echo "Running tests with coverage..."
+	go test -v -coverprofile=coverage.out ./...
+	@echo ""
+	@echo "Coverage Summary:"
+	@go tool cover -func=coverage.out | tail -1
+	@echo ""
+	@echo "Generating HTML coverage report..."
+	@go tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report saved to: coverage.html"
+	@echo ""
+	@echo "To view report: open coverage.html"
+
+# Run short tests only
+test-short:
+	@echo "Running short tests..."
+	go test -v -short ./...
 
 # Development
 dev: build

@@ -63,6 +63,8 @@ spawn --instance-type m7i.large --region us-east-1 --ttl 8h
 - **💾 AMI Management**: Create and manage custom AMIs for reusable software stacks ([docs](AMI_MANAGEMENT.md))
 - **🔐 IAM Instance Profiles**: Secure AWS service access without credentials, 13 built-in policy templates ([docs](IAM_INSTANCE_PROFILES_STATUS.md))
 - **☁️ Detached Mode**: Lambda-orchestrated parameter sweeps that survive laptop disconnection ([docs](PARAMETER_SWEEPS.md))
+- **🖥️ Slurm Integration**: Run existing Slurm batch scripts on AWS without modification ([docs](SLURM_GUIDE.md))
+- **📦 Data Staging**: Efficient multi-region data distribution with 90-99% cost savings ([docs](DATA_STAGING_GUIDE.md))
 
 ## 📦 Installation
 
@@ -1435,11 +1437,20 @@ spawn reads this and launches accordingly!
 
 ## 📚 Documentation
 
+### Core Features
 - **[PARAMETER_SWEEPS.md](PARAMETER_SWEEPS.md)** - Parameter sweeps and hyperparameter tuning
 - **[DETACHED_MODE.md](DETACHED_MODE.md)** - Lambda-orchestrated sweeps architecture
 - **[JOB_ARRAYS.md](JOB_ARRAYS.md)** - Job arrays for coordinated instance groups
+- **[MPI_GUIDE.md](MPI_GUIDE.md)** - MPI support with placement groups and EFA
 - **[AMI_MANAGEMENT.md](AMI_MANAGEMENT.md)** - Create and manage custom AMIs
 - **[IAM_INSTANCE_PROFILES_STATUS.md](IAM_INSTANCE_PROFILES_STATUS.md)** - IAM instance profiles for secure AWS service access
+
+### HPC & Cloud Migration
+- **[SLURM_GUIDE.md](SLURM_GUIDE.md)** - Run existing Slurm batch scripts on AWS without modification
+- **[DATA_STAGING_GUIDE.md](DATA_STAGING_GUIDE.md)** - Multi-region data distribution with 90-99% cost savings
+
+### Operations & Support
+- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Common errors, diagnostic commands, getting help
 - **[IAM_PERMISSIONS.md](IAM_PERMISSIONS.md)** - Required AWS permissions for spawn CLI
 - **[DNS_SETUP.md](DNS_SETUP.md)** - Custom DNS configuration
 - **[MONITORING.md](MONITORING.md)** - Monitoring and observability

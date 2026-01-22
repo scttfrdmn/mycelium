@@ -5,9 +5,66 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.9.0] - 2026-01-17
+## [0.9.0] - 2026-01-22
 
-### Added
+### Added - HPC Integration & Cloud Migration
+
+#### Slurm Integration
+- **New Commands**: `spawn slurm convert`, `spawn slurm estimate`, `spawn slurm submit`
+- Convert existing Slurm batch scripts (`.sbatch`) to spawn parameter sweeps
+- Support for common Slurm directives: `--array`, `--time`, `--mem`, `--cpus-per-task`, `--gres=gpu`, `--nodes`
+- Custom `#SPAWN` directives for cloud-specific overrides
+- Automatic instance type selection based on resource requirements
+- Cost estimation and comparison with institutional HPC clusters
+- Comprehensive Slurm integration guide ([SLURM_GUIDE.md](SLURM_GUIDE.md))
+
+#### Data Staging
+- **New Commands**: `spawn stage upload`, `spawn stage list`, `spawn stage estimate`, `spawn stage delete`
+- Multi-region data staging with automatic replication
+- 90-99% cost savings for multi-region data distribution
+- SHA256 integrity verification
+- 7-day automatic cleanup (configurable 1-90 days)
+- DynamoDB metadata tracking
+- Integration with parameter sweeps via `--stage-id` flag
+- Comprehensive data staging guide ([DATA_STAGING_GUIDE.md](DATA_STAGING_GUIDE.md))
+
+#### MPI Enhancements
+- **Placement Groups**: Automatic creation and management for low-latency MPI communication
+- **EFA Support**: Elastic Fabric Adapter for ultra-low latency (sub-microsecond)
+- **Instance Validation**: Pre-flight checks for EFA and placement group compatibility
+- MPI placement group guide additions to [MPI_GUIDE.md](MPI_GUIDE.md)
+
+### Added - Testing Infrastructure (Issue #53)
+
+- **AWS Mocking Framework**: Full EC2 and S3 mock clients for unit testing (`pkg/aws/mock/`)
+- **Test Utilities**: Comprehensive helper package (`pkg/testutil/`) with 20+ functions
+- **Test Fixtures**: Example data in `testdata/` for Slurm scripts and parameters
+- **Unit Tests**:
+  - `cmd/launch_test.go`: Launch validation tests (405 lines, 7 test suites)
+  - `pkg/aws/client_test.go`: AWS client tests (478 lines)
+  - `cmd/slurm_test.go`: Slurm conversion tests (392 lines)
+  - `cmd/stage_test.go`: Data staging tests (383 lines)
+
+### Added - Documentation (Issue #53)
+
+- **[SLURM_GUIDE.md](SLURM_GUIDE.md)**: Comprehensive 1,100+ line guide covering:
+  - Quick start and conversion examples
+  - Complete Slurm directive mapping
+  - GPU, MPI, and array job examples
+  - Migration workflow and cost comparison
+
+- **[DATA_STAGING_GUIDE.md](DATA_STAGING_GUIDE.md)**: Complete 880+ line guide covering:
+  - Cost optimization strategies
+  - Multi-region deployment patterns
+  - Integration with parameter sweeps
+  - Bioinformatics and ML examples
+
+- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)**: Comprehensive 1,200+ line guide covering:
+  - Common errors (quota, permissions, network)
+  - Launch, Slurm, staging, and MPI issues
+  - Diagnostic commands and debugging workflows
+
+### Added - Multi-Region Features
 
 - **Per-region max concurrent limits** (Issue #41)
   - New `--max-concurrent-per-region` flag for balanced regional capacity usage
