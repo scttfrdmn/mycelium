@@ -97,9 +97,22 @@ type SweepRecord struct {
 	PlacementGroup string `dynamodbav:"placement_group,omitempty"`
 	EFAEnabled     bool   `dynamodbav:"efa_enabled,omitempty"`
 
+	// Region constraints
+	RegionConstraints *RegionConstraint `dynamodbav:"region_constraints,omitempty"`
+	FilteredRegions   []string          `dynamodbav:"filtered_regions,omitempty"`
+
 	// Schedule integration
 	Source     string `dynamodbav:"source,omitempty"`      // "cli" | "scheduled"
 	ScheduleID string `dynamodbav:"schedule_id,omitempty"` // For traceability
+}
+
+// RegionConstraint defines constraints for region selection
+type RegionConstraint struct {
+	Include       []string `dynamodbav:"include,omitempty"`
+	Exclude       []string `dynamodbav:"exclude,omitempty"`
+	Geographic    []string `dynamodbav:"geographic,omitempty"`
+	ProximityFrom string   `dynamodbav:"proximity_from,omitempty"`
+	CostTier      string   `dynamodbav:"cost_tier,omitempty"`
 }
 
 // RegionProgress tracks per-region sweep progress
