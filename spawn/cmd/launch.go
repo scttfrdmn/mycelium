@@ -26,6 +26,7 @@ import (
 	"github.com/scttfrdmn/mycelium/spawn/pkg/pricing"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/progress"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/queue"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/regions"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/staging"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/storage"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/sweep"
@@ -114,6 +115,13 @@ var (
 	estimateOnly           bool
 	autoYes                bool
 	distributionMode       string
+
+	// Region constraints
+	regionsInclude    []string
+	regionsExclude    []string
+	regionsGeographic []string
+	proximityFrom     string
+	costTier          string
 
 	// Batch queue
 	batchQueueFile string
@@ -225,6 +233,13 @@ func init() {
 	launchCmd.Flags().BoolVar(&estimateOnly, "estimate-only", false, "Show cost estimate and exit without launching")
 	launchCmd.Flags().BoolVarP(&autoYes, "yes", "y", false, "Auto-approve cost estimate (skip confirmation)")
 	launchCmd.Flags().StringVar(&distributionMode, "mode", "balanced", "Distribution mode: balanced (fair share) or opportunistic (prioritize available regions)")
+
+	// Region constraints
+	launchCmd.Flags().StringSliceVar(&regionsInclude, "regions-include", []string{}, "Only use these regions (supports wildcards: us-*, eu-*)")
+	launchCmd.Flags().StringSliceVar(&regionsExclude, "regions-exclude", []string{}, "Exclude these regions (supports wildcards: us-*, eu-*)")
+	launchCmd.Flags().StringSliceVar(&regionsGeographic, "regions-geographic", []string{}, "Geographic constraints: us, eu, ap, north-america, europe, asia-pacific")
+	launchCmd.Flags().StringVar(&proximityFrom, "proximity-from", "", "Prefer regions close to this region (e.g., us-east-1)")
+	launchCmd.Flags().StringVar(&costTier, "cost-tier", "", "Prefer cost tier: low, standard, premium")
 
 	// Batch queue
 	launchCmd.Flags().StringVar(&batchQueueFile, "batch-queue", "", "Batch job queue file (JSON) for sequential execution")
@@ -2533,6 +2548,50 @@ func launchSweepDetached(ctx context.Context, paramFormat *ParamFileFormat, base
 
 	// Check if multi-region sweep
 	regionGroups := sweep.GroupParamsByRegion(sweepParamFormat.Params, sweepParamFormat.Defaults)
+
+	// Apply region constraints if specified
+	if shouldApplyRegionConstraints() {
+		constraint := &sweep.RegionConstraint{
+			Include:       regionsInclude,
+			Exclude:       regionsExclude,
+			Geographic:    regionsGeographic,
+			ProximityFrom: proximityFrom,
+			CostTier:      costTier,
+		}
+
+		// Validate constraint
+		if err := validateRegionConstraint(constraint); err != nil {
+			return fmt.Errorf("invalid region constraint: %w", err)
+		}
+
+		// Get all regions from parameter file
+		allRegions := make([]string, 0, len(regionGroups))
+		for region := range regionGroups {
+			allRegions = append(allRegions, region)
+		}
+
+		// Apply constraints
+		filteredRegions, err := applyRegionConstraints(allRegions, constraint)
+		if err != nil {
+			return fmt.Errorf("region constraints failed: %w", err)
+		}
+
+		// Remove filtered-out regions
+		for region := range regionGroups {
+			if !containsString(filteredRegions, region) {
+				delete(regionGroups, region)
+			}
+		}
+
+		// Store constraint in record
+		record.RegionConstraints = constraint
+		record.FilteredRegions = filteredRegions
+
+		fmt.Fprintf(os.Stderr, "🌍 Applied region constraints: %d regions allowed\n", len(filteredRegions))
+		fmt.Fprintf(os.Stderr, "   Filtered regions: %v\n", filteredRegions)
+		fmt.Fprintf(os.Stderr, "   Constraint: %s\n", formatConstraint(constraint))
+	}
+
 	if len(regionGroups) == 1 {
 		// Single region - use that as the sweep region
 		for region := range regionGroups {
@@ -2740,4 +2799,182 @@ func launchWithBatchQueue(ctx context.Context, plat *platform.Platform) error {
 	fmt.Fprintf(os.Stderr, "\n")
 
 	return nil
+}
+
+// shouldApplyRegionConstraints checks if any region constraint flags are set
+func shouldApplyRegionConstraints() bool {
+	return len(regionsInclude) > 0 ||
+		len(regionsExclude) > 0 ||
+		len(regionsGeographic) > 0 ||
+		proximityFrom != "" ||
+		costTier != ""
+}
+
+// validateRegionConstraint validates region constraint parameters
+func validateRegionConstraint(constraint *sweep.RegionConstraint) error {
+	// Validate cost tier
+	if constraint.CostTier != "" {
+		validTiers := map[string]bool{
+			"low":      true,
+			"standard": true,
+			"premium":  true,
+		}
+		if !validTiers[constraint.CostTier] {
+			return fmt.Errorf("invalid cost tier: %s (valid: low, standard, premium)", constraint.CostTier)
+		}
+	}
+
+	// Validate proximity region
+	if constraint.ProximityFrom != "" {
+		if !regions.IsValidRegion(constraint.ProximityFrom) {
+			return fmt.Errorf("invalid proximity region: %s", constraint.ProximityFrom)
+		}
+	}
+
+	// Validate geographic groups
+	for _, group := range constraint.Geographic {
+		if _, ok := regions.GeographicGroups[group]; !ok {
+			return fmt.Errorf("invalid geographic group: %s", group)
+		}
+	}
+
+	return nil
+}
+
+// applyRegionConstraints filters regions based on constraints
+func applyRegionConstraints(allRegions []string, constraint *sweep.RegionConstraint) ([]string, error) {
+	candidates := make([]string, len(allRegions))
+	copy(candidates, allRegions)
+
+	// Apply include filter
+	if len(constraint.Include) > 0 {
+		candidates = filterIncludeRegions(candidates, constraint.Include)
+	}
+
+	// Apply exclude filter
+	if len(constraint.Exclude) > 0 {
+		candidates = filterExcludeRegions(candidates, constraint.Exclude)
+	}
+
+	// Apply geographic filter
+	if len(constraint.Geographic) > 0 {
+		candidates = filterGeographicRegions(candidates, constraint.Geographic)
+	}
+
+	if len(candidates) == 0 {
+		return nil, fmt.Errorf("no regions match constraints: %s", formatConstraint(constraint))
+	}
+
+	return candidates, nil
+}
+
+// filterIncludeRegions keeps only regions matching include patterns
+func filterIncludeRegions(allRegions []string, patterns []string) []string {
+	result := make([]string, 0, len(allRegions))
+	for _, region := range allRegions {
+		if matchesAnyPattern(region, patterns) {
+			result = append(result, region)
+		}
+	}
+	return result
+}
+
+// filterExcludeRegions removes regions matching exclude patterns
+func filterExcludeRegions(allRegions []string, patterns []string) []string {
+	result := make([]string, 0, len(allRegions))
+	for _, region := range allRegions {
+		if !matchesAnyPattern(region, patterns) {
+			result = append(result, region)
+		}
+	}
+	return result
+}
+
+// filterGeographicRegions keeps only regions in specified geographic groups
+func filterGeographicRegions(allRegions []string, groups []string) []string {
+	allowed := make(map[string]bool)
+	for _, group := range groups {
+		if groupRegions, ok := regions.GeographicGroups[group]; ok {
+			for _, r := range groupRegions {
+				allowed[r] = true
+			}
+		}
+	}
+
+	result := make([]string, 0, len(allRegions))
+	for _, region := range allRegions {
+		if allowed[region] {
+			result = append(result, region)
+		}
+	}
+	return result
+}
+
+// matchesAnyPattern checks if region matches any of the patterns
+func matchesAnyPattern(region string, patterns []string) bool {
+	for _, pattern := range patterns {
+		if matchesWildcard(region, pattern) {
+			return true
+		}
+	}
+	return false
+}
+
+// matchesWildcard matches region against pattern with wildcard support
+func matchesWildcard(s, pattern string) bool {
+	// Exact match
+	if s == pattern {
+		return true
+	}
+
+	// Prefix wildcard (us-*)
+	if strings.HasSuffix(pattern, "*") {
+		prefix := strings.TrimSuffix(pattern, "*")
+		return strings.HasPrefix(s, prefix)
+	}
+
+	// Suffix wildcard (*-1)
+	if strings.HasPrefix(pattern, "*") {
+		suffix := strings.TrimPrefix(pattern, "*")
+		return strings.HasSuffix(s, suffix)
+	}
+
+	return false
+}
+
+// containsString checks if slice contains string
+func containsString(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
+}
+
+// formatConstraint returns human-readable constraint description
+func formatConstraint(c *sweep.RegionConstraint) string {
+	parts := []string{}
+
+	if len(c.Include) > 0 {
+		parts = append(parts, fmt.Sprintf("include=%s", strings.Join(c.Include, ",")))
+	}
+	if len(c.Exclude) > 0 {
+		parts = append(parts, fmt.Sprintf("exclude=%s", strings.Join(c.Exclude, ",")))
+	}
+	if len(c.Geographic) > 0 {
+		parts = append(parts, fmt.Sprintf("geographic=%s", strings.Join(c.Geographic, ",")))
+	}
+	if c.ProximityFrom != "" {
+		parts = append(parts, fmt.Sprintf("proximity_from=%s", c.ProximityFrom))
+	}
+	if c.CostTier != "" {
+		parts = append(parts, fmt.Sprintf("cost_tier=%s", c.CostTier))
+	}
+
+	if len(parts) == 0 {
+		return "no constraints"
+	}
+
+	return strings.Join(parts, ", ")
 }

@@ -57,6 +57,23 @@ type SweepRecord struct {
 	// MPI support
 	PlacementGroup string `dynamodbav:"placement_group,omitempty" json:"placement_group,omitempty"`
 	EFAEnabled     bool   `dynamodbav:"efa_enabled,omitempty" json:"efa_enabled,omitempty"`
+
+	// Region constraints
+	RegionConstraints *RegionConstraint `dynamodbav:"region_constraints,omitempty" json:"region_constraints,omitempty"`
+	FilteredRegions   []string          `dynamodbav:"filtered_regions,omitempty" json:"filtered_regions,omitempty"`
+
+	// Scheduled execution tracking
+	Source     string `dynamodbav:"source,omitempty" json:"source,omitempty"`           // "cli" or "scheduled"
+	ScheduleID string `dynamodbav:"schedule_id,omitempty" json:"schedule_id,omitempty"` // For scheduled sweeps
+}
+
+// RegionConstraint defines constraints for region selection (embedded for DynamoDB compatibility)
+type RegionConstraint struct {
+	Include       []string `dynamodbav:"include,omitempty" json:"include,omitempty"`
+	Exclude       []string `dynamodbav:"exclude,omitempty" json:"exclude,omitempty"`
+	Geographic    []string `dynamodbav:"geographic,omitempty" json:"geographic,omitempty"`
+	ProximityFrom string   `dynamodbav:"proximity_from,omitempty" json:"proximity_from,omitempty"`
+	CostTier      string   `dynamodbav:"cost_tier,omitempty" json:"cost_tier,omitempty"`
 }
 
 // RegionProgress tracks per-region sweep progress
