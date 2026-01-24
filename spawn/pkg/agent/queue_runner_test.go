@@ -116,8 +116,8 @@ func TestCalculateBackoff(t *testing.T) {
 
 func TestLoadOrInitState(t *testing.T) {
 	tests := []struct {
-		name      string
-		queueCfg  *queue.QueueConfig
+		name         string
+		queueCfg     *queue.QueueConfig
 		wantJobCount int
 		wantStatus   string
 	}{
@@ -197,38 +197,38 @@ func TestLoadOrInitState(t *testing.T) {
 
 func TestJobStateTransitions(t *testing.T) {
 	tests := []struct {
-		name           string
-		initialStatus  string
-		action         string
-		expectedStatus string
+		name            string
+		initialStatus   string
+		action          string
+		expectedStatus  string
 		validTransition bool
 	}{
 		{
-			name:           "pending to running",
-			initialStatus:  "pending",
-			action:         "start",
-			expectedStatus: "running",
+			name:            "pending to running",
+			initialStatus:   "pending",
+			action:          "start",
+			expectedStatus:  "running",
 			validTransition: true,
 		},
 		{
-			name:           "running to completed",
-			initialStatus:  "running",
-			action:         "complete_success",
-			expectedStatus: "completed",
+			name:            "running to completed",
+			initialStatus:   "running",
+			action:          "complete_success",
+			expectedStatus:  "completed",
 			validTransition: true,
 		},
 		{
-			name:           "running to failed",
-			initialStatus:  "running",
-			action:         "complete_failure",
-			expectedStatus: "failed",
+			name:            "running to failed",
+			initialStatus:   "running",
+			action:          "complete_failure",
+			expectedStatus:  "failed",
 			validTransition: true,
 		},
 		{
-			name:           "pending to skipped",
-			initialStatus:  "pending",
-			action:         "skip",
-			expectedStatus: "skipped",
+			name:            "pending to skipped",
+			initialStatus:   "pending",
+			action:          "skip",
+			expectedStatus:  "skipped",
 			validTransition: true,
 		},
 	}
@@ -348,40 +348,40 @@ func TestQueueStateMarshaling(t *testing.T) {
 
 func TestRetryLogic(t *testing.T) {
 	tests := []struct {
-		name            string
-		maxAttempts     int
-		currentAttempt  int
-		shouldRetry     bool
+		name           string
+		maxAttempts    int
+		currentAttempt int
+		shouldRetry    bool
 	}{
 		{
-			name:            "first attempt, should retry",
-			maxAttempts:     3,
-			currentAttempt:  1,
-			shouldRetry:     true,
+			name:           "first attempt, should retry",
+			maxAttempts:    3,
+			currentAttempt: 1,
+			shouldRetry:    true,
 		},
 		{
-			name:            "second attempt, should retry",
-			maxAttempts:     3,
-			currentAttempt:  2,
-			shouldRetry:     true,
+			name:           "second attempt, should retry",
+			maxAttempts:    3,
+			currentAttempt: 2,
+			shouldRetry:    true,
 		},
 		{
-			name:            "last attempt, should not retry",
-			maxAttempts:     3,
-			currentAttempt:  3,
-			shouldRetry:     false,
+			name:           "last attempt, should not retry",
+			maxAttempts:    3,
+			currentAttempt: 3,
+			shouldRetry:    false,
 		},
 		{
-			name:            "exceeded attempts",
-			maxAttempts:     3,
-			currentAttempt:  4,
-			shouldRetry:     false,
+			name:           "exceeded attempts",
+			maxAttempts:    3,
+			currentAttempt: 4,
+			shouldRetry:    false,
 		},
 		{
-			name:            "no retry config (maxAttempts=1)",
-			maxAttempts:     1,
-			currentAttempt:  1,
-			shouldRetry:     false,
+			name:           "no retry config (maxAttempts=1)",
+			maxAttempts:    1,
+			currentAttempt: 1,
+			shouldRetry:    false,
 		},
 	}
 

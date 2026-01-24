@@ -22,12 +22,12 @@ import (
 )
 
 const (
-	TestSchedulesTable        = "spawn-schedules"
-	TestScheduleHistoryTable  = "spawn-schedule-history"
+	TestSchedulesTable          = "spawn-schedules"
+	TestScheduleHistoryTable    = "spawn-schedule-history"
 	TestSweepOrchestrationTable = "spawn-sweep-orchestration"
-	TestScheduleBucket        = "spawn-schedules-us-east-1"
-	TestQueueResultsBucket    = "spawn-queue-results-test"
-	TestRegion                = "us-east-1"
+	TestScheduleBucket          = "spawn-schedules-us-east-1"
+	TestQueueResultsBucket      = "spawn-queue-results-test"
+	TestRegion                  = "us-east-1"
 )
 
 // AWS Client Helpers
@@ -84,11 +84,11 @@ type ScheduleTestConfig struct {
 
 // ExecutionHistory represents a schedule execution record
 type ExecutionHistory struct {
-	ScheduleID   string
+	ScheduleID    string
 	ExecutionTime time.Time
-	SweepID      string
-	Status       string
-	ErrorMessage string
+	SweepID       string
+	Status        string
+	ErrorMessage  string
 }
 
 // CreateTestSchedule creates a schedule for testing
@@ -285,22 +285,22 @@ func CleanupSchedule(t *testing.T, ctx context.Context, scheduleID string) {
 
 // QueueState represents the queue execution state
 type QueueState struct {
-	QueueID      string      `json:"queue_id"`
-	Status       string      `json:"status"`
-	StartedAt    time.Time   `json:"started_at"`
-	CompletedAt  time.Time   `json:"completed_at"`
-	Jobs         []JobState  `json:"jobs"`
+	QueueID     string     `json:"queue_id"`
+	Status      string     `json:"status"`
+	StartedAt   time.Time  `json:"started_at"`
+	CompletedAt time.Time  `json:"completed_at"`
+	Jobs        []JobState `json:"jobs"`
 }
 
 // JobState represents individual job state
 type JobState struct {
-	JobID       string    `json:"job_id"`
-	Status      string    `json:"status"`
-	StartedAt   time.Time `json:"started_at"`
-	CompletedAt time.Time `json:"completed_at"`
-	ExitCode    int       `json:"exit_code"`
-	Attempt     int       `json:"attempt"`
-	ErrorMessage string   `json:"error_message,omitempty"`
+	JobID        string    `json:"job_id"`
+	Status       string    `json:"status"`
+	StartedAt    time.Time `json:"started_at"`
+	CompletedAt  time.Time `json:"completed_at"`
+	ExitCode     int       `json:"exit_code"`
+	Attempt      int       `json:"attempt"`
+	ErrorMessage string    `json:"error_message,omitempty"`
 }
 
 // UploadQueueConfig uploads queue config to S3

@@ -84,8 +84,8 @@ type SlackMessage struct {
 
 // SlackAttachment represents a Slack message attachment
 type SlackAttachment struct {
-	Color  string        `json:"color"`
-	Fields []SlackField  `json:"fields"`
+	Color  string       `json:"color"`
+	Fields []SlackField `json:"fields"`
 }
 
 // SlackField represents a field in a Slack attachment

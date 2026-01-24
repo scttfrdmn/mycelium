@@ -43,11 +43,11 @@ func TestCalculateBackoff_Exponential(t *testing.T) {
 		attempt int
 		want    time.Duration
 	}{
-		{attempt: 1, want: 1 * time.Second},  // 1 * 2^0
-		{attempt: 2, want: 2 * time.Second},  // 1 * 2^1
-		{attempt: 3, want: 4 * time.Second},  // 1 * 2^2
-		{attempt: 4, want: 8 * time.Second},  // 1 * 2^3
-		{attempt: 5, want: 16 * time.Second}, // 1 * 2^4
+		{attempt: 1, want: 1 * time.Second},   // 1 * 2^0
+		{attempt: 2, want: 2 * time.Second},   // 1 * 2^1
+		{attempt: 3, want: 4 * time.Second},   // 1 * 2^2
+		{attempt: 4, want: 8 * time.Second},   // 1 * 2^3
+		{attempt: 5, want: 16 * time.Second},  // 1 * 2^4
 		{attempt: 10, want: 60 * time.Second}, // Capped at max_delay
 	}
 
@@ -219,11 +219,11 @@ func TestShouldRetry_DontRetryList(t *testing.T) {
 		exitCode int
 		want     bool
 	}{
-		{exitCode: 0, want: true},  // Success - would retry if it failed
-		{exitCode: 1, want: true},  // Generic error - retry
-		{exitCode: 2, want: false}, // In dont_retry list
+		{exitCode: 0, want: true},    // Success - would retry if it failed
+		{exitCode: 1, want: true},    // Generic error - retry
+		{exitCode: 2, want: false},   // In dont_retry list
 		{exitCode: 127, want: false}, // In dont_retry list
-		{exitCode: 137, want: true}, // Not in dont_retry list
+		{exitCode: 137, want: true},  // Not in dont_retry list
 	}
 
 	for _, tt := range tests {
@@ -243,10 +243,10 @@ func TestShouldRetry_RetryOnList(t *testing.T) {
 		exitCode int
 		want     bool
 	}{
-		{exitCode: 1, want: true},   // In retry list
-		{exitCode: 2, want: false},  // Not in retry list
-		{exitCode: 137, want: true}, // SIGKILL - in retry list
-		{exitCode: 143, want: true}, // SIGTERM - in retry list
+		{exitCode: 1, want: true},    // In retry list
+		{exitCode: 2, want: false},   // Not in retry list
+		{exitCode: 137, want: true},  // SIGKILL - in retry list
+		{exitCode: 143, want: true},  // SIGTERM - in retry list
 		{exitCode: 127, want: false}, // Not in retry list
 	}
 

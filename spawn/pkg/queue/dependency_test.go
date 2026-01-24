@@ -138,10 +138,10 @@ func TestTopologicalSort(t *testing.T) {
 
 func TestDependenciesMet(t *testing.T) {
 	tests := []struct {
-		name       string
-		job        JobConfig
-		completed  map[string]bool
-		want       bool
+		name      string
+		job       JobConfig
+		completed map[string]bool
+		want      bool
 	}{
 		{
 			name: "no dependencies",

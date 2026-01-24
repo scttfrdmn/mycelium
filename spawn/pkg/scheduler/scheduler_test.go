@@ -88,10 +88,10 @@ func (m *mockSchedulerClient) UpdateSchedule(ctx context.Context, params *schedu
 
 func TestCreateSchedule(t *testing.T) {
 	tests := []struct {
-		name        string
-		record      *ScheduleRecord
-		wantErr     bool
-		setupMocks  func(*mockDynamoDBClient, *mockSchedulerClient)
+		name       string
+		record     *ScheduleRecord
+		wantErr    bool
+		setupMocks func(*mockDynamoDBClient, *mockSchedulerClient)
 	}{
 		{
 			name: "one-time schedule",
@@ -168,7 +168,7 @@ func TestCreateSchedule(t *testing.T) {
 			}
 
 			client := &Client{
-				dynamoClient:  mockDDB,
+				dynamoClient:    mockDDB,
 				schedulerClient: mockSched,
 				lambdaARN:       "arn:aws:lambda:us-east-1:123456789012:function:scheduler-handler",
 				roleARN:         "arn:aws:iam::123456789012:role/EventBridgeSchedulerRole",
@@ -281,7 +281,7 @@ func TestDeleteSchedule(t *testing.T) {
 			}
 
 			client := &Client{
-				dynamoClient:  mockDDB,
+				dynamoClient:    mockDDB,
 				schedulerClient: mockSched,
 			}
 
@@ -347,7 +347,7 @@ func TestUpdateScheduleStatus(t *testing.T) {
 			}
 
 			client := &Client{
-				dynamoClient:  mockDDB,
+				dynamoClient:    mockDDB,
 				schedulerClient: mockSched,
 			}
 

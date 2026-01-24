@@ -467,6 +467,7 @@ func (r *QueueRunner) markResultsUploaded(jobID string) {
 		}
 	}
 }
+
 // loadOrInitState loads existing state or initializes new state
 func loadOrInitState(stateFile string, cfg *queue.QueueConfig) (*QueueState, error) {
 	// Try to load existing state (resume scenario)

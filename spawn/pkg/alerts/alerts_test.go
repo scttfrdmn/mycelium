@@ -57,8 +57,8 @@ func TestAlertConfigValidation(t *testing.T) {
 		{
 			name: "missing triggers",
 			config: &AlertConfig{
-				UserID:  "123456789012",
-				SweepID: "sweep-123",
+				UserID:   "123456789012",
+				SweepID:  "sweep-123",
 				Triggers: []TriggerType{},
 				Destinations: []Destination{
 					{Type: DestinationEmail, Target: "user@example.com"},

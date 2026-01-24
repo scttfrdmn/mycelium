@@ -2,12 +2,12 @@ package regions
 
 // RegionMetadata contains geographic and cost information for AWS regions
 type RegionMetadata struct {
-	Code        string   // AWS region code (e.g., "us-east-1")
-	Name        string   // Human-readable name
-	Geographic  string   // Geographic group: "us", "eu", "ap", "sa", "af", "me", "ca"
-	Subregion   string   // Subregion: "north-america", "europe", "asia-pacific", etc.
-	CostTier    string   // Cost tier: "low", "standard", "premium"
-	Coordinates LatLong  // Geographic coordinates for proximity calculations
+	Code        string  // AWS region code (e.g., "us-east-1")
+	Name        string  // Human-readable name
+	Geographic  string  // Geographic group: "us", "eu", "ap", "sa", "af", "me", "ca"
+	Subregion   string  // Subregion: "north-america", "europe", "asia-pacific", etc.
+	CostTier    string  // Cost tier: "low", "standard", "premium"
+	Coordinates LatLong // Geographic coordinates for proximity calculations
 }
 
 // LatLong represents geographic coordinates

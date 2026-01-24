@@ -17,46 +17,46 @@ const (
 
 // RegionalCost represents cost for a specific region
 type RegionalCost struct {
-	Region         string
-	InstanceHours  float64
-	EstimatedCost  float64
-	InstanceCount  int
-	InstanceType   string
+	Region        string
+	InstanceHours float64
+	EstimatedCost float64
+	InstanceCount int
+	InstanceType  string
 }
 
 // InstanceTypeCost represents cost for a specific instance type
 type InstanceTypeCost struct {
-	InstanceType   string
-	InstanceHours  float64
-	EstimatedCost  float64
-	InstanceCount  int
+	InstanceType  string
+	InstanceHours float64
+	EstimatedCost float64
+	InstanceCount int
 }
 
 // CostBreakdown represents a detailed cost breakdown
 type CostBreakdown struct {
-	SweepID           string
-	TotalCost         float64
+	SweepID            string
+	TotalCost          float64
 	TotalInstanceHours float64
-	Budget            float64
-	BudgetRemaining   float64
-	BudgetExceeded    bool
-	ByRegion          []RegionalCost
-	ByInstanceType    []InstanceTypeCost
+	Budget             float64
+	BudgetRemaining    float64
+	BudgetExceeded     bool
+	ByRegion           []RegionalCost
+	ByInstanceType     []InstanceTypeCost
 }
 
 // SweepInstance represents an instance in the sweep
 type SweepInstance struct {
-	Index          int     `dynamodbav:"index"`
-	Region         string  `dynamodbav:"region"`
-	InstanceID     string  `dynamodbav:"instance_id"`
-	RequestedType  string  `dynamodbav:"requested_type,omitempty"`
-	ActualType     string  `dynamodbav:"actual_type,omitempty"`
-	State          string  `dynamodbav:"state"`
-	LaunchedAt     string  `dynamodbav:"launched_at"`
-	TerminatedAt   string  `dynamodbav:"terminated_at,omitempty"`
-	ErrorMessage   string  `dynamodbav:"error_message,omitempty"`
-	InstanceHours  float64 `dynamodbav:"instance_hours,omitempty"`
-	EstimatedCost  float64 `dynamodbav:"estimated_cost,omitempty"`
+	Index         int     `dynamodbav:"index"`
+	Region        string  `dynamodbav:"region"`
+	InstanceID    string  `dynamodbav:"instance_id"`
+	RequestedType string  `dynamodbav:"requested_type,omitempty"`
+	ActualType    string  `dynamodbav:"actual_type,omitempty"`
+	State         string  `dynamodbav:"state"`
+	LaunchedAt    string  `dynamodbav:"launched_at"`
+	TerminatedAt  string  `dynamodbav:"terminated_at,omitempty"`
+	ErrorMessage  string  `dynamodbav:"error_message,omitempty"`
+	InstanceHours float64 `dynamodbav:"instance_hours,omitempty"`
+	EstimatedCost float64 `dynamodbav:"estimated_cost,omitempty"`
 }
 
 // SweepRecord represents the minimal sweep record for cost calculation
@@ -101,11 +101,11 @@ func (c *Client) GetCostBreakdown(ctx context.Context, sweepID string) (*CostBre
 
 	// Calculate breakdown
 	breakdown := &CostBreakdown{
-		SweepID:         sweepID,
-		TotalCost:       sweep.EstimatedCost,
-		Budget:          sweep.Budget,
-		ByRegion:        make([]RegionalCost, 0),
-		ByInstanceType:  make([]InstanceTypeCost, 0),
+		SweepID:        sweepID,
+		TotalCost:      sweep.EstimatedCost,
+		Budget:         sweep.Budget,
+		ByRegion:       make([]RegionalCost, 0),
+		ByInstanceType: make([]InstanceTypeCost, 0),
 	}
 
 	// Aggregate by region

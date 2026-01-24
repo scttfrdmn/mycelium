@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	AlertsTableName        = "spawn-alerts"
-	AlertHistoryTableName  = "spawn-alert-history"
+	AlertsTableName       = "spawn-alerts"
+	AlertHistoryTableName = "spawn-alert-history"
 	AlertTTLDays          = 90
 )
 
