@@ -26,36 +26,61 @@ type TemplateVariable struct {
 	Required    bool
 }
 
+// getUserConfigDir returns the user's config directory for spawn templates
+func getUserConfigDir() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, ".config", "spawn", "templates", "queue")
+}
+
 // LoadTemplate loads a template by name from templates/queue/<name>.json
+// Searches in order: user config dir, embedded templates, file system
 func LoadTemplate(name string) (*Template, error) {
-	// Get spawn binary directory
+	var data []byte
+	var err error
+
+	// 1. Try user config directory first (highest priority)
+	userConfigPath := filepath.Join(getUserConfigDir(), name+".json")
+	data, err = os.ReadFile(userConfigPath)
+	if err == nil {
+		return parseTemplate(name, data)
+	}
+
+	// 2. Try embedded templates
+	embeddedPath := filepath.Join("templates", name+".json")
+	data, err = embeddedTemplates.ReadFile(embeddedPath)
+	if err == nil {
+		return parseTemplate(name, data)
+	}
+
+	// 3. Fall back to file system (for development)
 	exe, err := os.Executable()
 	if err != nil {
 		return nil, fmt.Errorf("get executable path: %w", err)
 	}
 
 	exeDir := filepath.Dir(exe)
-
-	// Try multiple locations for templates
 	templatePaths := []string{
-		filepath.Join(exeDir, "templates", "queue", name+".json"),       // Same dir as binary
-		filepath.Join(exeDir, "..", "templates", "queue", name+".json"), // Parent dir (for installed binaries)
+		filepath.Join(exeDir, "templates", "queue", name+".json"),
+		filepath.Join(exeDir, "..", "templates", "queue", name+".json"),
 	}
 
-	var data []byte
 	var lastErr error
 	for _, templatePath := range templatePaths {
 		data, err = os.ReadFile(templatePath)
 		if err == nil {
-			break
+			return parseTemplate(name, data)
 		}
 		lastErr = err
 	}
 
-	if data == nil {
-		return nil, fmt.Errorf("read template %s: %w", name, lastErr)
-	}
+	return nil, fmt.Errorf("template %s not found: %w", name, lastErr)
+}
 
+// parseTemplate parses template data and extracts variables
+func parseTemplate(name string, data []byte) (*Template, error) {
 	var config QueueConfig
 	if err := json.Unmarshal(data, &config); err != nil {
 		return nil, fmt.Errorf("parse template: %w", err)
@@ -129,45 +154,70 @@ func (t *Template) Substitute(vars map[string]string) (*QueueConfig, error) {
 	return &config, nil
 }
 
-// ListTemplates lists all available templates
+// ListTemplates lists all available templates from all locations
+// User templates override built-in templates with the same name
 func ListTemplates() ([]*Template, error) {
+	// Collect unique template names (user templates override built-in)
+	templateNames := make(map[string]bool)
+
+	// 1. Read embedded templates
+	embeddedDir := "templates"
+	entries, err := embeddedTemplates.ReadDir(embeddedDir)
+	if err == nil {
+		for _, entry := range entries {
+			if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+				continue
+			}
+			name := strings.TrimSuffix(entry.Name(), ".json")
+			templateNames[name] = true
+		}
+	}
+
+	// 2. Read user config directory (overrides embedded)
+	userConfigDir := getUserConfigDir()
+	userEntries, err := os.ReadDir(userConfigDir)
+	if err == nil {
+		for _, entry := range userEntries {
+			if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+				continue
+			}
+			name := strings.TrimSuffix(entry.Name(), ".json")
+			templateNames[name] = true
+		}
+	}
+
+	// 3. Read file system directories (for development)
 	exe, err := os.Executable()
-	if err != nil {
-		return nil, fmt.Errorf("get executable path: %w", err)
-	}
-
-	exeDir := filepath.Dir(exe)
-
-	// Try multiple locations for template directory
-	templateDirs := []string{
-		filepath.Join(exeDir, "templates", "queue"),       // Same dir as binary
-		filepath.Join(exeDir, "..", "templates", "queue"), // Parent dir (for installed binaries)
-	}
-
-	var entries []os.DirEntry
-	var lastErr error
-	for _, templateDir := range templateDirs {
-		entries, err = os.ReadDir(templateDir)
-		if err == nil {
-			break
+	if err == nil {
+		exeDir := filepath.Dir(exe)
+		fsDirs := []string{
+			filepath.Join(exeDir, "templates", "queue"),
+			filepath.Join(exeDir, "..", "templates", "queue"),
 		}
-		lastErr = err
+
+		for _, fsDir := range fsDirs {
+			fsEntries, err := os.ReadDir(fsDir)
+			if err != nil {
+				continue
+			}
+
+			for _, entry := range fsEntries {
+				if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+					continue
+				}
+				name := strings.TrimSuffix(entry.Name(), ".json")
+				templateNames[name] = true
+			}
+		}
 	}
 
-	if entries == nil {
-		return nil, fmt.Errorf("read template directory: %w", lastErr)
-	}
-
+	// Load all templates
 	var templates []*Template
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
-			continue
-		}
-
-		name := strings.TrimSuffix(entry.Name(), ".json")
+	for name := range templateNames {
 		tmpl, err := LoadTemplate(name)
 		if err != nil {
-			return nil, fmt.Errorf("load template %s: %w", name, err)
+			// Skip templates that fail to load
+			continue
 		}
 		templates = append(templates, tmpl)
 	}

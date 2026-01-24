@@ -1,12 +1,15 @@
 package cmd
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -137,6 +140,26 @@ Examples:
 	RunE: runQueueTemplateShow,
 }
 
+var queueTemplateInitCmd = &cobra.Command{
+	Use:   "init",
+	Short: "Interactive wizard to create a queue configuration",
+	Long: `Launch an interactive wizard to create a custom queue configuration.
+
+Guides you through creating a queue by asking questions about:
+- Workflow type and name
+- Number of jobs and commands
+- Job dependencies
+- Timeouts and retry policies
+- Result collection
+- S3 bucket configuration
+
+Examples:
+  spawn queue template init
+  spawn queue template init --output my-queue.json
+`,
+	RunE: runQueueTemplateInit,
+}
+
 func init() {
 	// Results subcommand flags
 	queueResultsCmd.Flags().StringVarP(&queueOutputDir, "output", "o", ".", "Output directory for results")
@@ -144,6 +167,9 @@ func init() {
 	// Template generate flags
 	queueTemplateGenerateCmd.Flags().StringP("output", "o", "", "Output file (default: stdout)")
 	queueTemplateGenerateCmd.Flags().StringToString("var", nil, "Template variables (key=value)")
+
+	// Template init flags
+	queueTemplateInitCmd.Flags().StringP("output", "o", "", "Output file (default: queue.json)")
 
 	// Add subcommands
 	queueCmd.AddCommand(queueStatusCmd)
@@ -154,6 +180,7 @@ func init() {
 	queueTemplateCmd.AddCommand(queueTemplateListCmd)
 	queueTemplateCmd.AddCommand(queueTemplateGenerateCmd)
 	queueTemplateCmd.AddCommand(queueTemplateShowCmd)
+	queueTemplateCmd.AddCommand(queueTemplateInitCmd)
 
 	rootCmd.AddCommand(queueCmd)
 }
@@ -489,5 +516,187 @@ func runQueueTemplateShow(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Fprintf(os.Stderr, "\n")
+	return nil
+}
+
+func runQueueTemplateInit(cmd *cobra.Command, args []string) error {
+	output, _ := cmd.Flags().GetString("output")
+	if output == "" {
+		output = "queue.json"
+	}
+
+	fmt.Fprintf(os.Stderr, "\n🧙 Queue Configuration Wizard\n\n")
+	fmt.Fprintf(os.Stderr, "This wizard will help you create a custom batch queue configuration.\n\n")
+
+	scanner := bufio.NewScanner(os.Stdin)
+
+	// Helper to prompt for input
+	prompt := func(question string, defaultVal string) string {
+		if defaultVal != "" {
+			fmt.Fprintf(os.Stderr, "%s [%s]: ", question, defaultVal)
+		} else {
+			fmt.Fprintf(os.Stderr, "%s: ", question)
+		}
+		scanner.Scan()
+		val := strings.TrimSpace(scanner.Text())
+		if val == "" {
+			return defaultVal
+		}
+		return val
+	}
+
+	// Helper to prompt for yes/no
+	promptYesNo := func(question string, defaultYes bool) bool {
+		defaultStr := "y/N"
+		if defaultYes {
+			defaultStr = "Y/n"
+		}
+		fmt.Fprintf(os.Stderr, "%s [%s]: ", question, defaultStr)
+		scanner.Scan()
+		val := strings.ToLower(strings.TrimSpace(scanner.Text()))
+		if val == "" {
+			return defaultYes
+		}
+		return val == "y" || val == "yes"
+	}
+
+	// Queue metadata
+	queueID := prompt("Queue ID", "my-queue")
+	queueName := prompt("Queue name (description)", "My Batch Queue")
+
+	// Jobs
+	fmt.Fprintf(os.Stderr, "\n")
+	numJobsStr := prompt("Number of jobs", "3")
+	numJobs, err := strconv.Atoi(numJobsStr)
+	if err != nil || numJobs < 1 {
+		return fmt.Errorf("invalid number of jobs: %s", numJobsStr)
+	}
+
+	jobs := make([]queue.JobConfig, numJobs)
+
+	fmt.Fprintf(os.Stderr, "\n--- Job Configuration ---\n\n")
+
+	for i := 0; i < numJobs; i++ {
+		fmt.Fprintf(os.Stderr, "Job %d:\n", i+1)
+
+		jobID := prompt(fmt.Sprintf("  Job ID"), fmt.Sprintf("job%d", i+1))
+		command := prompt("  Command to execute", "echo 'Hello World'")
+		timeout := prompt("  Timeout (e.g., 5m, 1h, 30s)", "10m")
+
+		// Validate timeout format
+		if _, err := time.ParseDuration(timeout); err != nil {
+			fmt.Fprintf(os.Stderr, "  ⚠️  Invalid timeout format, using default 10m\n")
+			timeout = "10m"
+		}
+
+		jobs[i] = queue.JobConfig{
+			JobID:   jobID,
+			Command: command,
+			Timeout: timeout,
+		}
+
+		// Dependencies
+		if i > 0 && promptYesNo("  Add dependency on previous job?", true) {
+			jobs[i].DependsOn = []string{jobs[i-1].JobID}
+		}
+
+		// Environment variables
+		if promptYesNo("  Add environment variables?", false) {
+			jobs[i].Env = make(map[string]string)
+			for {
+				key := prompt("    Variable name (empty to finish)", "")
+				if key == "" {
+					break
+				}
+				value := prompt(fmt.Sprintf("    Value for %s", key), "")
+				jobs[i].Env[key] = value
+			}
+		}
+
+		// Retry configuration
+		if promptYesNo("  Configure retry?", false) {
+			maxAttemptsStr := prompt("    Max attempts", "3")
+			maxAttempts, err := strconv.Atoi(maxAttemptsStr)
+			if err != nil || maxAttempts < 1 {
+				maxAttempts = 3
+			}
+
+			backoff := prompt("    Backoff strategy (exponential/fixed)", "exponential")
+			if backoff != "exponential" && backoff != "fixed" {
+				backoff = "exponential"
+			}
+
+			jobs[i].Retry = &queue.RetryConfig{
+				MaxAttempts: maxAttempts,
+				Backoff:     backoff,
+			}
+		}
+
+		// Result paths
+		if promptYesNo("  Collect result files?", false) {
+			var resultPaths []string
+			for {
+				path := prompt("    File path or glob pattern (empty to finish)", "")
+				if path == "" {
+					break
+				}
+				resultPaths = append(resultPaths, path)
+			}
+			jobs[i].ResultPaths = resultPaths
+		}
+
+		fmt.Fprintf(os.Stderr, "\n")
+	}
+
+	// Global settings
+	fmt.Fprintf(os.Stderr, "--- Global Settings ---\n\n")
+
+	globalTimeout := prompt("Global timeout (max queue execution time)", "2h")
+	if _, err := time.ParseDuration(globalTimeout); err != nil {
+		fmt.Fprintf(os.Stderr, "⚠️  Invalid timeout format, using default 2h\n")
+		globalTimeout = "2h"
+	}
+
+	onFailure := "stop"
+	if !promptYesNo("Stop queue on first job failure?", true) {
+		onFailure = "continue"
+	}
+
+	s3Bucket := prompt("S3 bucket for results", "spawn-results-us-east-1")
+	s3Prefix := prompt("S3 prefix (optional)", fmt.Sprintf("queues/%s", queueID))
+
+	// Build queue config
+	config := &queue.QueueConfig{
+		QueueID:        queueID,
+		QueueName:      queueName,
+		Jobs:           jobs,
+		GlobalTimeout:  globalTimeout,
+		OnFailure:      onFailure,
+		ResultS3Bucket: s3Bucket,
+		ResultS3Prefix: s3Prefix,
+	}
+
+	// Validate
+	fmt.Fprintf(os.Stderr, "\n🔍 Validating configuration...\n")
+	if err := queue.ValidateQueue(config); err != nil {
+		return fmt.Errorf("validation failed: %w", err)
+	}
+	fmt.Fprintf(os.Stderr, "✓ Configuration is valid\n\n")
+
+	// Marshal to JSON
+	data, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal config: %w", err)
+	}
+
+	// Write to file
+	if err := os.WriteFile(output, data, 0644); err != nil {
+		return fmt.Errorf("write output file: %w", err)
+	}
+
+	fmt.Fprintf(os.Stderr, "✅ Queue configuration created: %s\n\n", output)
+	fmt.Fprintf(os.Stderr, "To launch this queue:\n")
+	fmt.Fprintf(os.Stderr, "  spawn launch --batch-queue %s --instance-type <type> --region <region>\n\n", output)
+
 	return nil
 }
