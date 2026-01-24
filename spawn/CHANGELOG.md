@@ -5,6 +5,70 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2026-01-24
+
+### Added - Queue Templates (Feature #57)
+
+#### Pre-built Templates
+- **5 Production Templates**: Ready-to-use queue configurations for common workflows
+  - `ml-pipeline` - ML training workflow (preprocess → train → evaluate → export)
+  - `etl` - ETL pipeline (extract → transform → load → validate)
+  - `ci-cd` - CI/CD workflow (checkout → build → test → deploy → smoke-test)
+  - `data-processing` - Data processing (download → process → aggregate → upload)
+  - `simple-sequential` - Simple 3-step customizable workflow
+- **Variable Substitution**: `{{VAR}}` for required variables, `{{VAR:default}}` for optional
+- **Embedded Templates**: Templates compiled into binary using go:embed for portability
+
+#### Template Management Commands
+- **`spawn queue template list`**: List all available templates with metadata
+- **`spawn queue template show <name>`**: Display template details, jobs, and variables
+- **`spawn queue template generate <name>`**: Generate queue config from template
+  - `--var KEY=VALUE` flag for variable substitution
+  - `--output <file>` flag to save generated config
+  - Validates all required variables provided
+  - Validates generated config before output
+
+#### Interactive Wizard
+- **`spawn queue template init`**: Interactive wizard to create custom queue configs
+  - Guided prompts for queue metadata, jobs, dependencies, timeouts
+  - Environment variable configuration per job
+  - Retry strategy setup (max attempts, backoff: exponential/fixed)
+  - Result path collection with glob pattern support
+  - Global settings (timeout, failure handling, S3 bucket)
+  - Saves validated config to `queue.json`
+
+#### Custom Templates
+- **User Template Directory**: `~/.config/spawn/templates/queue/`
+- **Template Search Priority**: User config → embedded → filesystem
+- **Override Built-ins**: User templates override embedded templates with same name
+- Custom templates use same variable substitution and validation
+
+#### Launch Integration
+- **`spawn launch --queue-template <name>`**: Launch directly from template
+- **`--template-var KEY=VALUE`**: Provide template variables inline
+- Generates queue config on-the-fly without intermediate file
+- Full validation before instance launch
+
+#### Implementation
+- **pkg/queue/template.go**: Template engine with variable substitution
+- **pkg/queue/embedded.go**: Embedded template file system
+- **pkg/queue/templates/**: 5 JSON templates embedded in binary
+- **cmd/queue.go**: Template subcommands implementation
+- **cmd/launch.go**: Launch integration with `--queue-template` flag
+- **pkg/queue/template_test.go**: Comprehensive unit tests
+
+#### Documentation
+- **[BATCH_QUEUE_GUIDE.md](BATCH_QUEUE_GUIDE.md)**: Added "Queue Templates" section
+  - Template listing and discovery
+  - Variable substitution examples
+  - Direct launch from templates
+  - Custom template creation guide
+  - All 5 template usage examples
+
+### Testing
+- **pkg/queue/template_test.go**: Template loading, variable extraction, substitution, validation
+- Coverage: Variable parsing, defaults, missing required vars, template listing
+
 ## [0.10.0] - 2026-01-23
 
 ### Added - Scheduled Executions (Feature #51)
@@ -291,5 +355,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 See git history for changes prior to v0.8.0.
 
+[0.11.0]: https://github.com/scttfrdmn/mycelium/compare/v0.10.0...v0.11.0
+[0.10.0]: https://github.com/scttfrdmn/mycelium/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/scttfrdmn/mycelium/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/scttfrdmn/mycelium/compare/v0.7.0...v0.8.0
