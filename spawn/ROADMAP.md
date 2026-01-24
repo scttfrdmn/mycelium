@@ -363,7 +363,7 @@ Spawn has evolved from a single-instance tool into a **production-ready cloud or
 
 ## Recommended Next Steps (v0.13.0)
 
-**Focus:** Security hardening, compliance, and documentation
+**Focus:** Security hardening and documentation
 
 ### Priority 1: Security Hardening (#63) - 8 weeks
 **Why:** Production systems need robust security
@@ -379,30 +379,7 @@ Spawn has evolved from a single-instance tool into a **production-ready cloud or
 - SSH security improvements
 - SECURITY.md documentation
 
-### Priority 2: NIST Compliance (#64, #65) - 10 weeks
-**Why:** Enable use in regulated environments (federal, DoD, CUI)
-**Impact:** Unlocks government and contractor markets
-**Deliverables:**
-
-**NIST 800-171 (#64):**
-- Configuration mode flag (--nist-800-171)
-- Self-hosted infrastructure support
-- CloudFormation/Terraform templates
-- Audit logging with user identity
-- Encrypted volumes by default
-- Private subnet deployment
-- NIST800171.md compliance guide
-
-**NIST 800-53 (#65):**
-- Baseline selection (Low/Moderate/High)
-- FedRAMP compatibility
-- SBOM generation
-- Backup/restore automation
-- Contingency planning features
-- NIST80053.md compliance guide
-- System Security Plan templates
-
-### Priority 3: Comprehensive Documentation (#66) - 14 weeks
+### Priority 2: Comprehensive Documentation (#66) - 14 weeks
 **Why:** Good documentation drives adoption
 **Impact:** Users can learn and master spawn efficiently
 **Deliverables:**
@@ -414,15 +391,15 @@ Spawn has evolved from a single-instance tool into a **production-ready cloud or
 - FAQ (50+ questions)
 - Documentation website (docs.mycelium.dev)
 
-### Priority 4: Infrastructure (#62) - 1 week
+### Priority 3: Infrastructure (#62) - 1 week
 **Why:** Enable automated Docker image publishing
 **Impact:** Users can pull spawn Docker images
 **Deliverables:**
 - Configure Docker Hub credentials
 - Automated multi-arch builds
 
-**Total Timeline for v0.13.0:** ~16 weeks (parallelizable)
-**Target Release:** April 2026
+**Total Timeline for v0.13.0:** ~14 weeks (parallelizable)
+**Target Release:** March 2026
 
 ---
 
@@ -446,8 +423,13 @@ Spawn has evolved from a single-instance tool into a **production-ready cloud or
 
 **Current State (v0.12.0):** spawn is **production-ready** for most use cases. The core platform is complete and battle-tested.
 
-**v0.13.0 Direction:** Focus shift to security, compliance, and documentation to enable enterprise and government adoption.
+**v0.13.0 Direction:** Focus shift to security hardening and comprehensive documentation to enable broader adoption.
 
-**Future Work (v0.14.0+):** Web dashboard, auto-scaling job arrays, template marketplace, and additional enterprise features.
+**Future Work (v0.14.0+):**
+- NIST compliance (800-171, 800-53) for government/regulated environments
+- Web dashboard
+- Auto-scaling job arrays
+- Template marketplace
+- Additional enterprise features
 
-**Achievement:** Transformed from "convenient single-instance tool" to "comprehensive cloud orchestration platform" in ~4 months. Now adding enterprise-grade security and compliance.
+**Achievement:** Transformed from "convenient single-instance tool" to "comprehensive cloud orchestration platform" in ~4 months. Now adding enterprise-grade security and documentation.
