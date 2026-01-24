@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -75,7 +75,7 @@ func NewAgent(ctx context.Context) (*Agent, error) {
 	})
 	var publicIP string
 	if err == nil {
-		ipBytes, _ := ioutil.ReadAll(publicIPResult.Content)
+		ipBytes, _ := io.ReadAll(publicIPResult.Content)
 		publicIP = strings.TrimSpace(string(ipBytes))
 	}
 
@@ -488,7 +488,7 @@ func (a *Agent) isIdle() bool {
 
 func (a *Agent) getCPUUsage() float64 {
 	// Read /proc/stat
-	data, err := ioutil.ReadFile("/proc/stat")
+	data, err := os.ReadFile("/proc/stat")
 	if err != nil {
 		return 100.0 // Assume active if can't read
 	}
@@ -522,7 +522,7 @@ func (a *Agent) getCPUUsage() float64 {
 
 func (a *Agent) getNetworkBytes() int64 {
 	// Read /proc/net/dev
-	data, err := ioutil.ReadFile("/proc/net/dev")
+	data, err := os.ReadFile("/proc/net/dev")
 	if err != nil {
 		return 1000000 // Assume active if can't read
 	}
@@ -548,7 +548,7 @@ func (a *Agent) getNetworkBytes() int64 {
 func (a *Agent) getDiskIO() int64 {
 	// Read /proc/diskstats
 	// Format: major minor name reads ... sectors_read ... writes ... sectors_written ...
-	data, err := ioutil.ReadFile("/proc/diskstats")
+	data, err := os.ReadFile("/proc/diskstats")
 	if err != nil {
 		return 0 // Assume no activity if can't read
 	}
@@ -717,7 +717,7 @@ func (a *Agent) checkSpotInterruption(ctx context.Context) bool {
 	}
 
 	// Parse the response
-	body, err := ioutil.ReadAll(result.Content)
+	body, err := io.ReadAll(result.Content)
 	if err != nil {
 		log.Printf("Error reading Spot interruption response: %v", err)
 		return false
@@ -769,7 +769,7 @@ func (a *Agent) isSpotInstance() bool {
 		return false
 	}
 
-	body, err := ioutil.ReadAll(result.Content)
+	body, err := io.ReadAll(result.Content)
 	if err != nil {
 		return false
 	}
@@ -792,7 +792,7 @@ func (a *Agent) sendSpotInterruptionNotification(action, interruptTime string) {
   "detected_at": "%s"
 }`, a.instanceID, action, interruptTime, time.Now().UTC().Format(time.RFC3339))
 
-	if err := ioutil.WriteFile(notificationFile, []byte(notification), 0644); err != nil {
+	if err := os.WriteFile(notificationFile, []byte(notification), 0644); err != nil {
 		log.Printf("Failed to write notification file: %v", err)
 	}
 

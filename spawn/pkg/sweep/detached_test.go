@@ -81,7 +81,7 @@ func TestGroupParamsByRegion(t *testing.T) {
 			},
 		},
 		{
-			name: "Empty params",
+			name:   "Empty params",
 			params: []map[string]interface{}{},
 			defaults: map[string]interface{}{
 				"region": "us-east-1",
@@ -102,9 +102,9 @@ func TestGroupParamsByRegion(t *testing.T) {
 				"region": "ap-northeast-1",
 			},
 			expected: map[string][]int{
-				"us-east-1":     {0, 1},
-				"us-west-2":     {2, 3},
-				"eu-west-1":     {4},
+				"us-east-1":      {0, 1},
+				"us-west-2":      {2, 3},
+				"eu-west-1":      {4},
 				"ap-northeast-1": {5},
 			},
 		},

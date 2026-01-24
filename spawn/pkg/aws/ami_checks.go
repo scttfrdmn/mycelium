@@ -10,11 +10,11 @@ import (
 
 // AMIHealthCheck represents the health status of an AMI
 type AMIHealthCheck struct {
-	BaseAMIOutdated   bool
-	BaseAMIAge        time.Duration
-	CurrentBaseAMI    string // Current recommended base AMI
-	OldBaseAMI        string // Base AMI used in this custom AMI
-	Warnings          []string
+	BaseAMIOutdated bool
+	BaseAMIAge      time.Duration
+	CurrentBaseAMI  string // Current recommended base AMI
+	OldBaseAMI      string // Base AMI used in this custom AMI
+	Warnings        []string
 }
 
 // CheckAMIHealth checks if an AMI has an outdated base AMI

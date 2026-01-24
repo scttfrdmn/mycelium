@@ -20,11 +20,11 @@ type RegionMismatch struct {
 
 // DataLocalityWarning contains information about region mismatches
 type DataLocalityWarning struct {
-	Mismatches      []RegionMismatch
-	HasMismatches   bool
-	TotalCostPerGB  float64
-	AvgLatencyMs    int
-	Recommendation  string
+	Mismatches     []RegionMismatch
+	HasMismatches  bool
+	TotalCostPerGB float64
+	AvgLatencyMs   int
+	Recommendation string
 }
 
 // DetectEFSRegion detects the region of an EFS filesystem

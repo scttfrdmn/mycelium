@@ -287,33 +287,33 @@ func TestRegionFiltering(t *testing.T) {
 	}
 
 	tests := []struct {
-		name          string
-		regionFilter  string
-		wantCount     int
-		wantFirstIdx  int
+		name         string
+		regionFilter string
+		wantCount    int
+		wantFirstIdx int
 	}{
 		{
-			name:          "filter us-east-1",
-			regionFilter:  "us-east-1",
-			wantCount:     2,
-			wantFirstIdx:  0,
+			name:         "filter us-east-1",
+			regionFilter: "us-east-1",
+			wantCount:    2,
+			wantFirstIdx: 0,
 		},
 		{
-			name:          "filter us-west-2",
-			regionFilter:  "us-west-2",
-			wantCount:     1,
-			wantFirstIdx:  1,
+			name:         "filter us-west-2",
+			regionFilter: "us-west-2",
+			wantCount:    1,
+			wantFirstIdx: 1,
 		},
 		{
-			name:          "no filter (empty)",
-			regionFilter:  "",
-			wantCount:     4,
-			wantFirstIdx:  0,
+			name:         "no filter (empty)",
+			regionFilter: "",
+			wantCount:    4,
+			wantFirstIdx: 0,
 		},
 		{
-			name:          "filter non-existent region",
-			regionFilter:  "ap-south-1",
-			wantCount:     0,
+			name:         "filter non-existent region",
+			regionFilter: "ap-south-1",
+			wantCount:    0,
 		},
 	}
 

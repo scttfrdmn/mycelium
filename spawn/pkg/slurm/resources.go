@@ -67,9 +67,9 @@ func matches(t InstanceTypeSpec, job *SlurmJob) bool {
 		// Check GPU type if specified
 		if job.GPUType != "" {
 			if t.GPUType != job.GPUType && !isCompatibleGPUType(job.GPUType, t.GPUType) {
-			return false
+				return false
+			}
 		}
-	}
 	}
 
 	return true

@@ -7,12 +7,12 @@ import (
 
 func TestEstimateStagingCost(t *testing.T) {
 	tests := []struct {
-		name                     string
-		dataSizeGB               int
-		numRegions               int
-		instancesPerRegion       int
-		expectRecommendation     string
-		expectSavings            bool
+		name                 string
+		dataSizeGB           int
+		numRegions           int
+		instancesPerRegion   int
+		expectRecommendation string
+		expectSavings        bool
 	}{
 		{
 			name:                 "Large dataset, multiple regions",

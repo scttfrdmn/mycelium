@@ -49,7 +49,7 @@ type DNSUpdateResponse struct {
 }
 
 var (
-	cfg          aws.Config
+	cfg           aws.Config
 	route53Client *route53.Client
 )
 

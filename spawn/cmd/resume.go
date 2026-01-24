@@ -15,9 +15,9 @@ import (
 )
 
 var (
-	resumeSweepID string
+	resumeSweepID       string
 	resumeMaxConcurrent int
-	resumeDetach bool
+	resumeDetach        bool
 )
 
 var resumeCmd = &cobra.Command{

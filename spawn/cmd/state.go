@@ -8,17 +8,17 @@ import (
 	"time"
 
 	"github.com/scttfrdmn/mycelium/pkg/i18n"
-	"github.com/spf13/cobra"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/aws"
+	"github.com/spf13/cobra"
 )
 
 var (
-	stopJobArrayID       string
-	stopJobArrayName     string
-	hibernateJobArrayID  string
+	stopJobArrayID        string
+	stopJobArrayName      string
+	hibernateJobArrayID   string
 	hibernateJobArrayName string
-	startJobArrayID      string
-	startJobArrayName    string
+	startJobArrayID       string
+	startJobArrayName     string
 )
 
 // stop command
@@ -45,7 +45,6 @@ var startCmd = &cobra.Command{
 	Args: cobra.RangeArgs(0, 1),
 	// Short and Long will be set after i18n initialization
 }
-
 
 func init() {
 	rootCmd.AddCommand(stopCmd)

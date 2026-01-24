@@ -6,20 +6,20 @@ import (
 
 // CostEstimate represents the estimated cost of different staging strategies
 type CostEstimate struct {
-	DataSizeGB          int
-	NumRegions          int
-	InstancesPerRegion  int
-	TotalInstances      int
+	DataSizeGB         int
+	NumRegions         int
+	InstancesPerRegion int
+	TotalInstances     int
 
 	// Option A: Single-region storage
-	SingleRegionStorageCost  float64
-	CrossRegionTransferCost  float64
-	SingleRegionTotalCost    float64
+	SingleRegionStorageCost float64
+	CrossRegionTransferCost float64
+	SingleRegionTotalCost   float64
 
 	// Option B: Regional replication
-	MultiRegionStorageCost   float64
-	ReplicationCost          float64
-	MultiRegionTotalCost     float64
+	MultiRegionStorageCost float64
+	ReplicationCost        float64
+	MultiRegionTotalCost   float64
 
 	// Savings
 	Savings        float64
@@ -32,9 +32,9 @@ const (
 	s3StorageCostPerGB = 0.023
 
 	// Data transfer pricing (per GB)
-	crossRegionTransferCost = 0.09  // Cross-region out
-	s3ReplicationCost       = 0.02  // S3 replication
-	internetTransferCost    = 0.09  // Internet out
+	crossRegionTransferCost = 0.09 // Cross-region out
+	s3ReplicationCost       = 0.02 // S3 replication
+	internetTransferCost    = 0.09 // Internet out
 
 	// Within-region transfers are free
 	withinRegionTransferCost = 0.0
@@ -76,19 +76,19 @@ func EstimateStagingCost(dataSizeGB, numRegions, instancesPerRegion int) *CostEs
 	}
 
 	return &CostEstimate{
-		DataSizeGB:               dataSizeGB,
-		NumRegions:               numRegions,
-		InstancesPerRegion:       instancesPerRegion,
-		TotalInstances:           totalInstances,
-		SingleRegionStorageCost:  singleRegionStorage,
-		CrossRegionTransferCost:  crossRegionTransfer,
-		SingleRegionTotalCost:    optionATotal,
-		MultiRegionStorageCost:   multiRegionStorage,
-		ReplicationCost:          replication,
-		MultiRegionTotalCost:     optionBTotal,
-		Savings:                  savings,
-		SavingsPercent:           savingsPercent,
-		Recommendation:           recommendation,
+		DataSizeGB:              dataSizeGB,
+		NumRegions:              numRegions,
+		InstancesPerRegion:      instancesPerRegion,
+		TotalInstances:          totalInstances,
+		SingleRegionStorageCost: singleRegionStorage,
+		CrossRegionTransferCost: crossRegionTransfer,
+		SingleRegionTotalCost:   optionATotal,
+		MultiRegionStorageCost:  multiRegionStorage,
+		ReplicationCost:         replication,
+		MultiRegionTotalCost:    optionBTotal,
+		Savings:                 savings,
+		SavingsPercent:          savingsPercent,
+		Recommendation:          recommendation,
 	}
 }
 
@@ -117,7 +117,7 @@ func (e *CostEstimate) FormatCostEstimate() string {
 	output += fmt.Sprintf("  Replication cost: $%.2f (one-time)\n", e.ReplicationCost)
 	output += fmt.Sprintf("    (%d regions × %d GB × $%.2f/GB)\n",
 		e.NumRegions-1, e.DataSizeGB, s3ReplicationCost)
-	output += fmt.Sprintf("  Cross-region transfer: $0.00 (instances download from local region)\n")
+	output += "  Cross-region transfer: $0.00 (instances download from local region)\n"
 	output += fmt.Sprintf("  Total: $%.2f\n\n", e.MultiRegionTotalCost)
 
 	if e.Savings > 0 {
@@ -146,10 +146,10 @@ func BreakEvenAnalysis(dataSizeGB, numRegions int) string {
 		breakEvenInstances := int(replicationCostTotal / crossRegionCostPerInstance)
 		output += fmt.Sprintf("Replication cost: $%.2f (one-time)\n", replicationCostTotal)
 		output += fmt.Sprintf("Cross-region cost per instance: $%.2f\n", crossRegionCostPerInstance)
-		output += fmt.Sprintf("\n")
+		output += "\n"
 		output += fmt.Sprintf("Break-even point: %d instances in remote regions\n", breakEvenInstances)
-		output += fmt.Sprintf("\n")
-		output += fmt.Sprintf("Replication is cost-effective when:\n")
+		output += "\n"
+		output += "Replication is cost-effective when:\n"
 		output += fmt.Sprintf("  - Running %d+ instances across %d regions\n", breakEvenInstances, numRegions-1)
 		output += fmt.Sprintf("  - %d+ instances per remote region (on average)\n", breakEvenInstances/(numRegions-1))
 	}

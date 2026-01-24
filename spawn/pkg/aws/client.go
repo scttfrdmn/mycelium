@@ -80,9 +80,9 @@ type LaunchConfig struct {
 	DNSName         string
 
 	// Completion signal settings
-	OnComplete       string // Action: terminate, stop, hibernate
-	CompletionFile   string // File path to watch (default: /tmp/SPAWN_COMPLETE)
-	CompletionDelay  string // Grace period before action (default: 30s)
+	OnComplete      string // Action: terminate, stop, hibernate
+	CompletionFile  string // File path to watch (default: /tmp/SPAWN_COMPLETE)
+	CompletionDelay string // Grace period before action (default: 30s)
 
 	// Session management
 	SessionTimeout string // Auto-logout idle shells (default: 30m, 0 to disable)
@@ -95,11 +95,11 @@ type LaunchConfig struct {
 	JobArrayCommand string // Command to run on all instances (optional)
 
 	// Parameter sweep settings
-	SweepID     string            // Unique sweep ID (e.g., "hyperparam-20260115-abc123")
-	SweepName   string            // User-friendly sweep name (e.g., "hyperparam")
-	SweepIndex  int               // This instance's index in the sweep (0..N-1)
-	SweepSize   int               // Total number of parameter sets in the sweep
-	Parameters  map[string]string // Parameter key-value pairs for PARAM_* env vars and tags
+	SweepID    string            // Unique sweep ID (e.g., "hyperparam-20260115-abc123")
+	SweepName  string            // User-friendly sweep name (e.g., "hyperparam")
+	SweepIndex int               // This instance's index in the sweep (0..N-1)
+	SweepSize  int               // Total number of parameter sets in the sweep
+	Parameters map[string]string // Parameter key-value pairs for PARAM_* env vars and tags
 
 	// Shared storage settings
 	EFSID         string // EFS filesystem ID to mount (fs-xxx)
@@ -145,10 +145,10 @@ func (c *Client) Launch(ctx context.Context, launchConfig LaunchConfig) (*Launch
 
 	// Build tags (including account and user tags for per-user isolation)
 	tags := buildTags(launchConfig, accountID, userARN)
-	
+
 	// Build block device mappings
 	blockDevices := buildBlockDevices(launchConfig)
-	
+
 	// Build run instances input
 	input := &ec2.RunInstancesInput{
 		InstanceType: types.InstanceType(launchConfig.InstanceType),
@@ -176,7 +176,7 @@ func (c *Client) Launch(ctx context.Context, launchConfig LaunchConfig) (*Launch
 			Name: aws.String(launchConfig.IamInstanceProfile),
 		}
 	}
-	
+
 	// Add network configuration
 	if launchConfig.EFAEnabled {
 		// EFA requires specific network interface configuration
@@ -208,7 +208,7 @@ func (c *Client) Launch(ctx context.Context, launchConfig LaunchConfig) (*Launch
 	} else if len(launchConfig.SecurityGroupIDs) > 0 {
 		input.SecurityGroupIds = launchConfig.SecurityGroupIDs
 	}
-	
+
 	// Add placement (AZ, placement group, and reservation)
 	placement := &types.Placement{}
 	if launchConfig.AvailabilityZone != "" {
@@ -220,14 +220,14 @@ func (c *Client) Launch(ctx context.Context, launchConfig LaunchConfig) (*Launch
 	if placement.AvailabilityZone != nil || placement.GroupName != nil {
 		input.Placement = placement
 	}
-	
+
 	// Add hibernation if enabled
 	if launchConfig.Hibernate {
 		input.HibernationOptions = &types.HibernationOptionsRequest{
 			Configured: aws.Bool(true),
 		}
 	}
-	
+
 	// Add Spot configuration if needed
 	if launchConfig.Spot {
 		input.InstanceMarketOptions = &types.InstanceMarketOptionsRequest{
@@ -236,24 +236,24 @@ func (c *Client) Launch(ctx context.Context, launchConfig LaunchConfig) (*Launch
 				SpotInstanceType: types.SpotInstanceTypeOneTime,
 			},
 		}
-		
+
 		if launchConfig.SpotMaxPrice != "" {
 			input.InstanceMarketOptions.SpotOptions.MaxPrice = aws.String(launchConfig.SpotMaxPrice)
 		}
 	}
-	
+
 	// Launch instance
 	result, err := ec2Client.RunInstances(ctx, input)
 	if err != nil {
 		return nil, fmt.Errorf("failed to launch instance: %w", err)
 	}
-	
+
 	if len(result.Instances) == 0 {
 		return nil, fmt.Errorf("no instances returned")
 	}
-	
+
 	instance := result.Instances[0]
-	
+
 	launchResult := &LaunchResult{
 		InstanceID:       *instance.InstanceId,
 		Name:             launchConfig.Name,
@@ -263,7 +263,7 @@ func (c *Client) Launch(ctx context.Context, launchConfig LaunchConfig) (*Launch
 		State:            string(instance.State.Name),
 		KeyName:          launchConfig.KeyName,
 	}
-	
+
 	return launchResult, nil
 }
 
@@ -280,11 +280,11 @@ func buildTags(config LaunchConfig, accountID string, userARN string) []types.Ta
 		{Key: aws.String("spawn:account-base36"), Value: aws.String(accountBase36)},
 		{Key: aws.String("spawn:iam-user"), Value: aws.String(userARN)}, // Per-user isolation
 	}
-	
+
 	if config.Name != "" {
 		tags = append(tags, types.Tag{Key: aws.String("Name"), Value: aws.String(config.Name)})
 	}
-	
+
 	if config.TTL != "" {
 		tags = append(tags, types.Tag{Key: aws.String("spawn:ttl"), Value: aws.String(config.TTL)})
 	}
@@ -296,7 +296,7 @@ func buildTags(config LaunchConfig, accountID string, userARN string) []types.Ta
 	if config.IdleTimeout != "" {
 		tags = append(tags, types.Tag{Key: aws.String("spawn:idle-timeout"), Value: aws.String(config.IdleTimeout)})
 	}
-	
+
 	if config.HibernateOnIdle {
 		tags = append(tags, types.Tag{Key: aws.String("spawn:hibernate-on-idle"), Value: aws.String("true")})
 	}
@@ -357,13 +357,13 @@ func buildTags(config LaunchConfig, accountID string, userARN string) []types.Ta
 func buildBlockDevices(config LaunchConfig) []types.BlockDeviceMapping {
 	// Calculate volume size for hibernation
 	volumeSize := int32(20) // Default 20 GB
-	
+
 	if config.Hibernate {
 		// For hibernation, need RAM + OS + buffer
 		// Estimate based on instance type
 		volumeSize = estimateVolumeSize(config.InstanceType)
 	}
-	
+
 	return []types.BlockDeviceMapping{
 		{
 			DeviceName: aws.String("/dev/xvda"),
@@ -390,14 +390,14 @@ func estimateVolumeSize(instanceType string) int32 {
 		"p5":  768, // H100 instances have lots of RAM
 		"g6":  32,
 	}
-	
+
 	// Extract family
 	for prefix, ram := range ramEstimates {
 		if len(instanceType) >= len(prefix) && instanceType[:len(prefix)] == prefix {
 			return ram + 10 // RAM + 10GB for OS
 		}
 	}
-	
+
 	return 20 // Default
 }
 
@@ -452,7 +452,7 @@ func (c *Client) ImportKeyPair(ctx context.Context, region, keyName string, publ
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) &&
 		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
-		findSubstring(s, substr)))
+			findSubstring(s, substr)))
 }
 
 func findSubstring(s, substr string) bool {
@@ -611,11 +611,11 @@ type InstanceInfo struct {
 	JobArraySize  string
 
 	// Sweep fields
-	SweepID     string
-	SweepName   string
-	SweepIndex  string
-	SweepSize   string
-	Parameters  map[string]string // Extracted from spawn:param:* tags
+	SweepID    string
+	SweepName  string
+	SweepIndex string
+	SweepSize  string
+	Parameters map[string]string // Extracted from spawn:param:* tags
 }
 
 // ListInstances returns all spawn-managed instances, optionally filtered by region and state

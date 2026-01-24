@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"github.com/scttfrdmn/mycelium/pkg/i18n"
-	"github.com/spf13/cobra"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/aws"
+	"github.com/spf13/cobra"
 )
 
 var (
@@ -157,12 +157,12 @@ func findSSHKey(keyName string) (string, error) {
 
 	// Try various common key names
 	keyPatterns := []string{
-		filepath.Join(sshDir, keyName),           // Exact name
-		filepath.Join(sshDir, keyName+".pem"),    // With .pem
-		filepath.Join(sshDir, keyName+".key"),    // With .key
-		filepath.Join(sshDir, "id_rsa"),          // Default RSA key
-		filepath.Join(sshDir, "id_ed25519"),      // Default Ed25519 key
-		filepath.Join(sshDir, "id_ecdsa"),        // Default ECDSA key
+		filepath.Join(sshDir, keyName),        // Exact name
+		filepath.Join(sshDir, keyName+".pem"), // With .pem
+		filepath.Join(sshDir, keyName+".key"), // With .key
+		filepath.Join(sshDir, "id_rsa"),       // Default RSA key
+		filepath.Join(sshDir, "id_ed25519"),   // Default Ed25519 key
+		filepath.Join(sshDir, "id_ecdsa"),     // Default ECDSA key
 	}
 
 	for _, path := range keyPatterns {

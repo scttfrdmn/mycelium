@@ -15,10 +15,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/scttfrdmn/mycelium/pkg/i18n"
-	"github.com/spf13/cobra"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/scttfrdmn/mycelium/pkg/i18n"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/aws"
 	spawnconfig "github.com/scttfrdmn/mycelium/spawn/pkg/config"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/input"
@@ -26,10 +25,13 @@ import (
 	"github.com/scttfrdmn/mycelium/spawn/pkg/platform"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/pricing"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/progress"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/queue"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/staging"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/storage"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/sweep"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/userdata"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/wizard"
+	"github.com/spf13/cobra"
 )
 
 var (
@@ -38,51 +40,51 @@ var (
 	region       string
 	az           string
 	ami          string
-	
+
 	// Network (empty = auto-create)
-	vpcID       string
-	subnetID    string
-	sgID        string
-	
+	vpcID    string
+	subnetID string
+	sgID     string
+
 	// SSH key
-	keyPair     string
-	
+	keyPair string
+
 	// Behavior
-	spot             bool
-	spotMaxPrice     string
-	useReservation   bool
-	reservationID    string
-	hibernate        bool
-	ttl              string
-	idleTimeout      string
-	hibernateOnIdle  bool
-	onComplete       string
-	completionFile   string
-	completionDelay  string
-	sessionTimeout   string
+	spot            bool
+	spotMaxPrice    string
+	useReservation  bool
+	reservationID   string
+	hibernate       bool
+	ttl             string
+	idleTimeout     string
+	hibernateOnIdle bool
+	onComplete      string
+	completionFile  string
+	completionDelay string
+	sessionTimeout  string
 
 	// Meta
-	name             string
-	userData         string
-	userDataFile     string
-	dnsName          string
-	dnsDomain        string
-	dnsAPIEndpoint   string
+	name           string
+	userData       string
+	userDataFile   string
+	dnsName        string
+	dnsDomain      string
+	dnsAPIEndpoint string
 
 	// Job array
-	count            int
-	jobArrayName     string
-	instanceNames    string
-	command          string
+	count         int
+	jobArrayName  string
+	instanceNames string
+	command       string
 
 	// MPI
-	mpiEnabled             bool
-	mpiProcessesPerNode    int
-	mpiCommand             string
-	mpiSkipInstall         bool
-	mpiPlacementGroup      string
-	mpiAutoPlacementGroup  bool
-	efaEnabled             bool
+	mpiEnabled            bool
+	mpiProcessesPerNode   int
+	mpiCommand            string
+	mpiSkipInstall        bool
+	mpiPlacementGroup     string
+	mpiAutoPlacementGroup bool
+	efaEnabled            bool
 
 	// Shared storage
 	efsID           string
@@ -113,6 +115,9 @@ var (
 	autoYes                bool
 	distributionMode       string
 
+	// Batch queue
+	batchQueueFile string
+
 	// IAM
 	iamRole            string
 	iamPolicy          []string
@@ -122,11 +127,11 @@ var (
 	iamRoleTags        []string
 
 	// Mode
-	interactive      bool
-	quiet            bool
-	waitForRunning   bool
-	waitForSSH       bool
-	skipRegionCheck  bool
+	interactive     bool
+	quiet           bool
+	waitForRunning  bool
+	waitForSSH      bool
+	skipRegionCheck bool
 )
 
 var launchCmd = &cobra.Command{
@@ -138,27 +143,27 @@ var launchCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(launchCmd)
-	
+
 	// Instance config
 	launchCmd.Flags().StringVar(&instanceType, "instance-type", "", "Instance type")
 	launchCmd.Flags().StringVar(&region, "region", "", "AWS region")
 	launchCmd.Flags().StringVar(&az, "az", "", "Availability zone")
 	launchCmd.Flags().StringVar(&ami, "ami", "", "AMI ID (auto-detects AL2023)")
-	
+
 	// Network
 	launchCmd.Flags().StringVar(&vpcID, "vpc", "", "VPC ID")
 	launchCmd.Flags().StringVar(&subnetID, "subnet", "", "Subnet ID")
 	launchCmd.Flags().StringVar(&sgID, "security-group", "", "Security group ID")
-	
+
 	// SSH
 	launchCmd.Flags().StringVar(&keyPair, "key-pair", "", "SSH key pair name")
-	
+
 	// Capacity
 	launchCmd.Flags().BoolVar(&spot, "spot", false, "Launch as Spot instance")
 	launchCmd.Flags().StringVar(&spotMaxPrice, "spot-max-price", "", "Max Spot price")
 	launchCmd.Flags().BoolVar(&useReservation, "use-reservation", false, "Use capacity reservation")
 	launchCmd.Flags().StringVar(&reservationID, "reservation-id", "", "Capacity reservation ID")
-	
+
 	// Behavior
 	launchCmd.Flags().BoolVar(&hibernate, "hibernate", false, "Enable hibernation")
 	launchCmd.Flags().StringVar(&ttl, "ttl", "", "Auto-terminate after duration (e.g., 8h)")
@@ -221,6 +226,9 @@ func init() {
 	launchCmd.Flags().BoolVarP(&autoYes, "yes", "y", false, "Auto-approve cost estimate (skip confirmation)")
 	launchCmd.Flags().StringVar(&distributionMode, "mode", "balanced", "Distribution mode: balanced (fair share) or opportunistic (prioritize available regions)")
 
+	// Batch queue
+	launchCmd.Flags().StringVar(&batchQueueFile, "batch-queue", "", "Batch job queue file (JSON) for sequential execution")
+
 	// IAM
 	launchCmd.Flags().StringVar(&iamRole, "iam-role", "", "IAM role name (creates if doesn't exist)")
 	launchCmd.Flags().StringSliceVar(&iamPolicy, "iam-policy", []string{}, "Service-level policies (e.g., s3:ReadOnly,dynamodb:WriteOnly)")
@@ -259,7 +267,12 @@ func runLaunch(cmd *cobra.Command, args []string) error {
 		platform.EnableWindowsColors()
 	}
 
-	// Check for parameter sweep mode FIRST (before wizard/config logic)
+	// Check for batch queue mode FIRST
+	if batchQueueFile != "" {
+		return launchWithBatchQueue(ctx, plat)
+	}
+
+	// Check for parameter sweep mode (before wizard/config logic)
 	if paramFile != "" || params != "" {
 		// Parameter sweep launch path - config will be built inside launchParameterSweep
 		// Create minimal config for sweep orchestration
@@ -525,10 +538,10 @@ func launchParameterSweep(ctx context.Context, baseConfig *aws.LaunchConfig, pla
 	for i, instance := range launchedInstances {
 		if instance != nil {
 			state.Instances = append(state.Instances, InstanceState{
-				Index:       i,
-				InstanceID:  instance.InstanceID,
-				State:       "running",
-				LaunchedAt:  time.Now(),
+				Index:      i,
+				InstanceID: instance.InstanceID,
+				State:      "running",
+				LaunchedAt: time.Now(),
 			})
 		}
 	}
@@ -775,7 +788,7 @@ func launchWithRollingQueue(ctx context.Context, awsClient *aws.Client, launchCo
 
 func launchWithProgress(ctx context.Context, awsClient *aws.Client, config *aws.LaunchConfig, plat *platform.Platform) error {
 	prog := progress.NewProgress()
-	
+
 	// Step 1: Detect AMI
 	prog.Start("Detecting AMI")
 	if config.AMI == "" {
@@ -788,7 +801,7 @@ func launchWithProgress(ctx context.Context, awsClient *aws.Client, config *aws.
 	}
 	prog.Complete("Detecting AMI")
 	time.Sleep(300 * time.Millisecond)
-	
+
 	// Step 2: Setup SSH key
 	prog.Start("Setting up SSH key")
 	if config.KeyName == "" {
@@ -957,24 +970,24 @@ func launchWithProgress(ctx context.Context, awsClient *aws.Client, config *aws.
 				prog.Complete("Checking data locality")
 				time.Sleep(300 * time.Millisecond)
 			} else if warning.HasMismatches {
-			prog.Complete("Checking data locality")
-			time.Sleep(300 * time.Millisecond)
+				prog.Complete("Checking data locality")
+				time.Sleep(300 * time.Millisecond)
 
-			// Display warning
-			fmt.Fprintf(os.Stderr, "%s", warning.FormatWarning())
+				// Display warning
+				fmt.Fprintf(os.Stderr, "%s", warning.FormatWarning())
 
-			// Prompt for confirmation unless auto-approved
-			if !autoYes {
-				fmt.Fprintf(os.Stderr, "   Continue with cross-region launch? [y/N]: ")
-				var response string
-				fmt.Scanln(&response)
-				response = strings.ToLower(strings.TrimSpace(response))
-				if response != "y" && response != "yes" {
-					fmt.Fprintf(os.Stderr, "\n❌ Launch cancelled\n")
-					return nil
+				// Prompt for confirmation unless auto-approved
+				if !autoYes {
+					fmt.Fprintf(os.Stderr, "   Continue with cross-region launch? [y/N]: ")
+					var response string
+					fmt.Scanln(&response)
+					response = strings.ToLower(strings.TrimSpace(response))
+					if response != "y" && response != "yes" {
+						fmt.Fprintf(os.Stderr, "\n❌ Launch cancelled\n")
+						return nil
+					}
+					fmt.Fprintf(os.Stderr, "\n")
 				}
-				fmt.Fprintf(os.Stderr, "\n")
-			}
 			} else {
 				prog.Complete("Checking data locality")
 				time.Sleep(300 * time.Millisecond)
@@ -1197,13 +1210,13 @@ func buildLaunchConfig(truffleInput *input.TruffleInput) (*aws.LaunchConfig, err
 	config := &aws.LaunchConfig{
 		Tags: make(map[string]string),
 	}
-	
+
 	// From truffle input
 	if truffleInput != nil {
 		config.InstanceType = truffleInput.InstanceType
 		config.Region = truffleInput.Region
 		config.AvailabilityZone = truffleInput.AvailabilityZone
-		
+
 		if truffleInput.Spot {
 			config.Spot = true
 			if truffleInput.SpotPrice > 0 {
@@ -1211,7 +1224,7 @@ func buildLaunchConfig(truffleInput *input.TruffleInput) (*aws.LaunchConfig, err
 			}
 		}
 	}
-	
+
 	// Override with flags
 	if instanceType != "" {
 		config.InstanceType = instanceType
@@ -1402,7 +1415,7 @@ func buildUserData(plat *platform.Platform, config *aws.LaunchConfig) (string, e
 			customUserData = userData
 		}
 	}
-	
+
 	// Build user-data with spored installer (S3-based with SHA256 verification)
 	script := fmt.Sprintf(`#!/bin/bash
 set -e
@@ -1804,12 +1817,12 @@ systemctl start spored
 
 echo "spored installation complete"
 `
-	
+
 	if customUserData != "" {
 		script += "\n# Custom user data\n"
 		script += customUserData
 	}
-	
+
 	return script, nil
 }
 
@@ -2052,9 +2065,9 @@ func launchJobArray(ctx context.Context, awsClient *aws.Client, baseConfig *aws.
 	prog.Start(fmt.Sprintf("Launching %d instances in parallel", count))
 
 	type launchResult struct {
-		index      int
-		result     *aws.LaunchResult
-		err        error
+		index  int
+		result *aws.LaunchResult
+		err    error
 	}
 
 	results := make(chan launchResult, count)
@@ -2581,6 +2594,150 @@ func launchSweepDetached(ctx context.Context, paramFormat *ParamFileFormat, base
 	fmt.Fprintf(os.Stderr, "  spawn status --sweep-id %s\n\n", sweepID)
 	fmt.Fprintf(os.Stderr, "To resume if needed:\n")
 	fmt.Fprintf(os.Stderr, "  spawn resume --sweep-id %s --detach\n", sweepID)
+
+	return nil
+}
+
+// launchWithBatchQueue launches a single instance with a batch job queue
+func launchWithBatchQueue(ctx context.Context, plat *platform.Platform) error {
+	fmt.Fprintf(os.Stderr, "\n📦 Launching Batch Queue Instance\n\n")
+
+	// Load and validate queue configuration
+	fmt.Fprintf(os.Stderr, "📋 Loading queue configuration...\n")
+	queueConfig, err := queue.LoadConfig(batchQueueFile)
+	if err != nil {
+		return fmt.Errorf("failed to load queue configuration: %w", err)
+	}
+	fmt.Fprintf(os.Stderr, "✓ Queue loaded: %d jobs\n", len(queueConfig.Jobs))
+
+	// Generate queue ID if not set
+	if queueConfig.QueueID == "" {
+		queueConfig.QueueID = queue.GenerateQueueID()
+	}
+
+	// Validate required flags
+	if instanceType == "" {
+		return fmt.Errorf("--instance-type is required for batch queue mode")
+	}
+
+	// Auto-detect region if not specified
+	queueRegion := region
+	if queueRegion == "" {
+		fmt.Fprintf(os.Stderr, "🌍 No region specified, auto-detecting closest region...\n")
+		detectedRegion, err := detectBestRegion(ctx, instanceType)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "⚠️  Could not auto-detect region: %v\n", err)
+			fmt.Fprintf(os.Stderr, "   Using default: us-east-1\n")
+			queueRegion = "us-east-1"
+		} else {
+			fmt.Fprintf(os.Stderr, "✓ Selected region: %s\n", detectedRegion)
+			queueRegion = detectedRegion
+		}
+	}
+
+	// Load AWS config for mycelium-dev (where EC2 instances run)
+	devCfg, err := config.LoadDefaultConfig(ctx,
+		config.WithRegion(queueRegion),
+		config.WithSharedConfigProfile("mycelium-dev"),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to load AWS config: %w", err)
+	}
+
+	// Get AWS account ID
+	stsClient := sts.NewFromConfig(devCfg)
+	identity, err := stsClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+	if err != nil {
+		return fmt.Errorf("failed to get caller identity: %w", err)
+	}
+	accountID := *identity.Account
+
+	// Upload queue configuration to S3
+	fmt.Fprintf(os.Stderr, "\n📤 Uploading queue configuration to S3...\n")
+
+	// Create queue JSON
+	queueJSON, err := json.MarshalIndent(queueConfig, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal queue config: %w", err)
+	}
+
+	// Write to temp file
+	tmpFile, err := os.CreateTemp("", "spawn-queue-*.json")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %w", err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	if _, err := tmpFile.Write(queueJSON); err != nil {
+		tmpFile.Close()
+		return fmt.Errorf("failed to write temp file: %w", err)
+	}
+	tmpFile.Close()
+
+	// Upload to S3
+	stagingClient := staging.NewClient(devCfg, accountID)
+	s3Key, size, _, err := stagingClient.UploadScheduleParams(ctx, tmpFile.Name(), queueConfig.QueueID, queueRegion)
+	if err != nil {
+		return fmt.Errorf("failed to upload queue config: %w", err)
+	}
+	fmt.Fprintf(os.Stderr, "✓ Uploaded: %s (%.2f KB)\n", s3Key, float64(size)/1024)
+
+	// Generate user-data with queue runner bootstrap
+	s3URL := fmt.Sprintf("s3://spawn-schedules-%s/%s", queueRegion, s3Key)
+	queueUserData := userdata.GenerateQueueRunnerUserData(s3URL, queueConfig.QueueID)
+
+	// Build launch config
+	launchConfig := &aws.LaunchConfig{
+		InstanceType: instanceType,
+		Region:       queueRegion,
+		AMI:          ami,
+		KeyName:      keyPair,
+		UserData:     queueUserData,
+		Spot:         spot,
+		SpotMaxPrice: spotMaxPrice,
+		Hibernate:    hibernate,
+		TTL:          queueConfig.GlobalTimeout, // Use global timeout as TTL
+		DNSName:      fmt.Sprintf("%s-%s", queueConfig.QueueName, queueConfig.QueueID),
+	}
+
+	// Add IAM role if specified
+	if iamRole != "" {
+		launchConfig.IamInstanceProfile = iamRole
+	}
+
+	// Add network config if specified
+	launchConfig.SecurityGroupIDs = []string{sgID}
+	launchConfig.SubnetID = subnetID
+
+	// Initialize AWS client
+	awsClient, err := aws.NewClient(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to initialize AWS client: %w", err)
+	}
+
+	// Launch instance
+	fmt.Fprintf(os.Stderr, "\n🚀 Launching instance...\n")
+	instance, err := awsClient.Launch(ctx, *launchConfig)
+	if err != nil {
+		return fmt.Errorf("failed to launch instance: %w", err)
+	}
+
+	fmt.Fprintf(os.Stderr, "\n✅ Batch queue instance launched!\n\n")
+	fmt.Fprintf(os.Stderr, "Queue ID:       %s\n", queueConfig.QueueID)
+	fmt.Fprintf(os.Stderr, "Instance ID:    %s\n", instance.InstanceID)
+	fmt.Fprintf(os.Stderr, "Instance Type:  %s\n", instanceType)
+	fmt.Fprintf(os.Stderr, "Region:         %s\n", queueRegion)
+	fmt.Fprintf(os.Stderr, "Total Jobs:     %d\n", len(queueConfig.Jobs))
+	fmt.Fprintf(os.Stderr, "Global Timeout: %s\n", queueConfig.GlobalTimeout)
+	fmt.Fprintf(os.Stderr, "\n")
+	fmt.Fprintf(os.Stderr, "The instance will execute jobs sequentially according to dependencies.\n")
+	fmt.Fprintf(os.Stderr, "Results will be uploaded to: %s/%s/\n", queueConfig.ResultS3Bucket, queueConfig.ResultS3Prefix)
+	fmt.Fprintf(os.Stderr, "\n")
+	fmt.Fprintf(os.Stderr, "To check queue status:\n")
+	fmt.Fprintf(os.Stderr, "  spawn queue status %s\n\n", instance.InstanceID)
+	fmt.Fprintf(os.Stderr, "To download results:\n")
+	fmt.Fprintf(os.Stderr, "  spawn queue results %s --output ./results/\n", queueConfig.QueueID)
+	fmt.Fprintf(os.Stderr, "\n")
 
 	return nil
 }

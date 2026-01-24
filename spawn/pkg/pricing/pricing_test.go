@@ -462,10 +462,10 @@ func TestCostEstimateDisplay(t *testing.T) {
 
 		// Check that output contains expected components
 		expectedStrings := []string{
-			"$10.50",       // Compute cost
-			"$0.0005",      // Lambda cost (detailed)
-			"$0.0000",      // Storage cost (detailed, very small)
-			"$10.50",       // Total cost
+			"$10.50",  // Compute cost
+			"$0.0005", // Lambda cost (detailed)
+			"$0.0000", // Storage cost (detailed, very small)
+			"$10.50",  // Total cost
 			"Compute",
 			"Lambda",
 			"Storage",

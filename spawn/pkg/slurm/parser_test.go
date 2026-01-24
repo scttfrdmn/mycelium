@@ -38,14 +38,14 @@ func TestParseTimeLimit(t *testing.T) {
 			expected: 1 * time.Hour,
 		},
 		{
-			name:     "Invalid format",
-			input:    "invalid",
-			wantErr:  true,
+			name:    "Invalid format",
+			input:   "invalid",
+			wantErr: true,
 		},
 		{
-			name:     "Too many colons",
-			input:    "1:2:3:4",
-			wantErr:  true,
+			name:    "Too many colons",
+			input:   "1:2:3:4",
+			wantErr: true,
 		},
 	}
 
@@ -111,9 +111,9 @@ func TestParseMemory(t *testing.T) {
 			expected: 16 * 1024,
 		},
 		{
-			name:     "Invalid format",
-			input:    "invalid",
-			wantErr:  true,
+			name:    "Invalid format",
+			input:   "invalid",
+			wantErr: true,
 		},
 	}
 
@@ -226,11 +226,11 @@ func TestParseArray(t *testing.T) {
 
 func TestParseGRES(t *testing.T) {
 	tests := []struct {
-		name        string
-		input       string
-		expectGPUs  int
-		expectType  string
-		wantErr     bool
+		name       string
+		input      string
+		expectGPUs int
+		expectType string
+		wantErr    bool
 	}{
 		{
 			name:       "GPU count only",

@@ -23,6 +23,9 @@ func main() {
 	// Handle subcommands
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
+		case "run-queue":
+			handleRunQueue()
+			os.Exit(0)
 		case "version":
 			fmt.Printf("spored version %s\n", Version)
 			os.Exit(0)
@@ -85,6 +88,28 @@ func main() {
 	agent.Cleanup(cleanupCtx)
 
 	log.Printf("spored stopped")
+}
+
+func handleRunQueue() {
+	if len(os.Args) < 3 {
+		fmt.Fprintf(os.Stderr, "Usage: spored run-queue <queue-file>\n")
+		os.Exit(1)
+	}
+
+	queueFile := os.Args[2]
+	ctx := context.Background()
+
+	runner, err := agent.NewQueueRunner(ctx, queueFile)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to initialize queue runner: %v\n", err)
+		os.Exit(1)
+	}
+
+	err = runner.Run()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Queue execution failed: %v\n", err)
+		os.Exit(1)
+	}
 }
 
 func handleStatus() {
@@ -616,6 +641,7 @@ func printHelp() {
 	fmt.Printf("spored v%s - Spawn EC2 instance agent\n\n", Version)
 	fmt.Println("Usage:")
 	fmt.Println("  spored                Run as daemon (monitors instance lifecycle)")
+	fmt.Println("  spored run-queue      Execute a batch job queue")
 	fmt.Println("  spored status         Show configuration and monitoring status")
 	fmt.Println("  spored reload         Reload configuration from EC2 tags")
 	fmt.Println("  spored config         Manage configuration settings")

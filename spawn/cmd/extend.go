@@ -10,8 +10,8 @@ import (
 	"strings"
 
 	"github.com/scttfrdmn/mycelium/pkg/i18n"
-	"github.com/spf13/cobra"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/aws"
+	"github.com/spf13/cobra"
 )
 
 var (

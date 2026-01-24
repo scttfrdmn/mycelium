@@ -27,9 +27,9 @@ import (
 )
 
 const (
-	tableName       = "spawn-sweep-orchestration"
-	maxExecutionDur = 13 * time.Minute
-	pollInterval    = 10 * time.Second
+	tableName        = "spawn-sweep-orchestration"
+	maxExecutionDur  = 13 * time.Minute
+	pollInterval     = 10 * time.Second
 	crossAccountRole = "arn:aws:iam::%s:role/SpawnSweepCrossAccountRole"
 )
 
@@ -66,36 +66,40 @@ type SweepEvent struct {
 
 // SweepRecord is the DynamoDB record structure
 type SweepRecord struct {
-	SweepID         string                      `dynamodbav:"sweep_id"`
-	SweepName       string                      `dynamodbav:"sweep_name"`
-	UserID          string                      `dynamodbav:"user_id"`
-	CreatedAt       string                      `dynamodbav:"created_at"`
-	UpdatedAt       string                      `dynamodbav:"updated_at"`
-	CompletedAt     string                      `dynamodbav:"completed_at,omitempty"`
-	S3ParamsKey            string                      `dynamodbav:"s3_params_key"`
-	MaxConcurrent          int                         `dynamodbav:"max_concurrent"`
-	MaxConcurrentPerRegion int                         `dynamodbav:"max_concurrent_per_region,omitempty"`
-	LaunchDelay            string                      `dynamodbav:"launch_delay"`
-	TotalParams     int                         `dynamodbav:"total_params"`
-	Region          string                      `dynamodbav:"region"`
-	AWSAccountID    string                      `dynamodbav:"aws_account_id"`
-	Status          string                      `dynamodbav:"status"`
-	CancelRequested bool                        `dynamodbav:"cancel_requested"`
-	EstimatedCost   float64                     `dynamodbav:"estimated_cost,omitempty"`
-	NextToLaunch    int                         `dynamodbav:"next_to_launch"`
-	Launched        int                         `dynamodbav:"launched"`
-	Failed          int                         `dynamodbav:"failed"`
-	ErrorMessage    string                      `dynamodbav:"error_message,omitempty"`
-	Instances       []SweepInstance             `dynamodbav:"instances"`
+	SweepID                string          `dynamodbav:"sweep_id"`
+	SweepName              string          `dynamodbav:"sweep_name"`
+	UserID                 string          `dynamodbav:"user_id"`
+	CreatedAt              string          `dynamodbav:"created_at"`
+	UpdatedAt              string          `dynamodbav:"updated_at"`
+	CompletedAt            string          `dynamodbav:"completed_at,omitempty"`
+	S3ParamsKey            string          `dynamodbav:"s3_params_key"`
+	MaxConcurrent          int             `dynamodbav:"max_concurrent"`
+	MaxConcurrentPerRegion int             `dynamodbav:"max_concurrent_per_region,omitempty"`
+	LaunchDelay            string          `dynamodbav:"launch_delay"`
+	TotalParams            int             `dynamodbav:"total_params"`
+	Region                 string          `dynamodbav:"region"`
+	AWSAccountID           string          `dynamodbav:"aws_account_id"`
+	Status                 string          `dynamodbav:"status"`
+	CancelRequested        bool            `dynamodbav:"cancel_requested"`
+	EstimatedCost          float64         `dynamodbav:"estimated_cost,omitempty"`
+	NextToLaunch           int             `dynamodbav:"next_to_launch"`
+	Launched               int             `dynamodbav:"launched"`
+	Failed                 int             `dynamodbav:"failed"`
+	ErrorMessage           string          `dynamodbav:"error_message,omitempty"`
+	Instances              []SweepInstance `dynamodbav:"instances"`
 
 	// Multi-region support
-	MultiRegion      bool                        `dynamodbav:"multi_region"`
-	RegionStatus     map[string]*RegionProgress  `dynamodbav:"region_status,omitempty"`
-	DistributionMode string                      `dynamodbav:"distribution_mode,omitempty"` // "balanced" or "opportunistic"
+	MultiRegion      bool                       `dynamodbav:"multi_region"`
+	RegionStatus     map[string]*RegionProgress `dynamodbav:"region_status,omitempty"`
+	DistributionMode string                     `dynamodbav:"distribution_mode,omitempty"` // "balanced" or "opportunistic"
 
 	// MPI support
 	PlacementGroup string `dynamodbav:"placement_group,omitempty"`
 	EFAEnabled     bool   `dynamodbav:"efa_enabled,omitempty"`
+
+	// Schedule integration
+	Source     string `dynamodbav:"source,omitempty"`      // "cli" | "scheduled"
+	ScheduleID string `dynamodbav:"schedule_id,omitempty"` // For traceability
 }
 
 // RegionProgress tracks per-region sweep progress
@@ -142,18 +146,18 @@ type LaunchConfig struct {
 
 // RegionalOrchestrator manages EC2 clients for multi-region sweeps
 type RegionalOrchestrator struct {
-	ec2Clients   map[string]*ec2.Client
-	accountID    string
-	credentials  *ststypes.Credentials
-	mu           sync.Mutex
+	ec2Clients  map[string]*ec2.Client
+	accountID   string
+	credentials *ststypes.Credentials
+	mu          sync.Mutex
 }
 
 var (
-	awsCfg        aws.Config
+	awsCfg         aws.Config
 	dynamodbClient *dynamodb.Client
-	s3Client      *s3.Client
-	lambdaClient  *lambdasvc.Client
-	stsClient     *sts.Client
+	s3Client       *s3.Client
+	lambdaClient   *lambdasvc.Client
+	stsClient      *sts.Client
 )
 
 func init() {
@@ -821,20 +825,20 @@ func getPricingRate(region, instanceType string) float64 {
 	// Real implementation would use pkg/pricing.GetEC2HourlyRate()
 	// For now, use rough estimates
 	baseRates := map[string]float64{
-		"t3.micro":    0.0104,
-		"t3.small":    0.0208,
-		"t3.medium":   0.0416,
-		"t3.large":    0.0832,
-		"t3.xlarge":   0.1664,
-		"t3.2xlarge":  0.3328,
-		"m5.large":    0.096,
-		"m5.xlarge":   0.192,
-		"m5.2xlarge":  0.384,
-		"c5.large":    0.085,
-		"c5.xlarge":   0.17,
-		"c5.2xlarge":  0.34,
-		"c6i.large":   0.085,
-		"c6i.xlarge":  0.17,
+		"t3.micro":   0.0104,
+		"t3.small":   0.0208,
+		"t3.medium":  0.0416,
+		"t3.large":   0.0832,
+		"t3.xlarge":  0.1664,
+		"t3.2xlarge": 0.3328,
+		"m5.large":   0.096,
+		"m5.xlarge":  0.192,
+		"m5.2xlarge": 0.384,
+		"c5.large":   0.085,
+		"c5.xlarge":  0.17,
+		"c5.2xlarge": 0.34,
+		"c6i.large":  0.085,
+		"c6i.xlarge": 0.17,
 	}
 
 	rate, ok := baseRates[strings.ToLower(instanceType)]

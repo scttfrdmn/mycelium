@@ -72,11 +72,11 @@ func (c *Client) CreateAMI(ctx context.Context, region string, input CreateAMIIn
 
 	// Create the AMI
 	result, err := ec2Client.CreateImage(ctx, &ec2.CreateImageInput{
-		InstanceId:          aws.String(input.InstanceID),
-		Name:                aws.String(input.Name),
-		Description:         aws.String(input.Description),
-		NoReboot:            aws.Bool(input.NoReboot),
-		TagSpecifications:   tagSpecs,
+		InstanceId:        aws.String(input.InstanceID),
+		Name:              aws.String(input.Name),
+		Description:       aws.String(input.Description),
+		NoReboot:          aws.Bool(input.NoReboot),
+		TagSpecifications: tagSpecs,
 	})
 	if err != nil {
 		return "", fmt.Errorf("failed to create AMI: %w", err)

@@ -107,7 +107,7 @@ func TestParseDNSName(t *testing.T) {
 	}{
 		{"my-instance.1kpqzg2c.spore.host", "spore.host", "my-instance", "123456789012", false},
 		{"dev.9lir3wux.spore.host", "spore.host", "dev", "752123829273", false},
-		{"invalid.spore.host", "spore.host", "", "", true},                // Wrong format
+		{"invalid.spore.host", "spore.host", "", "", true},              // Wrong format
 		{"my-instance.1kpqzg2c.wrong.host", "spore.host", "", "", true}, // Wrong domain
 	}
 

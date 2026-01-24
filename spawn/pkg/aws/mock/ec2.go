@@ -45,40 +45,40 @@ type MockEC2Client struct {
 	InstanceTypes   map[string]*types.InstanceTypeInfo
 
 	// Errors to return for specific operations (for error testing)
-	RunInstancesErr            error
-	DescribeInstancesErr       error
-	TerminateInstancesErr      error
-	CreateTagsErr              error
-	DescribeRegionsErr         error
-	DescribeKeyPairsErr        error
-	ImportKeyPairErr           error
-	StopInstancesErr           error
-	StartInstancesErr          error
-	DescribeVpcsErr            error
-	DescribeSecurityGroupsErr  error
-	CreateSecurityGroupErr     error
-	CreatePlacementGroupErr    error
-	DeletePlacementGroupErr    error
-	DescribeInstanceTypesErr   error
-	DescribeImagesErr          error
+	RunInstancesErr           error
+	DescribeInstancesErr      error
+	TerminateInstancesErr     error
+	CreateTagsErr             error
+	DescribeRegionsErr        error
+	DescribeKeyPairsErr       error
+	ImportKeyPairErr          error
+	StopInstancesErr          error
+	StartInstancesErr         error
+	DescribeVpcsErr           error
+	DescribeSecurityGroupsErr error
+	CreateSecurityGroupErr    error
+	CreatePlacementGroupErr   error
+	DeletePlacementGroupErr   error
+	DescribeInstanceTypesErr  error
+	DescribeImagesErr         error
 
 	// Call tracking
-	RunInstancesCalls            int
-	DescribeInstancesCalls       int
-	TerminateInstancesCalls      int
-	CreateTagsCalls              int
-	DescribeRegionsCalls         int
-	DescribeKeyPairsCalls        int
-	ImportKeyPairCalls           int
-	StopInstancesCalls           int
-	StartInstancesCalls          int
-	DescribeVpcsCalls            int
-	DescribeSecurityGroupsCalls  int
-	CreateSecurityGroupCalls     int
-	CreatePlacementGroupCalls    int
-	DeletePlacementGroupCalls    int
-	DescribeInstanceTypesCalls   int
-	DescribeImagesCalls          int
+	RunInstancesCalls           int
+	DescribeInstancesCalls      int
+	TerminateInstancesCalls     int
+	CreateTagsCalls             int
+	DescribeRegionsCalls        int
+	DescribeKeyPairsCalls       int
+	ImportKeyPairCalls          int
+	StopInstancesCalls          int
+	StartInstancesCalls         int
+	DescribeVpcsCalls           int
+	DescribeSecurityGroupsCalls int
+	CreateSecurityGroupCalls    int
+	CreatePlacementGroupCalls   int
+	DeletePlacementGroupCalls   int
+	DescribeInstanceTypesCalls  int
+	DescribeImagesCalls         int
 }
 
 // NewMockEC2Client creates a new mock EC2 client with default data

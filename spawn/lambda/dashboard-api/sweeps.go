@@ -7,12 +7,12 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
-	"github.com/aws/aws-sdk-go-v2/config"
 )
 
 const (
@@ -28,7 +28,7 @@ func handleListSweeps(ctx context.Context, cfg aws.Config, userID string) (event
 
 	// Scan table (TODO: Add GSI on user_id for better performance)
 	scanInput := &dynamodb.ScanInput{
-		TableName: aws.String(dynamoSweepTable),
+		TableName:        aws.String(dynamoSweepTable),
 		FilterExpression: aws.String("user_id = :user_id"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":user_id": &types.AttributeValueMemberS{Value: userID},
@@ -253,8 +253,8 @@ func handleCancelSweep(ctx context.Context, cfg aws.Config, sweepID, userID stri
 
 	// Build response
 	response := CancelSweepResponse{
-		Success:            true,
-		Message:            "Sweep cancelled successfully",
+		Success:             true,
+		Message:             "Sweep cancelled successfully",
 		InstancesTerminated: len(instanceIDs),
 	}
 

@@ -501,8 +501,8 @@ func TestSortResultsByMetric(t *testing.T) {
 			expected: []string{"job2", "job3", "job1"}, // "charlie" > "bravo" > "alpha" (descending)
 		},
 		{
-			name: "Empty results",
-			results: []SweepResult{},
+			name:     "Empty results",
+			results:  []SweepResult{},
 			metric:   "score",
 			expected: []string{},
 		},

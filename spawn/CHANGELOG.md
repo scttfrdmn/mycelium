@@ -5,6 +5,124 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-01-23
+
+### Added - Scheduled Executions (Feature #51)
+
+#### EventBridge Scheduler Integration
+- **New Commands**: `spawn schedule create`, `spawn schedule list`, `spawn schedule describe`, `spawn schedule pause`, `spawn schedule resume`, `spawn schedule cancel`
+- Schedule parameter sweeps for future execution without keeping CLI running
+- One-time schedules with `--at` flag (ISO 8601 format)
+- Recurring schedules with `--cron` flag (Unix cron expressions)
+- Full timezone support via `--timezone` flag (IANA timezone database)
+- Execution limits via `--max-executions` and `--end-after` flags
+- Automatic sweep execution tracking in DynamoDB execution history
+
+#### Infrastructure
+- **DynamoDB Tables**: `spawn-schedules` and `spawn-schedule-history` with TTL
+- **Lambda Function**: `scheduler-handler` for EventBridge trigger processing
+- **S3 Buckets**: `spawn-schedules-{region}` for parameter file storage
+- **EventBridge Scheduler**: Dynamic schedule creation per user request
+- Cross-account IAM: Lambda in mycelium-infra → EC2 in mycelium-dev
+
+#### Features
+- Parameter file uploaded to S3 once, reused for each execution
+- Pause/resume schedules without losing configuration
+- Execution history with success/failure tracking
+- Automatic cleanup after 90 days (DynamoDB TTL)
+- Integration with existing sweep-orchestrator Lambda
+- Full traceability: schedules linked to sweep executions
+
+#### Documentation
+- **[SCHEDULED_EXECUTIONS_GUIDE.md](SCHEDULED_EXECUTIONS_GUIDE.md)**: Comprehensive 800+ line guide
+- Cron expression syntax and examples
+- Timezone handling and DST transitions
+- Best practices for scheduling strategies
+- Troubleshooting common issues
+
+### Added - Batch Queue Mode (Feature #52)
+
+#### Sequential Job Execution
+- **New Flag**: `spawn launch --batch-queue <file.json>` for sequential job pipelines
+- **New Commands**: `spawn queue status <instance-id>`, `spawn queue results <queue-id>`
+- Sequential job execution with dependency management
+- Job-level retry with exponential or fixed backoff
+- Global and per-job timeout enforcement
+- Environment variable injection per job
+
+#### Queue Features
+- **Dependency Resolution**: Topological sort (Kahn's algorithm) for DAG validation
+- **State Persistence**: Queue state saved to disk for crash recovery
+- **Resume Capability**: Automatic resume from checkpoint after instance restart
+- **Result Collection**: Incremental S3 upload of job outputs and logs
+- **Failure Handling**: Configurable actions (`stop` or `continue`) on job failure
+- **Result Paths**: Glob pattern support for collecting output files
+
+#### Spored Integration
+- New `spored run-queue` subcommand for queue execution
+- Atomic state file writes (temp + rename) for crash safety
+- Per-job stdout/stderr logging to `/var/log/spored/jobs/`
+- Signal handling (SIGTERM, SIGINT) for graceful shutdown
+- S3 upload of final queue state
+
+#### Documentation
+- **[BATCH_QUEUE_GUIDE.md](BATCH_QUEUE_GUIDE.md)**: Comprehensive 1,000+ line guide
+- Complete JSON schema reference
+- Dependency management patterns
+- Retry strategy configuration
+- ML pipeline examples (preprocess → train → evaluate → export)
+- Troubleshooting queue execution issues
+
+#### Examples
+- **[ml-pipeline-queue.json](examples/ml-pipeline-queue.json)**: Production ML pipeline
+- **[simple-queue.json](examples/simple-queue.json)**: Basic 3-step pipeline
+- **[schedule-params.yaml](examples/schedule-params.yaml)**: Scheduling example with 11 configs
+- **[simple-params.yaml](examples/simple-params.yaml)**: Simple 3-config sweep
+
+### Added - Combined Features
+
+#### Scheduled Batch Queues
+- Schedule sequential job pipelines for recurring execution
+- Example: Nightly ML training pipeline with preprocessing steps
+- Full integration: EventBridge → Lambda → EC2 batch queue
+- Execution history tracking for both schedules and queues
+
+### Changed
+
+#### Launch Command
+- Added `--batch-queue` flag for queue mode
+- Queue validation before instance launch
+- User-data generation for queue runner bootstrap
+- Single instance launch (no multi-region for queues)
+
+#### Sweep Orchestrator
+- Added `source` and `schedule_id` fields to sweep records
+- Support for scheduler-initiated sweeps
+- Backward compatible with CLI-initiated sweeps
+
+#### Data Staging
+- Added `UploadScheduleParams()` method for schedule parameter uploads
+- Reuses existing multipart upload infrastructure
+
+### Fixed
+- Deprecated `io/ioutil` usage replaced with `io` and `os` packages
+- Unnecessary nil checks removed for slice operations
+- Optimized loop performance with direct append operations
+- EventBridge Scheduler API field names corrected
+
+### Testing
+
+#### Unit Tests
+- **pkg/scheduler/scheduler_test.go**: Schedule CRUD, EventBridge integration (69.7% coverage)
+- **pkg/queue/queue_test.go**: Queue validation, config parsing (78.4% coverage)
+- **pkg/queue/dependency_test.go**: Topological sort, cycle detection (78.4% coverage)
+- **pkg/agent/queue_runner_test.go**: Job execution, state management, retry logic
+
+#### Test Coverage
+- Scheduler package: 69.7%
+- Queue package: 78.4%
+- Integration tests pending deployment
+
 ## [0.9.0] - 2026-01-22
 
 ### Added - HPC Integration & Cloud Migration

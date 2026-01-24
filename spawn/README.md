@@ -65,6 +65,8 @@ spawn --instance-type m7i.large --region us-east-1 --ttl 8h
 - **☁️ Detached Mode**: Lambda-orchestrated parameter sweeps that survive laptop disconnection ([docs](PARAMETER_SWEEPS.md))
 - **🖥️ Slurm Integration**: Run existing Slurm batch scripts on AWS without modification ([docs](SLURM_GUIDE.md))
 - **📦 Data Staging**: Efficient multi-region data distribution with 90-99% cost savings ([docs](DATA_STAGING_GUIDE.md))
+- **⏰ Scheduled Executions**: Schedule parameter sweeps for future execution via EventBridge Scheduler ([docs](SCHEDULED_EXECUTIONS_GUIDE.md))
+- **🔄 Batch Queue Mode**: Sequential job execution with dependency management, retry logic, and state persistence ([docs](BATCH_QUEUE_GUIDE.md))
 
 ## 📦 Installation
 
@@ -474,6 +476,103 @@ spawn connect i-xxx --key my-project-key
 - User: Detected from AMI (usually `ec2-user` for Amazon Linux)
 - Port: `22`
 - Key: Auto-detected from `~/.ssh/` (checks multiple patterns)
+
+### spawn schedule
+
+Schedule parameter sweeps for future execution via AWS EventBridge Scheduler. Supports both one-time and recurring schedules.
+
+```bash
+# One-time schedule (specific date/time)
+spawn schedule create params.yaml \
+  --at "2026-01-24T02:00:00" \
+  --timezone "America/New_York" \
+  --name "nightly-training"
+
+# Recurring schedule (cron expression)
+spawn schedule create params.yaml \
+  --cron "0 2 * * *" \
+  --timezone "America/New_York" \
+  --name "daily-sweep" \
+  --max-executions 30
+
+# With end date
+spawn schedule create params.yaml \
+  --cron "0 */6 * * *" \
+  --end-after "2026-03-01T00:00:00Z" \
+  --name "quarterly-experiment"
+
+# List all schedules
+spawn schedule list
+spawn schedule list --status active
+
+# View schedule details and execution history
+spawn schedule describe <schedule-id>
+
+# Pause/resume schedules
+spawn schedule pause <schedule-id>
+spawn schedule resume <schedule-id>
+
+# Cancel schedule (prevents future executions)
+spawn schedule cancel <schedule-id>
+```
+
+**Common cron patterns:**
+```
+0 2 * * *       # Daily at 2 AM
+0 */6 * * *     # Every 6 hours
+0 0 * * 0       # Weekly on Sunday at midnight
+0 9 * * 1-5     # Weekdays at 9 AM
+*/30 * * * *    # Every 30 minutes
+```
+
+**Features:**
+- No CLI running required - EventBridge triggers automatically
+- Timezone support for consistent scheduling across regions
+- Execution limits via `--max-executions` or `--end-after`
+- Full execution history tracking
+- Parameter file uploaded to S3 once (reused for each execution)
+
+See [SCHEDULED_EXECUTIONS_GUIDE.md](SCHEDULED_EXECUTIONS_GUIDE.md) for complete documentation.
+
+### spawn queue
+
+Monitor and manage batch job queues running on EC2 instances.
+
+```bash
+# Check queue execution status
+spawn queue status <instance-id>
+# Shows: queue ID, status, job progress, current/completed jobs
+
+# Download all results from completed queue
+spawn queue results <queue-id> --output ./results/
+# Downloads: job outputs, logs (stdout/stderr), result files
+
+# Launch with batch queue (see spawn launch --batch-queue)
+spawn launch --instance-type g5.2xlarge --batch-queue ml-pipeline.json
+```
+
+**Example queue status output:**
+```
+Queue: queue-20260123-140532
+Status: running
+Started: 2026-01-23 14:05:32
+
+Jobs:
+  preprocess       completed    Attempt: 1
+  train            running      Attempt: 1
+    PID: 12345
+  evaluate         pending      Attempt: 0
+  export           pending      Attempt: 0
+```
+
+**Features:**
+- Real-time job status monitoring
+- Automatic result collection from S3
+- Resume capability after failures
+- Per-job retry with exponential backoff
+- Sequential execution with dependency management
+
+See [BATCH_QUEUE_GUIDE.md](BATCH_QUEUE_GUIDE.md) for complete documentation.
 
 ## 🎓 Usage
 

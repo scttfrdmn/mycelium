@@ -32,46 +32,46 @@ type MockS3Client struct {
 	Objects map[string]map[string]*Object // bucket -> key -> object
 
 	// Errors to return for specific operations
-	CreateBucketErr                     error
-	HeadBucketErr                       error
-	PutBucketTaggingErr                 error
-	PutBucketLifecycleConfigurationErr  error
-	PutObjectErr                        error
-	GetObjectErr                        error
-	HeadObjectErr                       error
-	ListObjectsV2Err                    error
-	DeleteObjectErr                     error
-	CopyObjectErr                       error
+	CreateBucketErr                    error
+	HeadBucketErr                      error
+	PutBucketTaggingErr                error
+	PutBucketLifecycleConfigurationErr error
+	PutObjectErr                       error
+	GetObjectErr                       error
+	HeadObjectErr                      error
+	ListObjectsV2Err                   error
+	DeleteObjectErr                    error
+	CopyObjectErr                      error
 
 	// Call tracking
-	CreateBucketCalls                     int
-	HeadBucketCalls                       int
-	PutBucketTaggingCalls                 int
-	PutBucketLifecycleConfigurationCalls  int
-	PutObjectCalls                        int
-	GetObjectCalls                        int
-	HeadObjectCalls                       int
-	ListObjectsV2Calls                    int
-	DeleteObjectCalls                     int
-	CopyObjectCalls                       int
+	CreateBucketCalls                    int
+	HeadBucketCalls                      int
+	PutBucketTaggingCalls                int
+	PutBucketLifecycleConfigurationCalls int
+	PutObjectCalls                       int
+	GetObjectCalls                       int
+	HeadObjectCalls                      int
+	ListObjectsV2Calls                   int
+	DeleteObjectCalls                    int
+	CopyObjectCalls                      int
 }
 
 // Bucket represents a mock S3 bucket
 type Bucket struct {
-	Name                string
-	Region              string
-	Tags                []types.Tag
-	LifecycleRules      []types.LifecycleRule
+	Name           string
+	Region         string
+	Tags           []types.Tag
+	LifecycleRules []types.LifecycleRule
 }
 
 // Object represents a mock S3 object
 type Object struct {
-	Key          string
-	Data         []byte
-	Metadata     map[string]string
-	ContentType  *string
-	Size         int64
-	ETag         *string
+	Key         string
+	Data        []byte
+	Metadata    map[string]string
+	ContentType *string
+	Size        int64
+	ETag        *string
 }
 
 // NewMockS3Client creates a new mock S3 client

@@ -26,18 +26,18 @@ type SweepConfig struct {
 
 // SweepState tracks the state of a parameter sweep
 type SweepState struct {
-	SweepID      string          `json:"sweep_id"`
-	SweepName    string          `json:"sweep_name"`
-	CreatedAt    time.Time       `json:"created_at"`
-	ParamFile    string          `json:"param_file"`
-	TotalParams  int             `json:"total_params"`
-	MaxConcurrent int            `json:"max_concurrent"`
-	LaunchDelay  string          `json:"launch_delay"`
-	Completed    int             `json:"completed"`
-	Running      int             `json:"running"`
-	Pending      int             `json:"pending"`
-	Failed       int             `json:"failed"`
-	Instances    []InstanceState `json:"instances"`
+	SweepID       string          `json:"sweep_id"`
+	SweepName     string          `json:"sweep_name"`
+	CreatedAt     time.Time       `json:"created_at"`
+	ParamFile     string          `json:"param_file"`
+	TotalParams   int             `json:"total_params"`
+	MaxConcurrent int             `json:"max_concurrent"`
+	LaunchDelay   string          `json:"launch_delay"`
+	Completed     int             `json:"completed"`
+	Running       int             `json:"running"`
+	Pending       int             `json:"pending"`
+	Failed        int             `json:"failed"`
+	Instances     []InstanceState `json:"instances"`
 }
 
 // InstanceState tracks the state of a single instance in a sweep

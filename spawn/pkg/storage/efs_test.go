@@ -9,13 +9,13 @@ import (
 // TestGetEFSProfile tests EFS profile retrieval
 func TestGetEFSProfile(t *testing.T) {
 	tests := []struct {
-		name          string
-		profile       EFSProfile
-		wantErr       bool
-		checkRSize    int
-		checkWSize    int
-		checkAsync    bool
-		checkActimeO  int
+		name         string
+		profile      EFSProfile
+		wantErr      bool
+		checkRSize   int
+		checkWSize   int
+		checkAsync   bool
+		checkActimeO int
 	}{
 		{
 			name:         "general profile",
@@ -323,11 +323,11 @@ func TestParseCustomOptions(t *testing.T) {
 			checkNFSVers: "4.1",
 		},
 		{
-			name:         "custom rsize and wsize",
-			optString:    "rsize=524288,wsize=524288",
-			wantErr:      false,
-			checkRSize:   524288,
-			checkWSize:   524288,
+			name:       "custom rsize and wsize",
+			optString:  "rsize=524288,wsize=524288",
+			wantErr:    false,
+			checkRSize: 524288,
+			checkWSize: 524288,
 		},
 		{
 			name:         "custom timeo and retrans",
@@ -337,10 +337,10 @@ func TestParseCustomOptions(t *testing.T) {
 			checkRetrans: 5,
 		},
 		{
-			name:         "enable async",
-			optString:    "async",
-			wantErr:      false,
-			checkAsync:   true,
+			name:       "enable async",
+			optString:  "async",
+			wantErr:    false,
+			checkAsync: true,
 		},
 		{
 			name:           "soft mount",
@@ -364,12 +364,12 @@ func TestParseCustomOptions(t *testing.T) {
 			checkActimeO: 5,
 		},
 		{
-			name:         "options with spaces",
-			optString:    "rsize=524288, wsize=524288, async",
-			wantErr:      false,
-			checkRSize:   524288,
-			checkWSize:   524288,
-			checkAsync:   true,
+			name:       "options with spaces",
+			optString:  "rsize=524288, wsize=524288, async",
+			wantErr:    false,
+			checkRSize: 524288,
+			checkWSize: 524288,
+			checkAsync: true,
 		},
 	}
 

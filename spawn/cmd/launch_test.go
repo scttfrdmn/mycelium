@@ -64,9 +64,9 @@ func TestParseTTL(t *testing.T) {
 // TestValidateRegion tests region validation logic
 func TestValidateRegion(t *testing.T) {
 	tests := []struct {
-		name    string
-		region  string
-		valid   bool
+		name   string
+		region string
+		valid  bool
 	}{
 		{
 			name:   "valid us-east-1",
@@ -175,11 +175,11 @@ func TestValidateInstanceType(t *testing.T) {
 // TestValidateJobArrayConfig tests job array configuration validation
 func TestValidateJobArrayConfig(t *testing.T) {
 	tests := []struct {
-		name          string
-		count         int
-		jobArrayName  string
-		wantErr       bool
-		errContains   string
+		name         string
+		count        int
+		jobArrayName string
+		wantErr      bool
+		errContains  string
 	}{
 		{
 			name:         "valid single instance",
@@ -289,9 +289,9 @@ func TestValidateMPIConfig(t *testing.T) {
 // TestValidateOnCompleteAction tests on-complete action validation
 func TestValidateOnCompleteAction(t *testing.T) {
 	tests := []struct {
-		name       string
-		action     string
-		wantErr    bool
+		name    string
+		action  string
+		wantErr bool
 	}{
 		{
 			name:    "valid terminate",
@@ -340,11 +340,11 @@ func TestValidateOnCompleteAction(t *testing.T) {
 // TestGenerateInstanceName tests instance name generation
 func TestGenerateInstanceName(t *testing.T) {
 	tests := []struct {
-		name          string
-		template      string
-		jobArrayName  string
-		index         int
-		want          string
+		name         string
+		template     string
+		jobArrayName string
+		index        int
+		want         string
 	}{
 		{
 			name:         "default template",
@@ -398,11 +398,11 @@ func TestGenerateInstanceName(t *testing.T) {
 // TestValidateIAMRoleConfig tests IAM role configuration validation
 func TestValidateIAMRoleConfig(t *testing.T) {
 	tests := []struct {
-		name              string
-		iamRole           string
-		iamPolicy         []string
+		name               string
+		iamRole            string
+		iamPolicy          []string
 		iamManagedPolicies []string
-		wantErr           bool
+		wantErr            bool
 	}{
 		{
 			name:    "use existing role",

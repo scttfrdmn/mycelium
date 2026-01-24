@@ -574,9 +574,7 @@ func writeCSV(results []SweepResult, outputFile string) error {
 	for _, k := range paramKeysSorted {
 		header = append(header, "param_"+k)
 	}
-	for _, k := range metricKeysSorted {
-		header = append(header, k)
-	}
+	header = append(header, metricKeysSorted...)
 	if err := writer.Write(header); err != nil {
 		return err
 	}

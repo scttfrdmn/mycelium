@@ -13,10 +13,10 @@ import (
 // TestSlurmConvert tests the slurm convert command
 func TestSlurmConvert(t *testing.T) {
 	tests := []struct {
-		name         string
-		script       string
-		wantErr      bool
-		checkOutput  bool
+		name        string
+		script      string
+		wantErr     bool
+		checkOutput bool
 	}{
 		{
 			name: "simple array job",
@@ -149,32 +149,32 @@ func TestSlurmArrayJobParsing(t *testing.T) {
 // TestSlurmTimeFormat tests parsing of Slurm time formats
 func TestSlurmTimeFormat(t *testing.T) {
 	tests := []struct {
-		name       string
-		timeStr    string
-		wantHours  int
+		name        string
+		timeStr     string
+		wantHours   int
 		wantMinutes int
-		wantErr    bool
+		wantErr     bool
 	}{
 		{
-			name:       "HH:MM:SS",
-			timeStr:    "01:30:00",
-			wantHours:  1,
+			name:        "HH:MM:SS",
+			timeStr:     "01:30:00",
+			wantHours:   1,
 			wantMinutes: 30,
-			wantErr:    false,
+			wantErr:     false,
 		},
 		{
-			name:       "MM:SS",
-			timeStr:    "45:00",
-			wantHours:  0,
+			name:        "MM:SS",
+			timeStr:     "45:00",
+			wantHours:   0,
 			wantMinutes: 45,
-			wantErr:    false,
+			wantErr:     false,
 		},
 		{
-			name:       "days-hours",
-			timeStr:    "2-12:00:00",
-			wantHours:  60, // 2*24 + 12
+			name:        "days-hours",
+			timeStr:     "2-12:00:00",
+			wantHours:   60, // 2*24 + 12
 			wantMinutes: 0,
-			wantErr:    false,
+			wantErr:     false,
 		},
 	}
 
@@ -423,8 +423,8 @@ echo "hello"
 			wantErr: false,
 		},
 		{
-			name: "empty script",
-			script: "",
+			name:    "empty script",
+			script:  "",
 			wantErr: true,
 			errMsg:  "empty",
 		},

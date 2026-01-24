@@ -17,25 +17,25 @@ type SlurmJob struct {
 	ScriptLines []string
 
 	// SBATCH directives
-	JobName         string
-	Partition       string
-	TimeLimit       time.Duration
-	MemoryMB        int
-	CPUsPerTask     int
-	Nodes           int
-	TasksPerNode    int
-	GPUs            int
-	GPUType         string
-	Array           *ArraySpec
-	Output          string
-	Error           string
-	MailType        string
-	MailUser        string
-	WorkingDir      string
-	ExcludeNodes    []string
-	Constraint      string
-	QOS             string
-	Account         string
+	JobName      string
+	Partition    string
+	TimeLimit    time.Duration
+	MemoryMB     int
+	CPUsPerTask  int
+	Nodes        int
+	TasksPerNode int
+	GPUs         int
+	GPUType      string
+	Array        *ArraySpec
+	Output       string
+	Error        string
+	MailType     string
+	MailUser     string
+	WorkingDir   string
+	ExcludeNodes []string
+	Constraint   string
+	QOS          string
+	Account      string
 
 	// Script body (non-SBATCH lines)
 	ScriptBody string
@@ -484,11 +484,11 @@ func parseArray(s string) (*ArraySpec, error) {
 // isBooleanFlag returns true if the flag is a boolean flag (no value)
 func isBooleanFlag(key string) bool {
 	boolFlags := map[string]bool{
-		"wait":      true,
-		"hold":      true,
-		"requeue":   true,
+		"wait":       true,
+		"hold":       true,
+		"requeue":    true,
 		"no-requeue": true,
-		"exclusive": true,
+		"exclusive":  true,
 	}
 	return boolFlags[key]
 }

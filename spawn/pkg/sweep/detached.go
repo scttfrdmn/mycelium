@@ -27,27 +27,27 @@ const (
 
 // SweepRecord represents the DynamoDB record structure
 type SweepRecord struct {
-	SweepID                string                     `dynamodbav:"sweep_id" json:"sweep_id"`
-	SweepName              string                     `dynamodbav:"sweep_name" json:"sweep_name"`
-	UserID                 string                     `dynamodbav:"user_id" json:"user_id"`
-	CreatedAt              string                     `dynamodbav:"created_at" json:"created_at"`
-	UpdatedAt              string                     `dynamodbav:"updated_at" json:"updated_at"`
-	CompletedAt            string                     `dynamodbav:"completed_at,omitempty" json:"completed_at,omitempty"`
-	S3ParamsKey            string                     `dynamodbav:"s3_params_key" json:"s3_params_key"`
-	MaxConcurrent          int                        `dynamodbav:"max_concurrent" json:"max_concurrent"`
-	MaxConcurrentPerRegion int                        `dynamodbav:"max_concurrent_per_region,omitempty" json:"max_concurrent_per_region,omitempty"`
-	LaunchDelay            string                     `dynamodbav:"launch_delay" json:"launch_delay"`
-	TotalParams            int                        `dynamodbav:"total_params" json:"total_params"`
-	Region                 string                     `dynamodbav:"region" json:"region"`
-	AWSAccountID           string                     `dynamodbav:"aws_account_id" json:"aws_account_id"`
-	Status                 string                     `dynamodbav:"status" json:"status"`
-	CancelRequested        bool                       `dynamodbav:"cancel_requested" json:"cancel_requested"`
-	EstimatedCost          float64                    `dynamodbav:"estimated_cost,omitempty" json:"estimated_cost,omitempty"`
-	NextToLaunch           int                        `dynamodbav:"next_to_launch" json:"next_to_launch"`
-	Launched               int                        `dynamodbav:"launched" json:"launched"`
-	Failed                 int                        `dynamodbav:"failed" json:"failed"`
-	ErrorMessage           string                     `dynamodbav:"error_message,omitempty" json:"error_message,omitempty"`
-	Instances              []SweepInstance            `dynamodbav:"instances" json:"instances"`
+	SweepID                string          `dynamodbav:"sweep_id" json:"sweep_id"`
+	SweepName              string          `dynamodbav:"sweep_name" json:"sweep_name"`
+	UserID                 string          `dynamodbav:"user_id" json:"user_id"`
+	CreatedAt              string          `dynamodbav:"created_at" json:"created_at"`
+	UpdatedAt              string          `dynamodbav:"updated_at" json:"updated_at"`
+	CompletedAt            string          `dynamodbav:"completed_at,omitempty" json:"completed_at,omitempty"`
+	S3ParamsKey            string          `dynamodbav:"s3_params_key" json:"s3_params_key"`
+	MaxConcurrent          int             `dynamodbav:"max_concurrent" json:"max_concurrent"`
+	MaxConcurrentPerRegion int             `dynamodbav:"max_concurrent_per_region,omitempty" json:"max_concurrent_per_region,omitempty"`
+	LaunchDelay            string          `dynamodbav:"launch_delay" json:"launch_delay"`
+	TotalParams            int             `dynamodbav:"total_params" json:"total_params"`
+	Region                 string          `dynamodbav:"region" json:"region"`
+	AWSAccountID           string          `dynamodbav:"aws_account_id" json:"aws_account_id"`
+	Status                 string          `dynamodbav:"status" json:"status"`
+	CancelRequested        bool            `dynamodbav:"cancel_requested" json:"cancel_requested"`
+	EstimatedCost          float64         `dynamodbav:"estimated_cost,omitempty" json:"estimated_cost,omitempty"`
+	NextToLaunch           int             `dynamodbav:"next_to_launch" json:"next_to_launch"`
+	Launched               int             `dynamodbav:"launched" json:"launched"`
+	Failed                 int             `dynamodbav:"failed" json:"failed"`
+	ErrorMessage           string          `dynamodbav:"error_message,omitempty" json:"error_message,omitempty"`
+	Instances              []SweepInstance `dynamodbav:"instances" json:"instances"`
 
 	// Multi-region support
 	MultiRegion      bool                       `dynamodbav:"multi_region" json:"multi_region"`

@@ -217,13 +217,13 @@ func TestStageDestinationPath(t *testing.T) {
 // TestStageEstimate tests cost estimation logic
 func TestStageEstimate(t *testing.T) {
 	tests := []struct {
-		name          string
-		dataSizeGB    int
-		instances     int
-		regionCount   int
-		wantStaging   float64  // Approximate staging cost
-		wantTransfer  float64  // Approximate transfer cost
-		savesPct      float64  // Expected savings percentage
+		name         string
+		dataSizeGB   int
+		instances    int
+		regionCount  int
+		wantStaging  float64 // Approximate staging cost
+		wantTransfer float64 // Approximate transfer cost
+		savesPct     float64 // Expected savings percentage
 	}{
 		{
 			name:        "100GB 2 regions 10 instances",

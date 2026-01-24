@@ -234,10 +234,10 @@ func TestCalculateScore(t *testing.T) {
 
 func TestCalculateScore_Boundaries(t *testing.T) {
 	tests := []struct {
-		name          string
-		stats         *AvailabilityStats
-		minExpected   float64
-		maxExpected   float64
+		name        string
+		stats       *AvailabilityStats
+		minExpected float64
+		maxExpected float64
 	}{
 		{
 			name: "Score should be between 0 and 1",

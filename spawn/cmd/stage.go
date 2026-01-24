@@ -14,12 +14,12 @@ import (
 )
 
 var (
-	stageRegions        string
-	stageDestination    string
-	stageSweepID        string
-	estimateDataSizeGB  int
-	estimateInstances   int
-	estimateRegions     string
+	stageRegions       string
+	stageDestination   string
+	stageSweepID       string
+	estimateDataSizeGB int
+	estimateInstances  int
+	estimateRegions    string
 )
 
 // stageCmd represents the stage command

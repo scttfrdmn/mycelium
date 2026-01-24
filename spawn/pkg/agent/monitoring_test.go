@@ -55,9 +55,9 @@ func TestGetDiskIO_ParsesDiskstats(t *testing.T) {
 // TestGetDiskIO_SkipsPartitions validates that partition entries are skipped
 func TestGetDiskIO_SkipsPartitions(t *testing.T) {
 	tests := []struct {
-		deviceName   string
-		shouldSkip   bool
-		description  string
+		deviceName  string
+		shouldSkip  bool
+		description string
 	}{
 		{"xvda", false, "Main xvd device (len=4, not > 4)"},
 		{"xvda1", true, "xvd partition (len=5, > 4 and ends with digit)"},
@@ -93,18 +93,18 @@ func TestGetDiskIO_DeviceTypesRecognized(t *testing.T) {
 		deviceName string
 		recognized bool
 	}{
-		{"xvda", true},   // Xen virtual disk
+		{"xvda", true}, // Xen virtual disk
 		{"xvdb", true},
 		{"nvme0n1", true}, // NVMe SSD
 		{"nvme1n1", true},
-		{"sda", true},     // SCSI/SATA
+		{"sda", true}, // SCSI/SATA
 		{"sdb", true},
-		{"vda", true},     // virtio disk
+		{"vda", true}, // virtio disk
 		{"vdb", true},
-		{"hda", false},    // IDE (not in filter)
-		{"loop0", false},  // Loop device (not in filter)
-		{"dm-0", false},   // Device mapper (not in filter)
-		{"sr0", false},    // CD-ROM (not in filter)
+		{"hda", false},   // IDE (not in filter)
+		{"loop0", false}, // Loop device (not in filter)
+		{"dm-0", false},  // Device mapper (not in filter)
+		{"sr0", false},   // CD-ROM (not in filter)
 	}
 
 	for _, tt := range tests {
@@ -167,9 +167,9 @@ func TestGetGPUUtilization_NoNvidiaSmi(t *testing.T) {
 func TestGetGPUUtilization_ParsesOutput(t *testing.T) {
 	// Test parsing logic for nvidia-smi output format
 	tests := []struct {
-		output          string
-		expectedMax     float64
-		description     string
+		output      string
+		expectedMax float64
+		description string
 	}{
 		{"50\n", 50.0, "Single GPU at 50%"},
 		{"25\n75\n", 75.0, "Two GPUs, max is 75%"},
@@ -207,11 +207,11 @@ func TestGetGPUUtilization_ParsesOutput(t *testing.T) {
 func TestGetGPUUtilization_MaxAcrossGPUs(t *testing.T) {
 	// Simulate finding max across multiple GPUs
 	gpuUtilizations := [][]float64{
-		{25.0, 50.0, 75.0},       // Max should be 75.0
-		{10.0, 5.0, 3.0},         // Max should be 10.0
-		{0.0, 0.0, 0.0},          // Max should be 0.0
-		{45.5, 45.4, 45.6},       // Max should be 45.6
-		{100.0, 99.0, 98.0},      // Max should be 100.0
+		{25.0, 50.0, 75.0},  // Max should be 75.0
+		{10.0, 5.0, 3.0},    // Max should be 10.0
+		{0.0, 0.0, 0.0},     // Max should be 0.0
+		{45.5, 45.4, 45.6},  // Max should be 45.6
+		{100.0, 99.0, 98.0}, // Max should be 100.0
 	}
 
 	for _, utils := range gpuUtilizations {
@@ -243,16 +243,16 @@ func TestIsIdle_DiskIOThreshold(t *testing.T) {
 	threshold := int64(100000) // 100KB
 
 	tests := []struct {
-		diskIO    int64
+		diskIO       int64
 		shouldBeIdle bool
 	}{
-		{0, true},           // No disk I/O - idle
-		{50000, true},       // 50KB - under threshold
-		{99999, true},       // Just under threshold
-		{100000, true},      // At threshold
-		{100001, false},     // Just over threshold
-		{200000, false},     // Well over threshold
-		{1000000, false},    // 1MB - definitely not idle
+		{0, true},        // No disk I/O - idle
+		{50000, true},    // 50KB - under threshold
+		{99999, true},    // Just under threshold
+		{100000, true},   // At threshold
+		{100001, false},  // Just over threshold
+		{200000, false},  // Well over threshold
+		{1000000, false}, // 1MB - definitely not idle
 	}
 
 	for _, tt := range tests {
@@ -305,12 +305,12 @@ func TestIsIdle_NetworkThreshold(t *testing.T) {
 		networkBytes int64
 		shouldBeIdle bool
 	}{
-		{0, true},       // No network traffic - idle
-		{5000, true},    // 5KB - under threshold
-		{9999, true},    // Just under threshold
-		{10000, true},   // At threshold
-		{10001, false},  // Just over threshold
-		{50000, false},  // 50KB - over threshold
+		{0, true},        // No network traffic - idle
+		{5000, true},     // 5KB - under threshold
+		{9999, true},     // Just under threshold
+		{10000, true},    // At threshold
+		{10001, false},   // Just over threshold
+		{50000, false},   // 50KB - over threshold
 		{1000000, false}, // 1MB - definitely not idle
 	}
 
@@ -329,13 +329,13 @@ func TestIsIdle_NetworkThreshold(t *testing.T) {
 // TestIsIdle_AllConditions validates that ALL conditions must be met for idle
 func TestIsIdle_AllConditions(t *testing.T) {
 	tests := []struct {
-		name          string
-		cpuUsage      float64
-		cpuThreshold  float64
-		networkBytes  int64
-		diskIO        int64
-		gpuUtil       float64
-		expectedIdle  bool
+		name         string
+		cpuUsage     float64
+		cpuThreshold float64
+		networkBytes int64
+		diskIO       int64
+		gpuUtil      float64
+		expectedIdle bool
 	}{
 		{
 			name:         "All metrics idle",

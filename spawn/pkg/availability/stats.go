@@ -22,15 +22,15 @@ const (
 
 // AvailabilityStats represents availability statistics for a region+instance_type combination
 type AvailabilityStats struct {
-	StatID           string `dynamodbav:"stat_id"`           // "{region}#{instance_type}"
+	StatID           string `dynamodbav:"stat_id"` // "{region}#{instance_type}"
 	Region           string `dynamodbav:"region"`
 	InstanceType     string `dynamodbav:"instance_type"`
 	SuccessCount     int    `dynamodbav:"success_count"`
 	FailureCount     int    `dynamodbav:"failure_count"`
-	ConsecutiveFails int    `dynamodbav:"consecutive_fails"` // For exponential backoff
-	LastSuccess      string `dynamodbav:"last_success"`      // RFC3339 timestamp
-	LastFailure      string `dynamodbav:"last_failure"`      // RFC3339 timestamp
-	LastErrorCode    string `dynamodbav:"last_error_code"`   // e.g., "InsufficientInstanceCapacity"
+	ConsecutiveFails int    `dynamodbav:"consecutive_fails"`       // For exponential backoff
+	LastSuccess      string `dynamodbav:"last_success"`            // RFC3339 timestamp
+	LastFailure      string `dynamodbav:"last_failure"`            // RFC3339 timestamp
+	LastErrorCode    string `dynamodbav:"last_error_code"`         // e.g., "InsufficientInstanceCapacity"
 	BackoffUntil     string `dynamodbav:"backoff_until,omitempty"` // RFC3339 timestamp
 	UpdatedAt        string `dynamodbav:"updated_at"`              // RFC3339 timestamp
 	TTLTimestamp     int64  `dynamodbav:"ttl_timestamp"`           // Unix epoch for DynamoDB TTL
@@ -157,7 +157,7 @@ func RecordFailure(ctx context.Context, client *dynamodb.Client, region, instanc
 	}
 
 	_, err = client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
-		TableName:                 aws.String(availabilityTableName),
+		TableName: aws.String(availabilityTableName),
 		Key: map[string]types.AttributeValue{
 			"stat_id": &types.AttributeValueMemberS{Value: statID},
 		},

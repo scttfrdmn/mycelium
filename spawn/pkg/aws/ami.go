@@ -21,7 +21,7 @@ var amiParameters = map[string]string{
 	// Standard AL2023
 	AMI_AL2023_X86: "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64",
 	AMI_AL2023_ARM: "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64",
-	
+
 	// GPU-enabled AL2023 (NVIDIA drivers pre-installed)
 	AMI_AL2023_GPU_X86: "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-gpu-x86_64",
 	AMI_AL2023_GPU_ARM: "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-gpu-arm64",
@@ -55,21 +55,21 @@ func (c *Client) GetAL2023AMI(ctx context.Context, region string, arch string, g
 	cfg := c.cfg
 	cfg.Region = region
 	ssmClient := ssm.NewFromConfig(cfg)
-	
+
 	output, err := ssmClient.GetParameter(ctx, &ssm.GetParameterInput{
 		Name: aws.String(parameterName),
 	})
-	
+
 	if err != nil {
 		return "", fmt.Errorf("failed to get AMI from SSM: %w", err)
 	}
-	
+
 	if output.Parameter == nil || output.Parameter.Value == nil {
 		return "", fmt.Errorf("AMI parameter value is nil")
 	}
-	
+
 	amiID := *output.Parameter.Value
-	
+
 	return amiID, nil
 }
 
@@ -88,7 +88,7 @@ func DetectGPUInstance(instanceType string) bool {
 		"inf1": true, // Inferentia
 		"trn1": true, // Trainium
 	}
-	
+
 	// Extract family (e.g., "p5" from "p5.48xlarge")
 	family := ""
 	for i, char := range instanceType {
@@ -97,7 +97,7 @@ func DetectGPUInstance(instanceType string) bool {
 			break
 		}
 	}
-	
+
 	return gpuFamilies[family]
 }
 
@@ -110,9 +110,9 @@ func DetectArchitecture(instanceType string) string {
 		"c6g": true, "c6gd": true, "c6gn": true, "c7g": true, "c7gd": true, "c7gn": true, "c8g": true,
 		"r6g": true, "r6gd": true, "r7g": true, "r7gd": true, "r8g": true,
 		"x2gd": true,
-		"g5g": true, // ARM GPU
+		"g5g":  true, // ARM GPU
 	}
-	
+
 	// Extract family
 	family := ""
 	for i, char := range instanceType {
@@ -121,11 +121,11 @@ func DetectArchitecture(instanceType string) string {
 			break
 		}
 	}
-	
+
 	if armFamilies[family] {
 		return "arm64"
 	}
-	
+
 	return "x86_64"
 }
 

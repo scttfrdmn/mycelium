@@ -27,10 +27,10 @@ func TestClientCreation(t *testing.T) {
 // TestGetEnabledRegions tests fetching enabled AWS regions
 func TestGetEnabledRegions(t *testing.T) {
 	tests := []struct {
-		name       string
+		name        string
 		mockRegions []types.Region
-		wantErr    bool
-		wantCount  int
+		wantErr     bool
+		wantCount   int
 	}{
 		{
 			name: "standard regions",
@@ -267,9 +267,9 @@ func TestParameterSweepConfig(t *testing.T) {
 // TestTTLValidation tests TTL string validation
 func TestTTLValidation(t *testing.T) {
 	tests := []struct {
-		name    string
-		ttl     string
-		valid   bool
+		name  string
+		ttl   string
+		valid bool
 	}{
 		{
 			name:  "valid hours",
@@ -319,9 +319,9 @@ func TestTTLValidation(t *testing.T) {
 // TestOnCompleteAction tests on-complete action validation
 func TestOnCompleteAction(t *testing.T) {
 	tests := []struct {
-		name       string
-		action     string
-		valid      bool
+		name   string
+		action string
+		valid  bool
 	}{
 		{
 			name:   "terminate",

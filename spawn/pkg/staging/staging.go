@@ -33,10 +33,10 @@ type StagingMetadata struct {
 
 // Client handles data staging operations
 type Client struct {
-	s3Client      *s3.Client
-	dynamoClient  *dynamodb.Client
-	uploader      *manager.Uploader
-	accountID     string
+	s3Client     *s3.Client
+	dynamoClient *dynamodb.Client
+	uploader     *manager.Uploader
+	accountID    string
 }
 
 // NewClient creates a new staging client
@@ -124,13 +124,13 @@ func (c *Client) RecordMetadata(ctx context.Context, metadata StagingMetadata) e
 	metadata.TTL = time.Now().Add(8 * 24 * time.Hour).Unix()
 
 	item := map[string]dynamodbtypes.AttributeValue{
-		"staging_id":  &dynamodbtypes.AttributeValueMemberS{Value: metadata.StagingID},
-		"local_path":  &dynamodbtypes.AttributeValueMemberS{Value: metadata.LocalPath},
-		"s3_key":      &dynamodbtypes.AttributeValueMemberS{Value: metadata.S3Key},
-		"created_at":  &dynamodbtypes.AttributeValueMemberS{Value: metadata.CreatedAt.Format(time.RFC3339)},
-		"size_bytes":  &dynamodbtypes.AttributeValueMemberN{Value: fmt.Sprintf("%d", metadata.SizeBytes)},
-		"sha256":      &dynamodbtypes.AttributeValueMemberS{Value: metadata.SHA256},
-		"ttl":         &dynamodbtypes.AttributeValueMemberN{Value: fmt.Sprintf("%d", metadata.TTL)},
+		"staging_id": &dynamodbtypes.AttributeValueMemberS{Value: metadata.StagingID},
+		"local_path": &dynamodbtypes.AttributeValueMemberS{Value: metadata.LocalPath},
+		"s3_key":     &dynamodbtypes.AttributeValueMemberS{Value: metadata.S3Key},
+		"created_at": &dynamodbtypes.AttributeValueMemberS{Value: metadata.CreatedAt.Format(time.RFC3339)},
+		"size_bytes": &dynamodbtypes.AttributeValueMemberN{Value: fmt.Sprintf("%d", metadata.SizeBytes)},
+		"sha256":     &dynamodbtypes.AttributeValueMemberS{Value: metadata.SHA256},
+		"ttl":        &dynamodbtypes.AttributeValueMemberN{Value: fmt.Sprintf("%d", metadata.TTL)},
 	}
 
 	// Add regions list
@@ -263,4 +263,47 @@ func (c *Client) DeleteStaging(ctx context.Context, stagingID string) error {
 		},
 	})
 	return err
+}
+
+// UploadScheduleParams uploads a parameter file for scheduled execution
+func (c *Client) UploadScheduleParams(ctx context.Context, localPath, scheduleID, region string) (string, int64, string, error) {
+	bucket := fmt.Sprintf("spawn-schedules-%s", region)
+	s3Key := fmt.Sprintf("schedules/%s/params.yaml", scheduleID)
+
+	// Open file
+	file, err := os.Open(localPath)
+	if err != nil {
+		return "", 0, "", fmt.Errorf("open file: %w", err)
+	}
+	defer file.Close()
+
+	// Calculate SHA256 and size
+	hash := sha256.New()
+	size, err := io.Copy(hash, file)
+	if err != nil {
+		return "", 0, "", fmt.Errorf("calculate hash: %w", err)
+	}
+	sha256sum := fmt.Sprintf("%x", hash.Sum(nil))
+
+	// Reset file pointer
+	if _, err := file.Seek(0, 0); err != nil {
+		return "", 0, "", fmt.Errorf("seek file: %w", err)
+	}
+
+	// Upload to S3
+	_, err = c.uploader.Upload(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(s3Key),
+		Body:   file,
+		Metadata: map[string]string{
+			"schedule-id": scheduleID,
+			"sha256":      sha256sum,
+		},
+		Tagging: aws.String("Project=spawn&Component=scheduler&ScheduleID=" + scheduleID),
+	})
+	if err != nil {
+		return "", 0, "", fmt.Errorf("upload to s3: %w", err)
+	}
+
+	return s3Key, size, sha256sum, nil
 }

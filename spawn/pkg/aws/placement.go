@@ -95,18 +95,18 @@ func (c *Client) ValidateInstanceTypeForEFA(ctx context.Context, instanceType st
 	efaSupported := map[string]bool{
 		"c5n.18xlarge": true, "c5n.metal": true,
 		"c6gn.16xlarge": true,
-		"g4dn.8xlarge": true, "g4dn.12xlarge": true, "g4dn.metal": true,
+		"g4dn.8xlarge":  true, "g4dn.12xlarge": true, "g4dn.metal": true,
 		"g5.8xlarge": true, "g5.12xlarge": true, "g5.16xlarge": true,
 		"g5.24xlarge": true, "g5.48xlarge": true,
 		"i3en.12xlarge": true, "i3en.24xlarge": true, "i3en.metal": true,
 		"inf1.24xlarge": true,
 		"m5dn.24xlarge": true, "m5n.24xlarge": true,
-		"m6i.32xlarge": true,
+		"m6i.32xlarge":  true,
 		"p3dn.24xlarge": true,
-		"p4d.24xlarge": true, "p4de.24xlarge": true,
-		"p5.48xlarge": true,
+		"p4d.24xlarge":  true, "p4de.24xlarge": true,
+		"p5.48xlarge":   true,
 		"r5dn.24xlarge": true, "r5n.24xlarge": true,
-		"r6i.32xlarge": true,
+		"r6i.32xlarge":  true,
 		"trn1.32xlarge": true,
 	}
 

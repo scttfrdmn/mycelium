@@ -8,12 +8,12 @@ import (
 
 // APIResponse is the standard API response format
 type APIResponse struct {
-	Success        bool         `json:"success"`
-	Message        string       `json:"message,omitempty"`
-	Error          string       `json:"error,omitempty"`
-	AccountBase36  string       `json:"account_base36,omitempty"`
-	RegionsQueried []string     `json:"regions_queried,omitempty"`
-	TotalInstances int          `json:"total_instances,omitempty"`
+	Success        bool           `json:"success"`
+	Message        string         `json:"message,omitempty"`
+	Error          string         `json:"error,omitempty"`
+	AccountBase36  string         `json:"account_base36,omitempty"`
+	RegionsQueried []string       `json:"regions_queried,omitempty"`
+	TotalInstances int            `json:"total_instances,omitempty"`
 	Instances      []InstanceInfo `json:"instances,omitempty"`
 	Instance       *InstanceInfo  `json:"instance,omitempty"`
 	User           *UserProfile   `json:"user,omitempty"`
@@ -21,50 +21,50 @@ type APIResponse struct {
 
 // InstanceInfo represents EC2 instance information
 type InstanceInfo struct {
-	InstanceID           string            `json:"instance_id"`
-	Name                 string            `json:"name"`
-	InstanceType         string            `json:"instance_type"`
-	State                string            `json:"state"`
-	Region               string            `json:"region"`
-	AvailabilityZone     string            `json:"availability_zone"`
-	PublicIP             string            `json:"public_ip,omitempty"`
-	PrivateIP            string            `json:"private_ip,omitempty"`
-	LaunchTime           time.Time         `json:"launch_time"`
-	TTL                  string            `json:"ttl,omitempty"`
-	TTLRemainingSeconds  int               `json:"ttl_remaining_seconds,omitempty"`
-	IdleTimeout          string            `json:"idle_timeout,omitempty"`
-	DNSName              string            `json:"dns_name,omitempty"`
-	SpotInstance         bool              `json:"spot_instance"`
-	KeyName              string            `json:"key_name,omitempty"`
-	Tags                 map[string]string `json:"tags"`
+	InstanceID          string            `json:"instance_id"`
+	Name                string            `json:"name"`
+	InstanceType        string            `json:"instance_type"`
+	State               string            `json:"state"`
+	Region              string            `json:"region"`
+	AvailabilityZone    string            `json:"availability_zone"`
+	PublicIP            string            `json:"public_ip,omitempty"`
+	PrivateIP           string            `json:"private_ip,omitempty"`
+	LaunchTime          time.Time         `json:"launch_time"`
+	TTL                 string            `json:"ttl,omitempty"`
+	TTLRemainingSeconds int               `json:"ttl_remaining_seconds,omitempty"`
+	IdleTimeout         string            `json:"idle_timeout,omitempty"`
+	DNSName             string            `json:"dns_name,omitempty"`
+	SpotInstance        bool              `json:"spot_instance"`
+	KeyName             string            `json:"key_name,omitempty"`
+	Tags                map[string]string `json:"tags"`
 }
 
 // UserProfile represents user account information
 type UserProfile struct {
-	UserID         string    `json:"user_id"`
-	AWSAccountID   string    `json:"aws_account_id"`
-	AccountBase36  string    `json:"account_base36"`
-	Email          string    `json:"email,omitempty"`
-	CreatedAt      time.Time `json:"created_at"`
-	LastAccess     time.Time `json:"last_access"`
+	UserID        string    `json:"user_id"`
+	AWSAccountID  string    `json:"aws_account_id"`
+	AccountBase36 string    `json:"account_base36"`
+	Email         string    `json:"email,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
+	LastAccess    time.Time `json:"last_access"`
 }
 
 // Sweep API Response structures
 
 // SweepAPIResponse is the response for /api/sweeps
 type SweepAPIResponse struct {
-	Success     bool       `json:"success"`
-	Message     string     `json:"message,omitempty"`
-	Error       string     `json:"error,omitempty"`
-	TotalSweeps int        `json:"total_sweeps"`
+	Success     bool        `json:"success"`
+	Message     string      `json:"message,omitempty"`
+	Error       string      `json:"error,omitempty"`
+	TotalSweeps int         `json:"total_sweeps"`
 	Sweeps      []SweepInfo `json:"sweeps"`
 }
 
 // SweepDetailAPIResponse is the response for /api/sweeps/{id}
 type SweepDetailAPIResponse struct {
-	Success bool           `json:"success"`
-	Message string         `json:"message,omitempty"`
-	Error   string         `json:"error,omitempty"`
+	Success bool            `json:"success"`
+	Message string          `json:"message,omitempty"`
+	Error   string          `json:"error,omitempty"`
 	Sweep   SweepDetailInfo `json:"sweep"`
 }
 
@@ -139,40 +139,40 @@ type UserAccountRecord struct {
 
 // SweepRecord represents a record in the spawn-sweep-orchestration DynamoDB table
 type SweepRecord struct {
-	SweepID         string                      `dynamodbav:"sweep_id"`
-	SweepName       string                      `dynamodbav:"sweep_name"`
-	UserID          string                      `dynamodbav:"user_id"`
-	CreatedAt       string                      `dynamodbav:"created_at"`
-	UpdatedAt       string                      `dynamodbav:"updated_at"`
-	CompletedAt     string                      `dynamodbav:"completed_at,omitempty"`
-	S3ParamsKey            string                      `dynamodbav:"s3_params_key"`
-	MaxConcurrent          int                         `dynamodbav:"max_concurrent"`
-	MaxConcurrentPerRegion int                         `dynamodbav:"max_concurrent_per_region,omitempty"`
-	LaunchDelay            string                      `dynamodbav:"launch_delay"`
-	TotalParams     int                         `dynamodbav:"total_params"`
-	Region          string                      `dynamodbav:"region"`
-	AWSAccountID    string                      `dynamodbav:"aws_account_id"`
-	Status          string                      `dynamodbav:"status"`
-	CancelRequested bool                        `dynamodbav:"cancel_requested"`
-	EstimatedCost   float64                     `dynamodbav:"estimated_cost,omitempty"`
-	NextToLaunch    int                         `dynamodbav:"next_to_launch"`
-	Launched        int                         `dynamodbav:"launched"`
-	Failed          int                         `dynamodbav:"failed"`
-	ErrorMessage    string                      `dynamodbav:"error_message,omitempty"`
-	Instances       []SweepInstance             `dynamodbav:"instances"`
+	SweepID                string          `dynamodbav:"sweep_id"`
+	SweepName              string          `dynamodbav:"sweep_name"`
+	UserID                 string          `dynamodbav:"user_id"`
+	CreatedAt              string          `dynamodbav:"created_at"`
+	UpdatedAt              string          `dynamodbav:"updated_at"`
+	CompletedAt            string          `dynamodbav:"completed_at,omitempty"`
+	S3ParamsKey            string          `dynamodbav:"s3_params_key"`
+	MaxConcurrent          int             `dynamodbav:"max_concurrent"`
+	MaxConcurrentPerRegion int             `dynamodbav:"max_concurrent_per_region,omitempty"`
+	LaunchDelay            string          `dynamodbav:"launch_delay"`
+	TotalParams            int             `dynamodbav:"total_params"`
+	Region                 string          `dynamodbav:"region"`
+	AWSAccountID           string          `dynamodbav:"aws_account_id"`
+	Status                 string          `dynamodbav:"status"`
+	CancelRequested        bool            `dynamodbav:"cancel_requested"`
+	EstimatedCost          float64         `dynamodbav:"estimated_cost,omitempty"`
+	NextToLaunch           int             `dynamodbav:"next_to_launch"`
+	Launched               int             `dynamodbav:"launched"`
+	Failed                 int             `dynamodbav:"failed"`
+	ErrorMessage           string          `dynamodbav:"error_message,omitempty"`
+	Instances              []SweepInstance `dynamodbav:"instances"`
 
 	// Multi-region support
-	MultiRegion      bool                        `dynamodbav:"multi_region"`
-	RegionStatus     map[string]*RegionProgress  `dynamodbav:"region_status,omitempty"`
-	DistributionMode string                      `dynamodbav:"distribution_mode,omitempty"` // "balanced" or "opportunistic"
+	MultiRegion      bool                       `dynamodbav:"multi_region"`
+	RegionStatus     map[string]*RegionProgress `dynamodbav:"region_status,omitempty"`
+	DistributionMode string                     `dynamodbav:"distribution_mode,omitempty"` // "balanced" or "opportunistic"
 }
 
 // RegionProgress tracks per-region sweep progress
 type RegionProgress struct {
-	Launched      int   `dynamodbav:"launched"`
-	Failed        int   `dynamodbav:"failed"`
-	ActiveCount   int   `dynamodbav:"active_count"`
-	NextToLaunch  []int `dynamodbav:"next_to_launch"`
+	Launched     int   `dynamodbav:"launched"`
+	Failed       int   `dynamodbav:"failed"`
+	ActiveCount  int   `dynamodbav:"active_count"`
+	NextToLaunch []int `dynamodbav:"next_to_launch"`
 }
 
 // SweepInstance tracks individual instance state in DynamoDB

@@ -56,27 +56,27 @@ func TestGetCrossRegionCost(t *testing.T) {
 
 func TestEstimateLatency(t *testing.T) {
 	tests := []struct {
-		name           string
-		sourceRegion   string
-		destRegion     string
+		name            string
+		sourceRegion    string
+		destRegion      string
 		expectedLatency int
 	}{
 		{
-			name:           "Same region",
-			sourceRegion:   "us-east-1",
-			destRegion:     "us-east-1",
+			name:            "Same region",
+			sourceRegion:    "us-east-1",
+			destRegion:      "us-east-1",
 			expectedLatency: 0,
 		},
 		{
-			name:           "Same continent - US",
-			sourceRegion:   "us-east-1",
-			destRegion:     "us-west-2",
+			name:            "Same continent - US",
+			sourceRegion:    "us-east-1",
+			destRegion:      "us-west-2",
 			expectedLatency: 50,
 		},
 		{
-			name:           "Cross-continent",
-			sourceRegion:   "us-east-1",
-			destRegion:     "eu-west-1",
+			name:            "Cross-continent",
+			sourceRegion:    "us-east-1",
+			destRegion:      "eu-west-1",
 			expectedLatency: 150,
 		},
 	}

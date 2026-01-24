@@ -48,7 +48,7 @@ func parseJSON(path string) (*ParamFileFormat, error) {
 		return nil, fmt.Errorf("failed to parse JSON parameter file: %w", err)
 	}
 
-	if format.Params == nil || len(format.Params) == 0 {
+	if len(format.Params) == 0 {
 		return nil, fmt.Errorf("parameter file must contain at least one parameter set in 'params' array")
 	}
 
@@ -72,7 +72,7 @@ func parseYAML(path string) (*ParamFileFormat, error) {
 		return nil, fmt.Errorf("failed to parse YAML parameter file: %w", err)
 	}
 
-	if format.Params == nil || len(format.Params) == 0 {
+	if len(format.Params) == 0 {
 		return nil, fmt.Errorf("parameter file must contain at least one parameter set in 'params' array")
 	}
 

@@ -259,11 +259,11 @@ func isValidStateTransition(currentState, action string) bool {
 // TestTTLCalculation tests remaining TTL calculation
 func TestTTLCalculation(t *testing.T) {
 	tests := []struct {
-		name        string
-		ttl         string
-		uptime      time.Duration
-		wantRemain  string
-		shouldCalc  bool
+		name       string
+		ttl        string
+		uptime     time.Duration
+		wantRemain string
+		shouldCalc bool
 	}{
 		{
 			name:       "half time remaining",
