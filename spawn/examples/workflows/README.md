@@ -7,8 +7,9 @@ This directory contains working examples of spawn integration with popular workf
 ### [Apache Airflow](airflow/)
 Platform for programmatically authoring, scheduling, and monitoring workflows.
 - Custom operator for spawn sweeps
-- DAG with polling and error handling
-- Production-ready example
+- Traditional DAG with polling and error handling
+- Modern TaskFlow API examples (Airflow 2.0+)
+- Production-ready implementations
 
 ### [Prefect](prefect/)
 Modern workflow orchestration with dynamic task generation.
@@ -51,6 +52,27 @@ Workflow language for genomic analysis pipelines.
 - Task-based workflows
 - Runtime configuration
 - Cromwell execution engine
+
+### [Dagster](dagster/)
+Modern data orchestrator with asset-based workflows.
+- Asset lineage tracking
+- Incremental materialization
+- Rich UI with visual pipeline editor
+- Type-safe workflows
+
+### [Luigi](luigi/)
+Spotify's batch processing workflow tool.
+- Simple Python task definitions
+- Automatic dependency resolution
+- Built-in scheduler and UI
+- Idempotent task execution
+
+### [Temporal](temporal/)
+Durable execution platform for long-running workflows.
+- Fault-tolerant workflow execution
+- Automatic retries with exponential backoff
+- Workflow history and replay
+- Built for microservices
 
 ## Quick Start
 

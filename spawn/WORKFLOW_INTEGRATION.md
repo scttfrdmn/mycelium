@@ -127,6 +127,8 @@ echo "Launched sweep: $(cat /tmp/sweep_id.txt)"
 
 ## Workflow Tool Integration
 
+> **Note:** This guide includes detailed examples for the most popular workflow tools. See [`examples/workflows/`](examples/workflows/) for additional examples including Dagster, Luigi, and Temporal.
+
 ### Apache Airflow
 
 Airflow is a platform for programmatically authoring, scheduling, and monitoring workflows.
