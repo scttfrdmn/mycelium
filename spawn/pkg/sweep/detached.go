@@ -43,6 +43,7 @@ type SweepRecord struct {
 	Status                 string          `dynamodbav:"status" json:"status"`
 	CancelRequested        bool            `dynamodbav:"cancel_requested" json:"cancel_requested"`
 	EstimatedCost          float64         `dynamodbav:"estimated_cost,omitempty" json:"estimated_cost,omitempty"`
+	Budget                 float64         `dynamodbav:"budget,omitempty" json:"budget,omitempty"` // Budget limit in dollars
 	NextToLaunch           int             `dynamodbav:"next_to_launch" json:"next_to_launch"`
 	Launched               int             `dynamodbav:"launched" json:"launched"`
 	Failed                 int             `dynamodbav:"failed" json:"failed"`

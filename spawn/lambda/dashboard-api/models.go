@@ -155,6 +155,7 @@ type SweepRecord struct {
 	Status                 string          `dynamodbav:"status"`
 	CancelRequested        bool            `dynamodbav:"cancel_requested"`
 	EstimatedCost          float64         `dynamodbav:"estimated_cost,omitempty"`
+	Budget                 float64         `dynamodbav:"budget,omitempty"`
 	NextToLaunch           int             `dynamodbav:"next_to_launch"`
 	Launched               int             `dynamodbav:"launched"`
 	Failed                 int             `dynamodbav:"failed"`

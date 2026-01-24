@@ -115,6 +115,7 @@ var (
 	estimateOnly           bool
 	autoYes                bool
 	distributionMode       string
+	budget                 float64
 
 	// Region constraints
 	regionsInclude    []string
@@ -232,6 +233,7 @@ func init() {
 	launchCmd.Flags().StringVar(&launchDelay, "launch-delay", "0s", "Delay between instance launches (e.g., 5s)")
 	launchCmd.Flags().BoolVar(&detach, "detach", false, "Run sweep orchestration in Lambda (survives disconnect)")
 	launchCmd.Flags().StringVar(&sweepName, "sweep-name", "", "Human-readable sweep identifier (auto-generated if empty)")
+	launchCmd.Flags().Float64Var(&budget, "budget", 0, "Budget limit in dollars (0 = no limit)")
 	launchCmd.Flags().BoolVar(&estimateOnly, "estimate-only", false, "Show cost estimate and exit without launching")
 	launchCmd.Flags().BoolVarP(&autoYes, "yes", "y", false, "Auto-approve cost estimate (skip confirmation)")
 	launchCmd.Flags().StringVar(&distributionMode, "mode", "balanced", "Distribution mode: balanced (fair share) or opportunistic (prioritize available regions)")
@@ -2508,6 +2510,17 @@ func launchSweepDetached(ctx context.Context, paramFormat *ParamFileFormat, base
 
 	fmt.Fprintf(os.Stderr, "\n%s\n\n", costEstimate.Display())
 
+	// Check budget
+	if budget > 0 {
+		if costEstimate.TotalCost > budget {
+			fmt.Fprintf(os.Stderr, "⚠️  WARNING: Estimated cost ($%.2f) exceeds budget ($%.2f) by $%.2f\n\n",
+				costEstimate.TotalCost, budget, costEstimate.TotalCost-budget)
+		} else {
+			fmt.Fprintf(os.Stderr, "✓ Within budget: $%.2f remaining of $%.2f\n\n",
+				budget-costEstimate.TotalCost, budget)
+		}
+	}
+
 	// If estimate-only, exit here
 	if estimateOnly {
 		fmt.Fprintf(os.Stderr, "✅ Cost estimate complete (--estimate-only specified)\n")
@@ -2548,6 +2561,7 @@ func launchSweepDetached(ctx context.Context, paramFormat *ParamFileFormat, base
 		Region:                 sweepRegion,
 		AWSAccountID:           accountID,
 		EstimatedCost:          costEstimate.TotalCost,
+		Budget:                 budget,
 	}
 
 	// Check if multi-region sweep

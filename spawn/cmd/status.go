@@ -243,6 +243,14 @@ func runSweepStatus(ctx context.Context, sweepID string) error {
 		// Show total cost if any
 		if totalCost > 0 {
 			fmt.Fprintf(os.Stdout, "\n  Total Estimated Cost: $%.2f\n", totalCost)
+			if status.Budget > 0 {
+				remaining := status.Budget - totalCost
+				if remaining < 0 {
+					fmt.Fprintf(os.Stdout, "  Budget:              $%.2f (EXCEEDED by $%.2f)\n", status.Budget, -remaining)
+				} else {
+					fmt.Fprintf(os.Stdout, "  Budget:              $%.2f (%.1f%% used)\n", status.Budget, (totalCost/status.Budget)*100)
+				}
+			}
 		}
 
 		fmt.Fprintf(os.Stdout, "\n")
