@@ -631,6 +631,137 @@ Default behavior if retry not specified:
 
 **Behavior:** Single attempt only, fails immediately on error.
 
+### Exponential Backoff with Jitter
+
+Adds randomization to prevent simultaneous retries (thundering herd).
+
+**Configuration:**
+```json
+{
+  "job_id": "train",
+  "command": "python train.py",
+  "timeout": "2h",
+  "retry": {
+    "max_attempts": 5,
+    "backoff": "exponential-jitter",
+    "base_delay": "2s",
+    "max_delay": "5m",
+    "jitter": 0.3
+  }
+}
+```
+
+**Parameters:**
+- `base_delay` - Starting delay (default: "5s")
+- `max_delay` - Maximum delay cap (default: "5m")
+- `jitter` - Randomization factor 0.0-1.0 (0.3 = ±30%)
+
+**Behavior:**
+- Attempt 1: Immediate
+- Attempt 2: ~2s ± 30% (1.4s - 2.6s)
+- Attempt 3: ~4s ± 30% (2.8s - 5.2s)
+- Attempt 4: ~8s ± 30% (5.6s - 10.4s)
+- Attempt 5: ~16s ± 30% (11.2s - 20.8s)
+
+**Formula:** `delay = min(base * 2^(attempt-1) * (1 + random(-jitter, +jitter)), max_delay)`
+
+**Use cases:**
+- Multiple parallel jobs that might fail together
+- Distributed systems (prevent coordinated retry storms)
+- API rate limiting with multiple workers
+- High-concurrency scenarios
+
+### Conditional Retry
+
+Only retry specific exit codes or skip known failure types.
+
+**Configuration:**
+```json
+{
+  "job_id": "download",
+  "command": "python download.py",
+  "timeout": "30m",
+  "retry": {
+    "max_attempts": 5,
+    "backoff": "exponential",
+    "retry_on_codes": [1, 137, 143],
+    "dont_retry_on_codes": [2, 127]
+  }
+}
+```
+
+**Parameters:**
+- `retry_on_codes` - Whitelist: only retry these exit codes
+- `dont_retry_on_codes` - Blacklist: never retry these exit codes (higher priority)
+
+**Common Exit Codes:**
+- `0` - Success
+- `1` - Generic error (usually retryable)
+- `2` - Syntax error / misuse of shell builtin (don't retry)
+- `127` - Command not found (don't retry)
+- `137` - SIGKILL (interrupted, retryable)
+- `143` - SIGTERM (interrupted, retryable)
+
+**Behavior:**
+- If `dont_retry_on_codes` specified: Never retry those codes
+- If `retry_on_codes` specified: Only retry those codes
+- If neither specified: Retry all non-zero exit codes
+
+**Examples:**
+
+Retry only network/interruption errors:
+```json
+{
+  "retry": {
+    "max_attempts": 3,
+    "retry_on_codes": [1, 137, 143]
+  }
+}
+```
+
+Skip syntax and dependency errors:
+```json
+{
+  "retry": {
+    "max_attempts": 5,
+    "dont_retry_on_codes": [2, 127]
+  }
+}
+```
+
+**Use cases:**
+- Distinguishing transient from permanent failures
+- Avoiding retry on config/syntax errors
+- Handling interrupted jobs (SIGTERM/SIGKILL)
+- Custom error code conventions
+
+### Combined Example: ML Training Pipeline
+
+```json
+{
+  "job_id": "train",
+  "command": "python train.py --data /data --output /tmp/model",
+  "timeout": "4h",
+  "retry": {
+    "max_attempts": 5,
+    "backoff": "exponential-jitter",
+    "base_delay": "2s",
+    "max_delay": "10m",
+    "jitter": 0.3,
+    "retry_on_codes": [1, 137, 143],
+    "dont_retry_on_codes": [2]
+  },
+  "result_paths": ["/tmp/model/*"]
+}
+```
+
+**Behavior:**
+- Retries up to 5 times
+- Uses exponential backoff with ±30% jitter
+- Only retries generic errors (1) and interruptions (137, 143)
+- Never retries syntax errors (2)
+- Caps delay at 10 minutes
+
 ### Retry Best Practices
 
 **Do use retry for:**
@@ -645,10 +776,23 @@ Default behavior if retry not specified:
 - ❌ Logic errors in code
 - ❌ Guaranteed-to-fail operations
 
-**Exponential vs Fixed:**
-- Use **exponential** for network/transient errors
+**Choosing a Backoff Strategy:**
+- Use **exponential-jitter** for distributed/parallel workloads
+- Use **exponential** for network/transient errors (single job)
 - Use **fixed** for rate limiting/quotas
 - Set **max_attempts** based on failure patterns (typically 2-5)
+
+**Using Conditional Retry:**
+- Add `retry_on_codes: [1, 137, 143]` for network jobs
+- Add `dont_retry_on_codes: [2, 127]` to skip config errors
+- Review job logs to identify retryable vs permanent failures
+- Use job environment variable `$JOB_ATTEMPT` to debug retry loops
+
+**Jitter Guidelines:**
+- Use jitter 0.2-0.3 (20-30%) for most cases
+- Higher jitter (0.4-0.5) if many parallel jobs
+- No jitter (0.0) for single-job queues
+- Jitter prevents synchronized retry storms
 
 ## Result Collection
 

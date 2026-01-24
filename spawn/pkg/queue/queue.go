@@ -31,8 +31,13 @@ type JobConfig struct {
 
 // RetryConfig defines retry behavior for a job
 type RetryConfig struct {
-	MaxAttempts int    `json:"max_attempts"`
-	Backoff     string `json:"backoff"` // "fixed" | "exponential"
+	MaxAttempts      int      `json:"max_attempts"`
+	Backoff          string   `json:"backoff"` // "fixed" | "exponential" | "exponential-jitter"
+	BaseDelay        string   `json:"base_delay,omitempty"` // e.g., "2s", "1m"
+	MaxDelay         string   `json:"max_delay,omitempty"`  // e.g., "5m", "1h"
+	Jitter           float64  `json:"jitter,omitempty"` // 0.0 - 1.0, adds randomization
+	RetryOnCodes     []int    `json:"retry_on_codes,omitempty"` // Only retry these exit codes
+	DontRetryOnCodes []int    `json:"dont_retry_on_codes,omitempty"` // Never retry these exit codes
 }
 
 // LoadConfig loads a queue configuration from a JSON file

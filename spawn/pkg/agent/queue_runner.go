@@ -210,11 +210,9 @@ func (r *QueueRunner) Run() error {
 // executeJobWithRetry executes a job with retry logic
 func (r *QueueRunner) executeJobWithRetry(job *queue.JobConfig) (*JobResult, error) {
 	maxAttempts := 1
-	backoff := "fixed"
 
 	if job.Retry != nil {
 		maxAttempts = job.Retry.MaxAttempts
-		backoff = job.Retry.Backoff
 	}
 
 	var lastErr error
@@ -231,9 +229,20 @@ func (r *QueueRunner) executeJobWithRetry(job *queue.JobConfig) (*JobResult, err
 		lastErr = err
 		lastResult = result
 
+		// Check if we should retry based on exit code
 		if attempt < maxAttempts {
-			backoffDuration := r.calculateBackoff(backoff, attempt)
-			fmt.Printf("Job %s failed, retrying after %v...\n", job.JobID, backoffDuration)
+			shouldRetry := queue.ShouldRetry(job.Retry, result.ExitCode)
+			if !shouldRetry {
+				fmt.Printf("Job %s failed with exit code %d (configured as non-retryable)\n", job.JobID, result.ExitCode)
+				return lastResult, fmt.Errorf("job failed with non-retryable exit code %d: %w", result.ExitCode, lastErr)
+			}
+
+			backoffDuration, err := queue.CalculateBackoff(job.Retry, attempt)
+			if err != nil {
+				fmt.Printf("Warning: failed to calculate backoff: %v, using 5s default\n", err)
+				backoffDuration = 5 * time.Second
+			}
+			fmt.Printf("Job %s failed (exit code %d), retrying after %v...\n", job.JobID, result.ExitCode, backoffDuration)
 			time.Sleep(backoffDuration)
 		}
 	}
@@ -458,17 +467,6 @@ func (r *QueueRunner) markResultsUploaded(jobID string) {
 		}
 	}
 }
-
-// calculateBackoff calculates retry backoff duration
-func (r *QueueRunner) calculateBackoff(backoffType string, attempt int) time.Duration {
-	if backoffType == "exponential" {
-		// Exponential: 1s, 2s, 4s, 8s, ...
-		return time.Duration(1<<uint(attempt-1)) * time.Second
-	}
-	// Fixed: 5 seconds
-	return 5 * time.Second
-}
-
 // loadOrInitState loads existing state or initializes new state
 func loadOrInitState(stateFile string, cfg *queue.QueueConfig) (*QueueState, error) {
 	// Try to load existing state (resume scenario)
