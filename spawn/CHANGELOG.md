@@ -5,6 +5,203 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] - 2026-01-24
+
+This release focuses on production observability, cost management, reliability, and workflow orchestration.
+
+### Added - Monitoring & Alerting System (Feature #58)
+
+#### Alert Types
+- **Cost Threshold Alerts**: Notify when sweep exceeds budget limit
+- **Long-Running Alerts**: Detect sweeps running longer than expected
+- **Failure Alerts**: Immediate notification on sweep/instance failures
+- **Completion Alerts**: Success notifications with summary metrics
+
+#### Notification Channels
+- **Slack**: Rich formatted messages with cost breakdowns and status
+- **Email**: Via SNS topics with HTML formatting
+- **SNS**: Direct integration with AWS SNS for custom subscribers
+- **Webhook**: Generic HTTP POST for custom integrations
+
+#### Alert Management Commands
+- **`spawn alerts create`**: Create alert with thresholds and channels
+- **`spawn alerts list`**: List active alerts with status
+- **`spawn alerts update`**: Modify alert configuration
+- **`spawn alerts delete`**: Remove alert
+- **`spawn alerts history`**: View alert trigger history
+
+#### Infrastructure
+- **Lambda Handler**: `alert-handler` for EventBridge trigger processing
+- **DynamoDB Tables**: `spawn-alerts` (config), `spawn-alert-history` (audit log)
+- **EventBridge Rules**: Dynamic rule creation per alert
+- **TTL Cleanup**: 90-day automatic cleanup of alert history
+
+#### Implementation
+- **pkg/alerts/**: Alert configuration, validation, notification logic
+- **lambda/alert-handler/**: Serverless alert processor
+- **cmd/alerts.go**: Alert management CLI commands
+
+### Added - Cost Tracking & Budget Management (Feature #59)
+
+#### Real-Time Cost Estimation
+- **Pre-Launch Estimates**: Show estimated cost before launching sweeps
+- **Instance Pricing**: Real-time pricing data from AWS Pricing API
+- **Multi-Region Support**: Per-region cost breakdowns
+- **Instance Type Analysis**: Cost by instance type in mixed sweeps
+
+#### Budget Management
+- **Budget Limits**: Set dollar limits on sweeps with `--budget` flag
+- **Budget Enforcement**: Prevent launches when budget exceeded
+- **Remaining Budget**: Track budget consumption in real-time
+- **Budget Alerts**: Integration with alerting system (#58)
+
+#### Cost Reporting
+- **Sweep Status**: Cost data in `spawn status --sweep-id` output
+- **Regional Breakdown**: Cost per region for multi-region sweeps
+- **Instance Hours**: Track total instance-hours consumed
+- **Success Rate Correlation**: Cost vs success rate analysis
+
+#### Cost Optimization Features
+- **Spot Savings Display**: Show actual savings vs on-demand
+- **Cost Projections**: Estimate completion cost for running sweeps
+- **Historical Tracking**: Cost trends over time
+
+#### Implementation
+- **pkg/cost/**: Cost calculation engine, pricing API integration
+- **pkg/pricing/**: AWS Pricing API client with caching
+- **DynamoDB Integration**: Store cost data in sweep status records
+
+### Added - Advanced Retry Strategies (Feature #60)
+
+#### Retry Backoff Strategies
+- **Fixed Delay**: Constant delay between retries
+- **Exponential Backoff**: 2^attempt × base_delay (e.g., 1s, 2s, 4s, 8s)
+- **Exponential with Jitter**: Random jitter (0-100%) to prevent thundering herd
+
+#### Retry Configuration
+- **Max Attempts**: Configurable retry limit per job
+- **Base Delay**: Initial delay before first retry
+- **Max Delay**: Cap on exponential growth
+- **Jitter Factor**: Randomization percentage (0.0-1.0)
+
+#### Intelligent Retry Logic
+- **Exit Code Filtering**: Only retry specific exit codes
+- **Blacklist Exit Codes**: Never retry certain failures (e.g., invalid input)
+- **Per-Job Configuration**: Different retry strategies per job
+- **Retry Tracking**: Record attempt count and delays in status
+
+#### Queue Integration
+- **Template Support**: Retry config in queue templates
+- **Status Display**: Show retry attempts in `spawn queue status`
+- **Result Preservation**: Keep results from all attempts
+- **Failure Analysis**: Track which jobs exhaust retries
+
+#### Implementation
+- **pkg/queue/retry.go**: Retry calculation engine
+- **pkg/agent/queue_runner.go**: Retry execution logic
+- **Tests**: Comprehensive retry strategy unit tests
+
+### Added - Workflow Orchestration Integration (Feature #61)
+
+This is a **major feature** enabling spawn to integrate seamlessly with popular workflow orchestration tools through CLI enhancements rather than custom plugins.
+
+#### Core Integration Flags
+
+**`--output-id <file>`** - Write sweep/instance IDs to file for scripting
+```bash
+spawn launch --params sweep.yaml --detach --output-id /tmp/sweep_id.txt
+# File contains: sweep-20240124-abc123
+```
+
+**`--wait`** - Block until sweep completion with automatic polling
+```bash
+spawn launch --params sweep.yaml --detach --wait --wait-timeout 2h
+# Polls every 30s until COMPLETED/FAILED/CANCELLED
+```
+
+**`--check-complete`** - Standardized exit codes for workflow branching
+```bash
+spawn status $SWEEP_ID --check-complete
+# Exit codes: 0=complete, 1=failed, 2=running, 3=error
+```
+
+#### Workflow Tool Examples
+
+**11 Complete Working Examples:**
+1. **Apache Airflow** - Custom operator + traditional DAG + TaskFlow API
+2. **Prefect** - Task-based flows with retries and caching
+3. **Nextflow** - Process-based bioinformatics pipelines
+4. **Snakemake** - Rule-based reproducible workflows
+5. **AWS Step Functions** - Serverless state machines with Lambda
+6. **Argo Workflows** - Kubernetes-native orchestration
+7. **Common Workflow Language (CWL)** - Portable tool definitions
+8. **Workflow Description Language (WDL)** - Genomics pipelines
+9. **Dagster** - Asset-based data orchestration with lineage
+10. **Luigi** - Spotify's batch processing with dependency resolution
+11. **Temporal** - Durable execution for long-running workflows
+
+Each example includes:
+- Complete working code
+- README with setup instructions
+- Sample input files
+- Both simple (`--wait`) and advanced (manual polling) patterns
+
+#### Documentation
+
+**WORKFLOW_INTEGRATION.md** (1,088 lines)
+- Quick start patterns (synchronous, asynchronous, fire-and-forget)
+- Detailed integration guides for all 11 tools
+- Advanced patterns (parallel sweeps, conditional execution, error recovery)
+- Docker usage instructions
+- Exit codes reference
+- Troubleshooting guide
+- Best practices
+
+**examples/workflows/** - 37 files of examples and documentation
+
+#### Docker Distribution
+
+**Dockerfile** - Multi-stage Alpine-based build
+- Minimal image size with alpine:latest
+- Includes AWS CLI, openssh-client, jq, curl
+- Multi-architecture: linux/amd64, linux/arm64
+
+**.github/workflows/docker-spawn.yml** - Automated CI/CD
+- Builds on version tags and main branch
+- Pushes to Docker Hub: `scttfrdmn/spawn:latest`
+- Version tags: `scttfrdmn/spawn:v0.12.0`
+- Cache optimization with GitHub Actions
+
+#### Implementation
+- **cmd/launch.go**: Added `--output-id`, `--wait`, `--wait-timeout` flags (+98 lines)
+- **cmd/status.go**: Added `--check-complete` flag with exit codes (+25 lines)
+- **cmd/launch_test.go**: Unit tests for `writeOutputID`
+- **cmd/status_test.go**: Unit tests for exit code logic (new file)
+
+#### Use Cases Unlocked
+- Scheduled parameter sweeps via workflow schedulers
+- Multi-stage data pipelines with spawn compute
+- CI/CD integration for ML model training
+- Bioinformatics workflows with spawn + Nextflow
+- Cost-optimized batch processing with retries
+
+### Changed
+- Exit codes for `spawn status --check-complete` are now standardized (0/1/2/3)
+- `--wait` flag requires `--detach` (validation added)
+
+### Documentation
+- Added WORKFLOW_INTEGRATION.md (comprehensive 1,088-line guide)
+- Added 11 workflow tool examples with READMEs
+- Updated alerting documentation
+- Updated cost tracking examples
+- Updated retry strategy documentation
+
+### Testing
+- Added unit tests for workflow integration flags
+- Added unit tests for retry strategies
+- Added integration tests for alert system
+- Added cost calculation tests
+
 ## [0.11.0] - 2026-01-24
 
 ### Added - Queue Templates (Feature #57)
