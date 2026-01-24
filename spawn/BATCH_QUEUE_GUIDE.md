@@ -6,6 +6,7 @@ Execute sequential jobs on a single EC2 instance with dependency management, sta
 
 - [Overview](#overview)
 - [Quick Start](#quick-start)
+- [Queue Templates](#queue-templates)
 - [Queue Configuration](#queue-configuration)
 - [Job Dependencies](#job-dependencies)
 - [Retry Strategies](#retry-strategies)
@@ -98,6 +99,322 @@ spawn queue status <instance-id>
 # Download results
 spawn queue results my-first-queue --output ./results/
 ```
+
+## Queue Templates
+
+Pre-built queue configuration templates for common workflows with variable substitution.
+
+### Available Templates
+
+List all available templates:
+
+```bash
+spawn queue template list
+```
+
+**Built-in templates:**
+- **ml-pipeline** - ML training workflow (preprocess → train → evaluate → export)
+- **etl** - ETL pipeline (extract → transform → load → validate)
+- **ci-cd** - CI/CD workflow (checkout → build → test → deploy → smoke-test)
+- **data-processing** - Data processing (download → process → aggregate → upload)
+- **simple-sequential** - Simple 3-step sequential workflow
+
+### View Template Details
+
+Show template structure and variables:
+
+```bash
+spawn queue template show ml-pipeline
+```
+
+**Output:**
+```
+Template: ml-pipeline
+Description: ML Training Pipeline
+
+Jobs:
+  1. preprocess (timeout: 30m)
+  2. train (timeout: 2h, depends on: preprocess)
+  3. evaluate (timeout: 15m, depends on: train)
+  4. export (timeout: 10m, depends on: evaluate)
+
+Required Variables:
+  INPUT        - Input data path
+  S3_BUCKET    - S3 bucket for results
+
+Optional Variables:
+  MODEL        - Model architecture (default: resnet50)
+  GPU_DEVICES  - CUDA device IDs (default: 0)
+  TRAIN_TIMEOUT - Training timeout (default: 2h)
+  ...
+```
+
+### Generate from Template
+
+Create a queue configuration from a template:
+
+```bash
+# Generate with defaults
+spawn queue template generate simple-sequential \
+  --var S3_BUCKET=my-results \
+  --output queue.json
+
+# Customize ML pipeline
+spawn queue template generate ml-pipeline \
+  --var INPUT=/data/train.csv \
+  --var S3_BUCKET=ml-results \
+  --var MODEL=vgg16 \
+  --var TRAIN_TIMEOUT=4h \
+  --output ml-pipeline.json
+
+# Output to stdout for piping
+spawn queue template generate etl \
+  --var SOURCE=s3://data/raw \
+  --var DESTINATION=postgresql://db \
+  --var S3_BUCKET=results | jq .
+```
+
+### Template Variables
+
+Templates use `{{VARIABLE}}` syntax for substitution:
+
+**Required variables** - Must be provided via `--var`:
+```json
+{
+  "command": "python train.py --input {{INPUT}}"
+}
+```
+
+**Optional variables** - Use default if not provided:
+```json
+{
+  "timeout": "{{TRAIN_TIMEOUT:2h}}",
+  "env": {
+    "CUDA_VISIBLE_DEVICES": "{{GPU_DEVICES:0}}"
+  }
+}
+```
+
+### Launch with Template
+
+**Option 1: Direct launch from template**
+
+Launch directly without generating a file first:
+
+```bash
+spawn launch \
+  --queue-template ml-pipeline \
+  --template-var INPUT=/data/train.csv \
+  --template-var S3_BUCKET=ml-results \
+  --template-var MODEL=vgg16 \
+  --instance-type g5.2xlarge \
+  --region us-east-1
+```
+
+**Option 2: Generate then launch**
+
+Generate template to file, review, then launch:
+
+```bash
+# Generate template to file
+spawn queue template generate ml-pipeline \
+  --var INPUT=/data/train.csv \
+  --var S3_BUCKET=ml-results \
+  --output pipeline.json
+
+# Review the generated file
+cat pipeline.json
+
+# Launch the queue
+spawn launch \
+  --batch-queue pipeline.json \
+  --instance-type g5.2xlarge \
+  --region us-east-1
+```
+
+### Template Examples
+
+#### ML Pipeline Template
+
+**Generate config:**
+```bash
+spawn queue template generate ml-pipeline \
+  --var INPUT=/mnt/data/training_set.csv \
+  --var S3_BUCKET=my-ml-results \
+  --var MODEL=resnet50 \
+  --var TRAIN_TIMEOUT=3h \
+  --var GPU_DEVICES=0 \
+  --output ml-pipeline.json
+```
+
+**Or launch directly:**
+```bash
+spawn launch \
+  --queue-template ml-pipeline \
+  --template-var INPUT=/mnt/data/training_set.csv \
+  --template-var S3_BUCKET=my-ml-results \
+  --template-var MODEL=vgg16 \
+  --instance-type g5.2xlarge \
+  --region us-east-1
+```
+
+**Workflow:**
+1. **preprocess** - Preprocess input data
+2. **train** - Train model with retry logic
+3. **evaluate** - Evaluate model performance
+4. **export** - Export to ONNX format
+
+**All variables:**
+- Required: `INPUT`, `S3_BUCKET`
+- Optional: `MODEL`, `GPU_DEVICES`, `TRAIN_TIMEOUT`, `PREPROCESS_TIMEOUT`, `EVAL_TIMEOUT`, `EXPORT_TIMEOUT`, `GLOBAL_TIMEOUT`, `QUEUE_ID`, `S3_PREFIX`, `ON_FAILURE`
+
+#### ETL Pipeline Template
+
+**Generate config:**
+```bash
+spawn queue template generate etl \
+  --var SOURCE=s3://data-lake/raw \
+  --var DESTINATION=postgresql://warehouse \
+  --var S3_BUCKET=etl-results \
+  --output etl-pipeline.json
+```
+
+**Or launch directly:**
+```bash
+spawn launch \
+  --queue-template etl \
+  --template-var SOURCE=s3://data-lake/raw \
+  --template-var DESTINATION=postgresql://warehouse \
+  --template-var S3_BUCKET=etl-results \
+  --instance-type c5.2xlarge \
+  --region us-east-1
+```
+
+**Workflow:**
+1. **extract** - Extract from source (with retry)
+2. **transform** - Transform data
+3. **load** - Load to destination (with retry)
+4. **validate** - Validate loaded data
+
+**All variables:**
+- Required: `SOURCE`, `DESTINATION`, `S3_BUCKET`
+- Optional: `EXTRACT_TIMEOUT`, `TRANSFORM_TIMEOUT`, `LOAD_TIMEOUT`, `VALIDATE_TIMEOUT`, `GLOBAL_TIMEOUT`, `QUEUE_ID`, `S3_PREFIX`
+
+#### CI/CD Pipeline Template
+
+**Generate config:**
+```bash
+spawn queue template generate ci-cd \
+  --var REPO_URL=https://github.com/user/repo \
+  --var ENDPOINT=https://staging.example.com \
+  --var S3_BUCKET=ci-results \
+  --var BRANCH=main \
+  --var ENVIRONMENT=staging \
+  --output ci-cd-pipeline.json
+```
+
+**Or launch directly:**
+```bash
+spawn launch \
+  --queue-template ci-cd \
+  --template-var REPO_URL=https://github.com/user/repo \
+  --template-var ENDPOINT=https://staging.example.com \
+  --template-var S3_BUCKET=ci-results \
+  --instance-type t3.large \
+  --region us-east-1
+```
+
+**Workflow:**
+1. **checkout** - Clone repository
+2. **build** - Build project (with retry)
+3. **test** - Run tests
+4. **deploy** - Deploy to environment
+5. **smoke-test** - Run smoke tests (with retry)
+
+**All variables:**
+- Required: `REPO_URL`, `ENDPOINT`, `S3_BUCKET`
+- Optional: `BRANCH`, `ENVIRONMENT`, `BUILD_TIMEOUT`, `TEST_TIMEOUT`, `DEPLOY_TIMEOUT`, `GLOBAL_TIMEOUT`, `QUEUE_ID`, `S3_PREFIX`
+
+#### Data Processing Template
+
+**Generate config:**
+```bash
+spawn queue template generate data-processing \
+  --var S3_SOURCE=s3://data/raw \
+  --var S3_DESTINATION=s3://data/processed/output.csv \
+  --var S3_BUCKET=processing-results \
+  --var WORKERS=16 \
+  --output data-processing.json
+```
+
+**Or launch directly:**
+```bash
+spawn launch \
+  --queue-template data-processing \
+  --template-var S3_SOURCE=s3://data/raw \
+  --template-var S3_DESTINATION=s3://data/processed/output.csv \
+  --template-var S3_BUCKET=processing-results \
+  --template-var WORKERS=16 \
+  --instance-type c5.4xlarge \
+  --region us-east-1
+```
+
+**Workflow:**
+1. **download** - Download from S3 (with retry)
+2. **process** - Process data with configurable workers
+3. **aggregate** - Aggregate results
+4. **upload** - Upload to S3 (with retry)
+
+**All variables:**
+- Required: `S3_SOURCE`, `S3_DESTINATION`, `S3_BUCKET`
+- Optional: `WORKERS`, `DOWNLOAD_TIMEOUT`, `PROCESS_TIMEOUT`, `AGGREGATE_TIMEOUT`, `GLOBAL_TIMEOUT`, `QUEUE_ID`, `S3_PREFIX`
+
+#### Simple Sequential Template
+
+**Generate config:**
+```bash
+spawn queue template generate simple-sequential \
+  --var S3_BUCKET=my-results \
+  --var STEP1_COMMAND="echo 'Starting...'" \
+  --var STEP2_COMMAND="python process.py" \
+  --var STEP3_COMMAND="echo 'Done!'" \
+  --output simple.json
+```
+
+**Or launch directly:**
+```bash
+spawn launch \
+  --queue-template simple-sequential \
+  --template-var S3_BUCKET=my-results \
+  --instance-type t3.medium \
+  --region us-east-1
+```
+
+**Workflow:**
+1. **step1** - Customizable first step
+2. **step2** - Customizable second step (depends on step1)
+3. **step3** - Customizable third step (depends on step2)
+
+**All variables:**
+- Required: `S3_BUCKET`
+- Optional: `STEP1_COMMAND`, `STEP2_COMMAND`, `STEP3_COMMAND`, `STEP1_TIMEOUT`, `STEP2_TIMEOUT`, `STEP3_TIMEOUT`, `GLOBAL_TIMEOUT`, `ON_FAILURE`, `QUEUE_ID`, `S3_PREFIX`
+
+### Benefits of Templates
+
+**Faster setup:**
+- No need to write JSON from scratch
+- Pre-configured retry logic and timeouts
+- Best practices built-in
+
+**Consistency:**
+- Standard workflows across projects
+- Reduced configuration errors
+- Easier to maintain
+
+**Customization:**
+- Variable substitution for flexibility
+- Override defaults as needed
+- Extend templates by editing generated JSON
 
 ## Queue Configuration
 

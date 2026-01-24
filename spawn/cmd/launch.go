@@ -125,6 +125,8 @@ var (
 
 	// Batch queue
 	batchQueueFile string
+	queueTemplate  string
+	templateVars   map[string]string
 
 	// IAM
 	iamRole            string
@@ -243,6 +245,8 @@ func init() {
 
 	// Batch queue
 	launchCmd.Flags().StringVar(&batchQueueFile, "batch-queue", "", "Batch job queue file (JSON) for sequential execution")
+	launchCmd.Flags().StringVar(&queueTemplate, "queue-template", "", "Queue template name (use 'spawn queue template list' to see options)")
+	launchCmd.Flags().StringToStringVar(&templateVars, "template-var", nil, "Template variables (key=value)")
 
 	// IAM
 	launchCmd.Flags().StringVar(&iamRole, "iam-role", "", "IAM role name (creates if doesn't exist)")
@@ -283,7 +287,7 @@ func runLaunch(cmd *cobra.Command, args []string) error {
 	}
 
 	// Check for batch queue mode FIRST
-	if batchQueueFile != "" {
+	if batchQueueFile != "" || queueTemplate != "" {
 		return launchWithBatchQueue(ctx, plat)
 	}
 
@@ -2662,12 +2666,50 @@ func launchWithBatchQueue(ctx context.Context, plat *platform.Platform) error {
 	fmt.Fprintf(os.Stderr, "\n📦 Launching Batch Queue Instance\n\n")
 
 	// Load and validate queue configuration
-	fmt.Fprintf(os.Stderr, "📋 Loading queue configuration...\n")
-	queueConfig, err := queue.LoadConfig(batchQueueFile)
-	if err != nil {
-		return fmt.Errorf("failed to load queue configuration: %w", err)
+	var queueConfig *queue.QueueConfig
+	var err error
+
+	if queueTemplate != "" {
+		// Generate from template
+		fmt.Fprintf(os.Stderr, "📋 Loading template: %s\n", queueTemplate)
+		tmpl, err := queue.LoadTemplate(queueTemplate)
+		if err != nil {
+			return fmt.Errorf("failed to load template: %w", err)
+		}
+
+		// Show required variables if none provided
+		if len(templateVars) == 0 {
+			var requiredVars []string
+			for _, v := range tmpl.Variables {
+				if v.Required {
+					requiredVars = append(requiredVars, v.Name)
+				}
+			}
+			if len(requiredVars) > 0 {
+				return fmt.Errorf("template requires variables: %v\nUse --template-var KEY=VALUE", requiredVars)
+			}
+		}
+
+		fmt.Fprintf(os.Stderr, "✓ Template loaded: %s (%d jobs)\n", tmpl.Description, len(tmpl.Config.Jobs))
+		fmt.Fprintf(os.Stderr, "🔧 Substituting variables...\n")
+
+		queueConfig, err = tmpl.Substitute(templateVars)
+		if err != nil {
+			return fmt.Errorf("failed to generate queue from template: %w", err)
+		}
+
+		fmt.Fprintf(os.Stderr, "✓ Queue generated: %d jobs\n", len(queueConfig.Jobs))
+	} else if batchQueueFile != "" {
+		// Load from file
+		fmt.Fprintf(os.Stderr, "📋 Loading queue configuration...\n")
+		queueConfig, err = queue.LoadConfig(batchQueueFile)
+		if err != nil {
+			return fmt.Errorf("failed to load queue configuration: %w", err)
+		}
+		fmt.Fprintf(os.Stderr, "✓ Queue loaded: %d jobs\n", len(queueConfig.Jobs))
+	} else {
+		return fmt.Errorf("either --batch-queue or --queue-template is required")
 	}
-	fmt.Fprintf(os.Stderr, "✓ Queue loaded: %d jobs\n", len(queueConfig.Jobs))
 
 	// Generate queue ID if not set
 	if queueConfig.QueueID == "" {

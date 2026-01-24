@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/queue"
 	"github.com/spf13/cobra"
 )
 
@@ -68,13 +69,91 @@ Examples:
 	RunE: runQueueResults,
 }
 
+var queueTemplateCmd = &cobra.Command{
+	Use:   "template",
+	Short: "Manage queue templates",
+	Long: `Manage pre-built queue configuration templates.
+
+Templates provide ready-to-use queue configurations for common workflows
+with variable substitution for customization.
+
+Available commands:
+  list      - List available templates
+  show      - Show template details
+  generate  - Generate queue config from template
+`,
+}
+
+var queueTemplateListCmd = &cobra.Command{
+	Use:   "list",
+	Short: "List available queue templates",
+	Long: `List all available queue configuration templates.
+
+Shows template names, descriptions, and required/optional variables.
+
+Examples:
+  spawn queue template list
+`,
+	RunE: runQueueTemplateList,
+}
+
+var queueTemplateGenerateCmd = &cobra.Command{
+	Use:   "generate <template-name>",
+	Short: "Generate queue configuration from template",
+	Long: `Generate a queue configuration file from a template with variable substitution.
+
+Variables can be provided via --var flags or use template defaults.
+
+Examples:
+  # Generate with defaults, output to file
+  spawn queue template generate ml-pipeline --output pipeline.json
+
+  # Provide required variables
+  spawn queue template generate ml-pipeline \
+    --var INPUT=/data/train.csv \
+    --var S3_BUCKET=my-results \
+    --output pipeline.json
+
+  # Output to stdout (for piping)
+  spawn queue template generate simple-sequential \
+    --var S3_BUCKET=results
+`,
+	Args: cobra.ExactArgs(1),
+	RunE: runQueueTemplateGenerate,
+}
+
+var queueTemplateShowCmd = &cobra.Command{
+	Use:   "show <template-name>",
+	Short: "Show template details",
+	Long: `Show detailed information about a queue template.
+
+Displays template description, jobs, and all variables with their defaults.
+
+Examples:
+  spawn queue template show ml-pipeline
+  spawn queue template show etl
+`,
+	Args: cobra.ExactArgs(1),
+	RunE: runQueueTemplateShow,
+}
+
 func init() {
 	// Results subcommand flags
 	queueResultsCmd.Flags().StringVarP(&queueOutputDir, "output", "o", ".", "Output directory for results")
 
+	// Template generate flags
+	queueTemplateGenerateCmd.Flags().StringP("output", "o", "", "Output file (default: stdout)")
+	queueTemplateGenerateCmd.Flags().StringToString("var", nil, "Template variables (key=value)")
+
 	// Add subcommands
 	queueCmd.AddCommand(queueStatusCmd)
 	queueCmd.AddCommand(queueResultsCmd)
+	queueCmd.AddCommand(queueTemplateCmd)
+
+	// Add template subcommands
+	queueTemplateCmd.AddCommand(queueTemplateListCmd)
+	queueTemplateCmd.AddCommand(queueTemplateGenerateCmd)
+	queueTemplateCmd.AddCommand(queueTemplateShowCmd)
 
 	rootCmd.AddCommand(queueCmd)
 }
@@ -290,4 +369,125 @@ func sshReadFile(host, remotePath string) (string, error) {
 	// For now, return a helpful error message
 	// In production, this would use golang.org/x/crypto/ssh or exec ssh
 	return "", fmt.Errorf("SSH file read not yet implemented - please SSH manually to %s and cat %s", host, remotePath)
+}
+
+func runQueueTemplateList(cmd *cobra.Command, args []string) error {
+	templates, err := queue.ListTemplates()
+	if err != nil {
+		return fmt.Errorf("list templates: %w", err)
+	}
+
+	fmt.Fprintf(os.Stderr, "\nAvailable Queue Templates:\n")
+	fmt.Fprintf(os.Stderr, "%s\n", strings.Repeat("━", 50))
+
+	for _, tmpl := range templates {
+		fmt.Fprintf(os.Stderr, "\n%s\n", tmpl.Name)
+		fmt.Fprintf(os.Stderr, "  %s (%d jobs)\n", tmpl.Description, len(tmpl.Config.Jobs))
+
+		// Show required variables
+		var required []string
+		var optional []string
+		for _, v := range tmpl.Variables {
+			if v.Required {
+				required = append(required, v.Name)
+			} else {
+				optional = append(optional, v.Name)
+			}
+		}
+
+		if len(required) > 0 {
+			fmt.Fprintf(os.Stderr, "  Required: %s\n", strings.Join(required, ", "))
+		}
+		if len(optional) > 0 {
+			fmt.Fprintf(os.Stderr, "  Optional: %s\n", strings.Join(optional, ", "))
+		}
+	}
+
+	fmt.Fprintf(os.Stderr, "\n")
+	return nil
+}
+
+func runQueueTemplateGenerate(cmd *cobra.Command, args []string) error {
+	templateName := args[0]
+	output, _ := cmd.Flags().GetString("output")
+	vars, _ := cmd.Flags().GetStringToString("var")
+
+	// Load template
+	tmpl, err := queue.LoadTemplate(templateName)
+	if err != nil {
+		return fmt.Errorf("load template: %w", err)
+	}
+
+	// Substitute variables
+	config, err := tmpl.Substitute(vars)
+	if err != nil {
+		return fmt.Errorf("substitute variables: %w", err)
+	}
+
+	// Marshal to JSON
+	data, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal config: %w", err)
+	}
+
+	// Output
+	if output == "" {
+		fmt.Println(string(data))
+	} else {
+		if err := os.WriteFile(output, data, 0644); err != nil {
+			return fmt.Errorf("write output file: %w", err)
+		}
+		fmt.Fprintf(os.Stderr, "Generated queue configuration: %s\n", output)
+	}
+
+	return nil
+}
+
+func runQueueTemplateShow(cmd *cobra.Command, args []string) error {
+	templateName := args[0]
+
+	tmpl, err := queue.LoadTemplate(templateName)
+	if err != nil {
+		return fmt.Errorf("load template: %w", err)
+	}
+
+	fmt.Fprintf(os.Stderr, "\nTemplate: %s\n", tmpl.Name)
+	fmt.Fprintf(os.Stderr, "Description: %s\n\n", tmpl.Description)
+
+	fmt.Fprintf(os.Stderr, "Jobs:\n")
+	for i, job := range tmpl.Config.Jobs {
+		deps := ""
+		if len(job.DependsOn) > 0 {
+			deps = fmt.Sprintf(", depends on: %s", strings.Join(job.DependsOn, ", "))
+		}
+		fmt.Fprintf(os.Stderr, "  %d. %s (timeout: %s%s)\n", i+1, job.JobID, job.Timeout, deps)
+	}
+
+	// Required variables
+	var required []string
+	var optional []string
+	for _, v := range tmpl.Variables {
+		if v.Required {
+			required = append(required, v.Name)
+		} else {
+			optional = append(optional, fmt.Sprintf("%s (default: %s)", v.Name, v.Default))
+		}
+	}
+
+	if len(required) > 0 {
+		fmt.Fprintf(os.Stderr, "\nRequired Variables:\n")
+		for _, v := range required {
+			fmt.Fprintf(os.Stderr, "  %s\n", v)
+		}
+	}
+
+	if len(optional) > 0 {
+		fmt.Fprintf(os.Stderr, "\nOptional Variables:\n")
+		for _, v := range optional {
+			fmt.Fprintf(os.Stderr, "  %s\n", v)
+		}
+	}
+
+	fmt.Fprintf(os.Stderr, "\n")
+	return nil
 }
