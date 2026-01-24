@@ -16,8 +16,9 @@ import (
 )
 
 var (
-	statusSweepID string
-	statusJSON    bool
+	statusSweepID       string
+	statusJSON          bool
+	statusCheckComplete bool
 )
 
 var statusCmd = &cobra.Command{
@@ -32,6 +33,7 @@ func init() {
 
 	statusCmd.Flags().StringVar(&statusSweepID, "sweep-id", "", "Check parameter sweep status instead of instance status")
 	statusCmd.Flags().BoolVar(&statusJSON, "json", false, "Output status as JSON")
+	statusCmd.Flags().BoolVar(&statusCheckComplete, "check-complete", false, "Check completion status and exit with standardized codes (0=complete, 1=failed, 2=running, 3=error)")
 
 	// Register completion for instance ID argument
 	statusCmd.ValidArgsFunction = completeInstanceID
@@ -102,12 +104,29 @@ func runSweepStatus(ctx context.Context, sweepID string) error {
 	}
 
 	// Query sweep status
-	if !statusJSON {
+	if !statusJSON && !statusCheckComplete {
 		fmt.Fprintf(os.Stderr, "🔍 Querying sweep status...\n\n")
 	}
 	status, err := sweep.QuerySweepStatus(ctx, cfg, sweepID)
 	if err != nil {
+		if statusCheckComplete {
+			os.Exit(3) // Error querying status
+		}
 		return fmt.Errorf("failed to query sweep status: %w", err)
+	}
+
+	// If check-complete mode, exit with standardized code
+	if statusCheckComplete {
+		switch status.Status {
+		case "COMPLETED":
+			os.Exit(0) // Complete
+		case "FAILED", "CANCELLED":
+			os.Exit(1) // Failed
+		case "RUNNING", "INITIALIZING":
+			os.Exit(2) // Still running
+		default:
+			os.Exit(3) // Unknown/error
+		}
 	}
 
 	// If JSON output requested, marshal and print

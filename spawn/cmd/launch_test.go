@@ -492,6 +492,38 @@ func TestValidateCompletionConfig(t *testing.T) {
 	}
 }
 
+// TestWriteOutputID tests the writeOutputID function for workflow integration
+func TestWriteOutputID(t *testing.T) {
+	tests := []struct {
+		name     string
+		id       string
+		filepath string
+		wantErr  bool
+	}{
+		{
+			name:     "empty filepath (no-op)",
+			id:       "sweep-123",
+			filepath: "",
+			wantErr:  false,
+		},
+		{
+			name:     "directory path (should fail)",
+			id:       "sweep-456",
+			filepath: "/tmp",
+			wantErr:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := writeOutputID(tt.id, tt.filepath)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("writeOutputID() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 // Helper types and functions
 
 type validationError struct {

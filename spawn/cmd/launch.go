@@ -143,6 +143,11 @@ var (
 	waitForRunning  bool
 	waitForSSH      bool
 	skipRegionCheck bool
+
+	// Workflow integration
+	outputIDFile string
+	wait         bool
+	waitTimeout  string
 )
 
 var launchCmd = &cobra.Command{
@@ -265,6 +270,11 @@ func init() {
 	launchCmd.Flags().BoolVar(&waitForSSH, "wait-for-ssh", true, "Wait until SSH is ready")
 	launchCmd.Flags().BoolVar(&skipRegionCheck, "skip-region-check", false, "Skip data locality region mismatch warnings")
 
+	// Workflow integration
+	launchCmd.Flags().StringVar(&outputIDFile, "output-id", "", "Write sweep/instance ID to file for scripting")
+	launchCmd.Flags().BoolVar(&wait, "wait", false, "Wait for sweep/launch to complete (requires --detach)")
+	launchCmd.Flags().StringVar(&waitTimeout, "wait-timeout", "0", "Timeout for --wait (e.g., 2h, 30m, 0=no timeout)")
+
 	// Register completions for flags
 	launchCmd.RegisterFlagCompletionFunc("region", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return completeRegion(cmd, args, toComplete)
@@ -363,6 +373,11 @@ func runLaunch(cmd *cobra.Command, args []string) error {
 }
 
 func launchParameterSweep(ctx context.Context, baseConfig *aws.LaunchConfig, plat *platform.Platform) error {
+	// Validate workflow integration flags
+	if wait && !detach {
+		return fmt.Errorf("--wait requires --detach (only works with Lambda orchestration)")
+	}
+
 	// Parse parameter file
 	var paramFormat *ParamFileFormat
 	var err error
@@ -385,6 +400,11 @@ func launchParameterSweep(ctx context.Context, baseConfig *aws.LaunchConfig, pla
 		name = "sweep"
 	}
 	sweepID := generateSweepID(name)
+
+	// Write sweep ID to file for workflow integration
+	if err := writeOutputID(sweepID, outputIDFile); err != nil {
+		fmt.Fprintf(os.Stderr, "⚠️  Failed to write sweep ID to file: %v\n", err)
+	}
 
 	fmt.Fprintf(os.Stderr, "\n🧪 Parameter Sweep: %s\n", sweepID)
 	fmt.Fprintf(os.Stderr, "   Parameters: %d\n", len(paramFormat.Params))
@@ -1133,6 +1153,11 @@ func launchWithProgress(ctx context.Context, awsClient *aws.Client, config *aws.
 	}
 	prog.Complete("Launching instance")
 	time.Sleep(300 * time.Millisecond)
+
+	// Write instance ID to file for workflow integration
+	if err := writeOutputID(result.InstanceID, outputIDFile); err != nil {
+		fmt.Fprintf(os.Stderr, "⚠️  Failed to write instance ID to file: %v\n", err)
+	}
 
 	// Step 7: Installing spore agent
 	prog.Start("Installing spore agent")
@@ -2321,6 +2346,11 @@ func launchJobArray(ctx context.Context, awsClient *aws.Client, baseConfig *aws.
 	// Each agent queries EC2 for all instances with the same spawn:job-array-id tag
 	// This avoids AWS tag size limitations (256 char max) and scales to any array size
 
+	// Write job array ID to file for workflow integration
+	if err := writeOutputID(jobArrayID, outputIDFile); err != nil {
+		fmt.Fprintf(os.Stderr, "⚠️  Failed to write job array ID to file: %v\n", err)
+	}
+
 	// Display success for job array
 	fmt.Fprintf(os.Stderr, "\n✅ Job array launched successfully!\n\n")
 	fmt.Fprintf(os.Stderr, "Job Array: %s\n", jobArrayName)
@@ -2672,6 +2702,14 @@ func launchSweepDetached(ctx context.Context, paramFormat *ParamFileFormat, base
 	fmt.Fprintf(os.Stderr, "To resume if needed:\n")
 	fmt.Fprintf(os.Stderr, "  spawn resume --sweep-id %s --detach\n", sweepID)
 
+	// Wait for completion if requested
+	if wait {
+		timeout, _ := time.ParseDuration(waitTimeout)
+		if err := waitForSweepCompletion(ctx, sweepID, timeout); err != nil {
+			return fmt.Errorf("wait failed: %w", err)
+		}
+	}
+
 	return nil
 }
 
@@ -2835,6 +2873,11 @@ func launchWithBatchQueue(ctx context.Context, plat *platform.Platform) error {
 	instance, err := awsClient.Launch(ctx, *launchConfig)
 	if err != nil {
 		return fmt.Errorf("failed to launch instance: %w", err)
+	}
+
+	// Write instance ID to file for workflow integration
+	if err := writeOutputID(instance.InstanceID, outputIDFile); err != nil {
+		fmt.Fprintf(os.Stderr, "⚠️  Failed to write instance ID to file: %v\n", err)
 	}
 
 	fmt.Fprintf(os.Stderr, "\n✅ Batch queue instance launched!\n\n")
@@ -3033,4 +3076,59 @@ func formatConstraint(c *sweep.RegionConstraint) string {
 	}
 
 	return strings.Join(parts, ", ")
+}
+
+// writeOutputID writes sweep/instance ID to file for workflow integration
+func writeOutputID(id, filepath string) error {
+	if filepath == "" {
+		return nil
+	}
+	return os.WriteFile(filepath, []byte(id+"\n"), 0644)
+}
+
+// waitForSweepCompletion polls sweep status until completion or timeout
+func waitForSweepCompletion(ctx context.Context, sweepID string, timeout time.Duration) error {
+	cfg, err := config.LoadDefaultConfig(ctx,
+		config.WithRegion("us-east-1"),
+		config.WithSharedConfigProfile("mycelium-infra"),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+
+	startTime := time.Now()
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	fmt.Fprintf(os.Stderr, "\n⏳ Waiting for sweep to complete...\n")
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+			status, err := sweep.QuerySweepStatus(ctx, cfg, sweepID)
+			if err != nil {
+				return fmt.Errorf("failed to query status: %w", err)
+			}
+
+			fmt.Fprintf(os.Stderr, "   Progress: %d/%d launched, Status: %s\n",
+				status.Launched, status.TotalParams, status.Status)
+
+			switch status.Status {
+			case "COMPLETED":
+				fmt.Fprintf(os.Stderr, "✅ Sweep completed successfully\n")
+				return nil
+			case "FAILED":
+				return fmt.Errorf("sweep failed: %s", status.ErrorMessage)
+			case "CANCELLED":
+				return fmt.Errorf("sweep was cancelled")
+			}
+
+			// Check timeout
+			if timeout > 0 && time.Since(startTime) > timeout {
+				return fmt.Errorf("timeout waiting for completion")
+			}
+		}
+	}
 }
