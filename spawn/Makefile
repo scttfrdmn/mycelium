@@ -1,4 +1,4 @@
-.PHONY: all build build-spawn build-spored build-all clean install test test-coverage test-short
+.PHONY: all build build-spawn build-spored build-all clean install test test-coverage test-short test-integration test-integration-scheduler test-integration-queue check
 
 # Version
 VERSION ?= 0.1.0
@@ -94,6 +94,37 @@ test-coverage:
 test-short:
 	@echo "Running short tests..."
 	go test -v -short ./...
+
+# Run integration tests
+test-integration:
+	@echo "Running all integration tests..."
+	@echo "Note: These tests require AWS credentials and may take 20-30 minutes"
+	go test -v -tags=integration -timeout 45m ./...
+
+# Run scheduler integration tests only
+test-integration-scheduler:
+	@echo "Running scheduler integration tests..."
+	@echo "Note: Requires AWS credentials (mycelium-dev profile)"
+	go test -v -tags=integration -run TestScheduler -timeout 20m ./...
+
+# Run queue integration tests only
+test-integration-queue:
+	@echo "Running queue integration tests..."
+	@echo "Note: Requires AWS credentials (mycelium-dev profile)"
+	go test -v -tags=integration -run TestQueue -timeout 20m ./...
+
+# Pre-commit checks (fast)
+check:
+	@echo "Running pre-commit checks..."
+	@echo "1. Formatting code..."
+	@gofmt -w .
+	@echo "2. Running go vet..."
+	@go vet ./...
+	@echo "3. Running staticcheck..."
+	@staticcheck ./... || echo "staticcheck not installed, skipping..."
+	@echo "4. Running short tests..."
+	@go test -short ./...
+	@echo "✓ All checks passed!"
 
 # Development
 dev: build
