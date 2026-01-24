@@ -363,22 +363,66 @@ Spawn has evolved from a single-instance tool into a **production-ready cloud or
 
 ## Recommended Next Steps (v0.13.0)
 
-### Priority 1: Complete Web Dashboard (4 weeks)
-**Why:** Last major component with incomplete user experience
-**Impact:** Enables non-technical users, team collaboration
-**Effort:** 3-4 weeks
+**Focus:** Security hardening, compliance, and documentation
 
-### Priority 2: Auto-Scaling Job Arrays (3 weeks)
-**Why:** High demand for long-running resilient clusters
-**Impact:** Enables production ML training, self-healing systems
-**Effort:** 3-4 weeks
+### Priority 1: Security Hardening (#63) - 8 weeks
+**Why:** Production systems need robust security
+**Impact:** Secure by default, enterprise-ready
+**Deliverables:**
+- Input validation and injection prevention
+- IAM permission review (least privilege)
+- Credential and secrets management audit
+- Network security hardening
+- Data encryption (at rest and in transit)
+- Dependency vulnerability scanning
+- Audit logging and traceability
+- SSH security improvements
+- SECURITY.md documentation
 
-### Priority 3: Advanced Volume Management (2 weeks)
-**Why:** Complete existing partial implementation
-**Impact:** Better data persistence, backup/restore workflows
-**Effort:** 2 weeks
+### Priority 2: NIST Compliance (#64, #65) - 10 weeks
+**Why:** Enable use in regulated environments (federal, DoD, CUI)
+**Impact:** Unlocks government and contractor markets
+**Deliverables:**
 
-**Total Timeline for v0.13.0:** 8-10 weeks
+**NIST 800-171 (#64):**
+- Configuration mode flag (--nist-800-171)
+- Self-hosted infrastructure support
+- CloudFormation/Terraform templates
+- Audit logging with user identity
+- Encrypted volumes by default
+- Private subnet deployment
+- NIST800171.md compliance guide
+
+**NIST 800-53 (#65):**
+- Baseline selection (Low/Moderate/High)
+- FedRAMP compatibility
+- SBOM generation
+- Backup/restore automation
+- Contingency planning features
+- NIST80053.md compliance guide
+- System Security Plan templates
+
+### Priority 3: Comprehensive Documentation (#66) - 14 weeks
+**Why:** Good documentation drives adoption
+**Impact:** Users can learn and master spawn efficiently
+**Deliverables:**
+- 7 beginner tutorials
+- 11+ how-to guides
+- Complete command reference (100+ flags)
+- Architecture documentation with diagrams
+- Troubleshooting guides
+- FAQ (50+ questions)
+- Documentation website (docs.mycelium.dev)
+
+### Priority 4: Infrastructure (#62) - 1 week
+**Why:** Enable automated Docker image publishing
+**Impact:** Users can pull spawn Docker images
+**Deliverables:**
+- Configure Docker Hub credentials
+- Automated multi-arch builds
+
+**Total Timeline for v0.13.0:** ~16 weeks (parallelizable)
+**Target Release:** April 2026
 
 ---
 
@@ -400,8 +444,10 @@ Spawn has evolved from a single-instance tool into a **production-ready cloud or
   - Data staging
   - Advanced DNS features
 
-**Current State:** spawn is **production-ready** for most use cases. The core platform is complete and battle-tested.
+**Current State (v0.12.0):** spawn is **production-ready** for most use cases. The core platform is complete and battle-tested.
 
-**Remaining Work:** Polish (web dashboard), advanced features (auto-scaling, marketplace), and enterprise capabilities.
+**v0.13.0 Direction:** Focus shift to security, compliance, and documentation to enable enterprise and government adoption.
 
-**Achievement:** Transformed from "convenient single-instance tool" to "comprehensive cloud orchestration platform" in ~4 months.
+**Future Work (v0.14.0+):** Web dashboard, auto-scaling job arrays, template marketplace, and additional enterprise features.
+
+**Achievement:** Transformed from "convenient single-instance tool" to "comprehensive cloud orchestration platform" in ~4 months. Now adding enterprise-grade security and compliance.
