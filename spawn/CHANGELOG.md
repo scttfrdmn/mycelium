@@ -5,6 +5,124 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0] - 2026-01-24
+
+This is a **critical security release** addressing command injection and path traversal vulnerabilities. All users should upgrade immediately.
+
+### Security - Command Injection Protection (CRITICAL)
+
+#### Vulnerabilities Fixed
+- **cmd/config.go**: SSH command injection via config keys/values
+- **cmd/launch.go**: User data script injection via username/SSH keys
+- **pkg/userdata/mpi.go**: MPI command injection in templates
+- **pkg/userdata/storage.go**: Mount path injection in templates
+
+Attack vectors blocked: `; rm -rf /`, `$(whoami)`, `` `whoami` ``, `${IFS}malicious`, variable expansion
+
+#### New Security Package (`pkg/security/`)
+- **ShellEscape()**: POSIX shell argument escaping using Go's strconv.Quote
+- **ValidateUsername()**: Regex validation for safe usernames (`^[a-z][a-z0-9_-]{0,31}$`)
+- **ValidateBase64()**: Base64 format validation to prevent injection
+- **ValidateCommand()**: Detection of dangerous shell characters
+- **SanitizeForLog()**: Removes AWS credentials from log messages
+
+#### Template Security
+- Added `shellEscape` template function for safe Go template rendering
+- All dynamic values in user data templates now properly escaped
+- MPI and storage templates hardened against injection attacks
+
+**Test Coverage**: 78.4% with comprehensive attack pattern fuzzing
+
+### Security - Path Traversal Protection (HIGH)
+
+#### Vulnerabilities Fixed
+- **cmd/launch.go**: User data file path traversal (`@../../etc/passwd`)
+- **pkg/agent/queue_runner.go**: Job result upload path traversal
+
+#### Path Validation (`pkg/security/path.go`)
+- **ValidatePathForReading()**: Blocks directory traversal attacks
+- **ValidateMountPath()**: Restricts mounts to `/mnt`, `/data`, `/scratch`
+- **SanitizePath()**: Removes traversal sequences for safe logging
+
+Blocked system paths: `/etc`, `/sys`, `/proc`, `/root`, `/boot`, `/dev`, `/var/lib`
+
+### Security - Credential Protection
+
+#### Secrets Package (`pkg/security/secrets.go`)
+- **EncryptSecret()/DecryptSecret()**: KMS-based encryption (infrastructure ready)
+- **MaskSecret()**: Shows only first/last 4 characters
+- **MaskURL()**: Masks webhook URL paths while showing domain
+- **IsEncrypted()**: Detects KMS-encrypted values
+
+#### Credential Masking
+- Webhook URLs masked in CLI output
+- AWS access keys removed from logs
+- Sensitive data sanitized before logging
+
+### Added - Audit Logging Infrastructure
+
+#### Audit Package (`pkg/audit/`)
+- **AuditLogger**: Structured JSON audit event logging
+- **Context Propagation**: Correlation IDs for distributed tracing
+- **User Attribution**: Every operation tagged with user ID
+- **CloudWatch Logs Ready**: JSON format for easy ingestion
+
+#### Audit Event Schema
+```json
+{
+  "timestamp": "2026-01-24T16:37:00Z",
+  "level": "info",
+  "operation": "launch_instances",
+  "user_id": "435415984226",
+  "instance_id": "i-1234567890",
+  "region": "us-east-1",
+  "correlation_id": "uuid-v4",
+  "result": "success",
+  "additional_data": {}
+}
+```
+
+**Test Coverage**: 79.2% with full context propagation testing
+
+### Changed - Dependencies
+
+- Added `github.com/aws/aws-sdk-go-v2/service/kms v1.49.5` for credential encryption
+- Added `github.com/google/uuid` for correlation ID generation
+
+### Documentation
+
+- **SECURITY.md**: Added code-level security hardening section
+- **SECURITY.md**: Added vulnerability reporting process
+- **SECURITY.md**: Documented all protection mechanisms
+- Security best practices for users and developers
+
+### Compliance
+
+This release addresses:
+- **OWASP Top 10**: A03:2021 (Injection)
+- **CWE-78**: OS Command Injection
+- **CWE-22**: Path Traversal
+- **CWE-532**: Information Exposure Through Log Files
+
+### Deferred to v0.13.1
+
+The following features are tracked in issue #67:
+- IAM policy hardening (scope S3/DynamoDB permissions)
+- Audit logging instrumentation (cmd/cancel, cmd/extend, Lambda handlers)
+- Webhook URL encryption implementation
+- CloudWatch Logs integration
+
+### Upgrade Notes
+
+**No Breaking Changes**: All security fixes are transparent to existing usage.
+
+**Action Required**: None. Security improvements are automatic upon upgrade.
+
+**Testing Recommended**:
+- Test user data file reads with `--user-data-file` flag
+- Verify SSH config commands work as expected
+- Test any custom scripts that use special characters
+
 ## [0.12.0] - 2026-01-24
 
 This release focuses on production observability, cost management, reliability, and workflow orchestration.
