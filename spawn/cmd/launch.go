@@ -27,6 +27,7 @@ import (
 	"github.com/scttfrdmn/mycelium/spawn/pkg/progress"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/queue"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/regions"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/security"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/staging"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/storage"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/sweep"
@@ -1440,10 +1441,22 @@ func buildUserData(plat *platform.Platform, config *aws.LaunchConfig) (string, e
 	}
 	publicKeyBase64 := base64.StdEncoding.EncodeToString(publicKey)
 
+	// Validate username and public key before using in script
+	if err := security.ValidateUsername(username); err != nil {
+		return "", fmt.Errorf("invalid username: %w", err)
+	}
+	if err := security.ValidateBase64(publicKeyBase64); err != nil {
+		return "", fmt.Errorf("invalid public key encoding: %w", err)
+	}
+
 	// Read custom user data if provided
 	customUserData := ""
 
 	if userDataFile != "" {
+		// Validate path for security
+		if err := security.ValidatePathForReading(userDataFile); err != nil {
+			return "", fmt.Errorf("invalid user data file path: %w", err)
+		}
 		data, err := os.ReadFile(userDataFile)
 		if err != nil {
 			return "", err
@@ -1452,6 +1465,10 @@ func buildUserData(plat *platform.Platform, config *aws.LaunchConfig) (string, e
 	} else if userData != "" {
 		if strings.HasPrefix(userData, "@") {
 			path := userData[1:]
+			// Validate path for security
+			if err := security.ValidatePathForReading(path); err != nil {
+				return "", fmt.Errorf("invalid user data file path: %w", err)
+			}
 			data, err := os.ReadFile(path)
 			if err != nil {
 				return "", err
@@ -1467,9 +1484,9 @@ func buildUserData(plat *platform.Platform, config *aws.LaunchConfig) (string, e
 set -e
 
 # User configuration
-LOCAL_USERNAME="%s"
-LOCAL_SSH_KEY_BASE64="%s"
-`, username, publicKeyBase64) + `
+LOCAL_USERNAME=%s
+LOCAL_SSH_KEY_BASE64=%s
+`, security.ShellEscape(username), security.ShellEscape(publicKeyBase64)) + `
 
 # Detect architecture
 ARCH=$(uname -m)

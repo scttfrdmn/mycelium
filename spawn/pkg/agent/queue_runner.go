@@ -16,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/queue"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/security"
 )
 
 // QueueRunner executes a batch job queue sequentially
@@ -333,6 +334,11 @@ func (r *QueueRunner) executeJob(job *queue.JobConfig, attempt int) (*JobResult,
 // uploadJobResults uploads job result files to S3
 func (r *QueueRunner) uploadJobResults(jobID string, resultPaths []string) error {
 	for _, pattern := range resultPaths {
+		// Validate pattern for security (prevent path traversal)
+		if err := security.ValidatePathForReading(pattern); err != nil {
+			return fmt.Errorf("invalid result path pattern %s: %w", pattern, err)
+		}
+
 		// Expand glob pattern
 		matches, err := filepath.Glob(pattern)
 		if err != nil {

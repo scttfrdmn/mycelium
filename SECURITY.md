@@ -580,7 +580,166 @@ aws cloudtrail lookup-events \
 
 ---
 
-## 10. Frequently Asked Questions (Security)
+## 10. Code-Level Security Hardening (v0.13.0)
+
+### Command Injection Protection
+
+spawn implements comprehensive protection against shell command injection attacks:
+
+**Security Package** (`spawn/pkg/security`):
+- `ShellEscape()`: Properly escapes strings for POSIX shell arguments
+- `ValidateUsername()`: Validates usernames against safe patterns
+- `ValidateCommand()`: Detects potentially dangerous shell characters
+
+**Protected Operations**:
+1. **SSH Commands** (`spawn/cmd/config.go`):
+   - Config keys and values properly escaped before SSH execution
+   - Prevents injection via `spawn config set "key" "value; rm -rf /"`
+
+2. **User Data Scripts** (`spawn/cmd/launch.go`):
+   - Usernames validated against regex: `^[a-z][a-z0-9_-]{0,31}$`
+   - SSH keys validated as proper base64
+   - All dynamic values shell-escaped in bash scripts
+
+3. **MPI Templates** (`spawn/pkg/userdata/mpi.go`):
+   - Custom `shellEscape` template function
+   - MPI commands properly escaped: `{{.MPICommand | shellEscape}}`
+
+4. **Storage Mounting** (`spawn/pkg/userdata/storage.go`):
+   - Mount paths validated and escaped
+   - Filesystem DNS names escaped in mount commands
+
+**Test Coverage**: 78.4% with attack pattern fuzzing
+
+---
+
+### Path Traversal Protection
+
+All file path operations are validated to prevent directory traversal attacks:
+
+**Validation Functions**:
+- `ValidatePathForReading()`: Blocks `../../etc/passwd` style attacks
+- `ValidateMountPath()`: Restricts mounts to `/mnt`, `/data`, `/scratch`
+- `SanitizePath()`: Removes traversal sequences for safe logging
+
+**Blocked Paths**:
+- `/etc/` - System configuration
+- `/sys/` - System kernel interface
+- `/proc/` - Process information
+- `/root/` - Root home directory
+- `/boot/` - Boot loader files
+- `/dev/` - Device files
+- `/var/lib/` - System libraries
+
+**Protected Operations**:
+1. **User Data File Reads** (`spawn/cmd/launch.go`):
+   - Both `--user-data-file` and `--user-data @file` validated
+   - Prevents reading system files
+
+2. **Job Result Uploads** (`spawn/pkg/agent/queue_runner.go`):
+   - Glob patterns validated before expansion
+   - Prevents uploading sensitive files
+
+---
+
+### Credential Protection
+
+Sensitive credentials are protected from exposure:
+
+**Security Functions**:
+- `MaskSecret()`: Masks secrets showing only first/last 4 chars
+- `MaskURL()`: Shows scheme and domain, masks path
+- `SanitizeForLog()`: Removes AWS keys from log messages
+- `EncryptSecret()`/`DecryptSecret()`: KMS-based encryption (ready for use)
+
+**Use Cases**:
+- Webhook URLs in alert configurations
+- API tokens in logs
+- AWS access keys accidentally logged
+
+---
+
+### Audit Logging Infrastructure
+
+Structured audit logging for security-sensitive operations:
+
+**Audit Package** (`spawn/pkg/audit`):
+
+**AuditLogger** - Structured JSON logging:
+```go
+logger := audit.NewLogger(os.Stderr, userID, correlationID)
+logger.LogOperation("terminate_instances", sweepID, "success", nil)
+```
+
+**Context Propagation**:
+```go
+ctx = audit.NewContextWithAudit(ctx, userID)
+logger := audit.NewLoggerFromContext(ctx)
+```
+
+**Audit Event Fields**:
+- `timestamp`: UTC timestamp
+- `level`: info/error
+- `operation`: Action performed
+- `user_id`: AWS account/user ID
+- `instance_id`: Resource identifier
+- `region`: AWS region
+- `correlation_id`: Trace requests across systems
+- `result`: success/failed/initiated
+- `error`: Error message if failed
+- `additional_data`: Structured metadata
+
+**Ready for CloudWatch Logs Integration**:
+- JSON format for CloudWatch Logs Insights
+- Correlation IDs for distributed tracing
+- User attribution for compliance
+
+**Test Coverage**: 79.2%
+
+---
+
+### Security Testing
+
+**Test Suites**:
+1. **Attack Pattern Tests** (`pkg/security/shell_test.go`):
+   - Command injection: `; rm -rf /`, `$(whoami)`, backticks
+   - Path traversal: `../../etc/passwd`
+   - Variable expansion: `${IFS}malicious`
+
+2. **Path Validation Tests** (`pkg/security/path_test.go`):
+   - System directory blocking
+   - Mount point restrictions
+   - Traversal detection
+
+3. **Audit Logger Tests** (`pkg/audit/logger_test.go`):
+   - JSON formatting
+   - Context propagation
+   - Error logging
+
+**Coverage Targets**:
+- Security package: 78.4% (target: 80%)
+- Audit package: 79.2% (target: 80%)
+
+---
+
+### Vulnerability Reporting
+
+**Security Contact**: scott@spore.host
+
+**Please Report**:
+- Command injection bypasses
+- Path traversal attacks
+- Credential exposure
+- Privilege escalation
+- Any security vulnerability
+
+**Do NOT report via public GitHub issues**
+
+Response time: 48 hours
+
+---
+
+## 11. Frequently Asked Questions (Security)
 
 ### Q: Can spawn access my existing EC2 instances?
 

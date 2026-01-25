@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"text/template"
+
+	"github.com/scttfrdmn/mycelium/spawn/pkg/security"
 )
 
 // StorageConfig contains configuration for storage mounting
@@ -21,7 +23,12 @@ type StorageConfig struct {
 
 // GenerateStorageUserData generates storage mounting script
 func GenerateStorageUserData(config StorageConfig) (string, error) {
-	tmpl, err := template.New("storage").Parse(storageUserDataTemplate)
+	// Register custom template function for shell escaping
+	funcMap := template.FuncMap{
+		"shellEscape": security.ShellEscape,
+	}
+
+	tmpl, err := template.New("storage").Funcs(funcMap).Parse(storageUserDataTemplate)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse storage template: %w", err)
 	}
@@ -38,18 +45,18 @@ const storageUserDataTemplate = `
 {{if .FSxLustreEnabled}}
 # FSx Lustre mounting
 amazon-linux-extras install -y lustre2.12
-mkdir -p {{.FSxMountPoint}}
-mount -t lustre {{.FSxFilesystemDNS}}@tcp:/{{.FSxMountName}} {{.FSxMountPoint}}
+mkdir -p {{.FSxMountPoint | shellEscape}}
+mount -t lustre {{.FSxFilesystemDNS | shellEscape}}@tcp:/{{.FSxMountName | shellEscape}} {{.FSxMountPoint | shellEscape}}
 echo "{{.FSxFilesystemDNS}}@tcp:/{{.FSxMountName}} {{.FSxMountPoint}} lustre defaults,noatime,flock,_netdev 0 0" >> /etc/fstab
-echo "export FSX_MOUNT={{.FSxMountPoint}}" >> /etc/profile.d/fsx.sh
+echo "export FSX_MOUNT={{.FSxMountPoint | shellEscape}}" >> /etc/profile.d/fsx.sh
 {{end}}
 
 {{if .EFSEnabled}}
 # EFS mounting
 yum install -y nfs-utils
-mkdir -p {{.EFSMountPoint}}
-mount -t nfs4 -o {{.EFSMountOptions}} {{.EFSFilesystemDNS}}:/ {{.EFSMountPoint}}
+mkdir -p {{.EFSMountPoint | shellEscape}}
+mount -t nfs4 -o {{.EFSMountOptions | shellEscape}} {{.EFSFilesystemDNS | shellEscape}}:/ {{.EFSMountPoint | shellEscape}}
 echo "{{.EFSFilesystemDNS}}:/ {{.EFSMountPoint}} nfs4 {{.EFSMountOptions}} 0 0" >> /etc/fstab
-echo "export EFS_MOUNT={{.EFSMountPoint}}" >> /etc/profile.d/efs.sh
+echo "export EFS_MOUNT={{.EFSMountPoint | shellEscape}}" >> /etc/profile.d/efs.sh
 {{end}}
 `

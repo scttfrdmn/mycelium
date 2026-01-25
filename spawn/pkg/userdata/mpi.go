@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"text/template"
+
+	"github.com/scttfrdmn/mycelium/spawn/pkg/security"
 )
 
 // MPIConfig contains configuration for MPI user-data generation
@@ -20,7 +22,12 @@ type MPIConfig struct {
 
 // GenerateMPIUserData generates the MPI setup script for inclusion in user-data
 func GenerateMPIUserData(config MPIConfig) (string, error) {
-	tmpl, err := template.New("mpi").Parse(mpiUserDataTemplate)
+	// Register custom template function for shell escaping
+	funcMap := template.FuncMap{
+		"shellEscape": security.ShellEscape,
+	}
+
+	tmpl, err := template.New("mpi").Funcs(funcMap).Parse(mpiUserDataTemplate)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse MPI template: %w", err)
 	}
@@ -96,6 +103,6 @@ while [ ! -f /etc/spawn/job-array-peers.json ]; do sleep 2; done
 jq -r ".[] | \"\(.ip) slots=$SLOTS\"" /etc/spawn/job-array-peers.json > /tmp/mpi-hostfile
 if [ "{{.JobArrayIndex}}" -eq 0 ]; then
   sleep 10
-  {{if .MPICommand}}mpirun --mca orte_base_help_aggregate 0 -np $(({{.JobArraySize}} * SLOTS)) -hostfile /tmp/mpi-hostfile {{.MPICommand}}{{end}}
+  {{if .MPICommand}}mpirun --mca orte_base_help_aggregate 0 -np $(({{.JobArraySize}} * SLOTS)) -hostfile /tmp/mpi-hostfile {{.MPICommand | shellEscape}}{{end}}
 fi
 `

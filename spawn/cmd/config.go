@@ -8,6 +8,7 @@ import (
 
 	"github.com/scttfrdmn/mycelium/pkg/i18n"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/aws"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/security"
 	"github.com/spf13/cobra"
 )
 
@@ -65,9 +66,9 @@ func runConfig(cmd *cobra.Command, args []string) error {
 	var sporedCmd string
 	switch action {
 	case "get":
-		sporedCmd = fmt.Sprintf("sudo /usr/local/bin/spored config get %s 2>&1", args[2])
+		sporedCmd = fmt.Sprintf("sudo /usr/local/bin/spored config get %s 2>&1", security.ShellEscape(args[2]))
 	case "set":
-		sporedCmd = fmt.Sprintf("sudo /usr/local/bin/spored config set %s %s 2>&1", args[2], args[3])
+		sporedCmd = fmt.Sprintf("sudo /usr/local/bin/spored config set %s %s 2>&1", security.ShellEscape(args[2]), security.ShellEscape(args[3]))
 	case "list":
 		sporedCmd = "sudo /usr/local/bin/spored config list 2>&1"
 	}
