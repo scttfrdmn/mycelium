@@ -1,10 +1,17 @@
 # Parameter Files Reference
 
-Complete reference for parameter sweep configuration files.
+Complete specification for parameter sweep configuration files.
 
-## File Format
+## Overview
 
-Parameter files use YAML or JSON format to define parameter sweeps.
+Parameter files define sweeps for launching multiple instances with different configurations. They use YAML format and support both simple lists and complex parameter combinations.
+
+**File format:** YAML (`.yaml` or `.yml`)
+
+**Used by:**
+- `spawn launch --param-file <file>`
+- `spawn list-sweeps`
+- `spawn resume --sweep-id <id>`
 
 ## Basic Structure
 

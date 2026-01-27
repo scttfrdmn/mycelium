@@ -277,7 +277,7 @@ https://discord.com/api/webhooks/{WEBHOOK_ID}/{WEBHOOK_TOKEN}
 ### Step 2: Create Alert
 
 ```bash
-export DISCORD_WEBHOOK="https://discord.com/api/webhooks/..."
+export DISCORD_WEBHOOK="https://discord.com/api/webhooks/{WEBHOOK_ID}/{WEBHOOK_TOKEN}"
 
 spawn alerts create sweep-20260127-abc123 \
   --discord $DISCORD_WEBHOOK \
