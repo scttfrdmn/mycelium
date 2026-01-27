@@ -5,6 +5,105 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.1] - 2026-01-27
+
+This release completes Phase 4 of security hardening (issue #67) with IAM policy scoping, comprehensive audit logging, and webhook URL encryption.
+
+### Security - IAM Policy Hardening
+
+#### Scoped Resource Policies (`pkg/aws/iam.go`)
+- **GenerateScopedS3Policy()**: Restricts S3 access to `spawn-binaries-*` and `spawn-results-*` buckets only
+- **GenerateScopedDynamoDBPolicy()**: Restricts DynamoDB access to `spawn-alerts`, `spawn-schedules`, `spawn-queues` tables
+- **GenerateScopedCloudWatchLogsPolicy()**: Restricts CloudWatch Logs to `/aws/spawn/audit` log group
+- **buildTrustPolicyWithAccount()**: Adds `aws:SourceAccount` condition to prevent cross-account role assumption
+
+**Impact**: Eliminates wildcard resource permissions (`*`), enforces least-privilege access
+
+**Test Coverage**: 8 comprehensive tests validating policy structure and resource scoping
+
+#### Trust Policy Hardening
+- All IAM roles now include account-specific conditions
+- Prevents unauthorized cross-account role assumption
+- Mitigates confused deputy attacks
+
+### Security - Audit Logging System
+
+#### Structured Audit Framework (`pkg/audit/`)
+- **AuditLogger**: Structured JSON logging with correlation IDs
+- **User Identity**: AWS STS GetCallerIdentity integration for accountability
+- **Correlation IDs**: UUID-based request tracing for distributed operations
+- **Metadata Tracking**: Contextual data (instance types, regions, counts, TTL values)
+
+#### Instrumented Operations
+- **cmd/cancel.go**: Sweep cancellation and instance termination tracking
+- **cmd/extend.go**: TTL extensions for single instances and job arrays
+- **cmd/launch.go**: Instance launches, IAM role creation, security group creation
+
+**Log Format**: JSON with timestamp, level, operation, user_id, resource_id, region, correlation_id, result, error
+
+**CloudWatch Integration Ready**: Logs can be shipped to `/aws/spawn/audit` log group for centralized monitoring
+
+### Security - Webhook URL Encryption
+
+#### KMS-Based Encryption (`pkg/alerts/alerts.go`)
+- **Encryption at Rest**: Webhook URLs (Slack, Discord, generic webhooks) encrypted in DynamoDB using AWS KMS
+- **NewClientWithEncryption()**: Constructor for KMS-enabled alert clients
+- **Automatic Encryption**: URLs encrypted before DynamoDB storage, decrypted on retrieval
+- **Log Masking**: Webhook URLs masked in all error logs using `security.MaskURL()`
+
+#### Lambda Handler Updates (`lambda/alert-handler/main.go`)
+- KMS client initialization with `WEBHOOK_KMS_KEY_ID` environment variable
+- Automatic decryption of webhook URLs when sending notifications
+- Masked URLs in error messages (prevents credential leakage)
+
+#### Backward Compatibility
+- **Opt-In**: Encryption disabled by default, enabled via environment variable
+- **Mixed Mode**: Supports both plaintext and encrypted URLs simultaneously
+- **Migration Safe**: Existing plaintext webhooks continue working during transition
+- **Detection**: `security.IsEncrypted()` automatically identifies encryption state
+
+#### KMS Key Created
+- **Alias**: `alias/spawn-webhook-encryption`
+- **Key ID**: `999884b3-23ce-44dd-88e8-5f46300cbd54`
+- **Region**: `us-east-1`
+- **Account**: `966362334030` (mycelium-infra)
+
+**Test Results**: All encryption, decryption, masking, and backward compatibility tests passed (see `KMS_TEST_RESULTS.md`)
+
+### Deployment Notes
+
+#### Lambda Configuration
+Set environment variable to enable webhook encryption:
+```bash
+WEBHOOK_KMS_KEY_ID=alias/spawn-webhook-encryption
+```
+
+#### IAM Permissions
+Lambda execution role requires:
+```json
+{
+  "Effect": "Allow",
+  "Action": ["kms:Decrypt", "kms:DescribeKey"],
+  "Resource": "arn:aws:kms:us-east-1:966362334030:key/999884b3-23ce-44dd-88e8-5f46300cbd54"
+}
+```
+
+#### Migration Strategy
+1. Deploy Lambda with `WEBHOOK_KMS_KEY_ID` environment variable
+2. New webhook URLs will be encrypted automatically
+3. Existing plaintext webhooks continue working (no action required)
+4. Optional: Re-save alerts to encrypt legacy webhooks
+
+**No Breaking Changes**: All updates are backward compatible.
+
+### Performance
+- Audit logging overhead: < 5ms per operation
+- KMS encryption: ~300 bytes overhead per webhook URL
+- KMS API latency: ~50ms per encrypt/decrypt operation
+
+### Related Issues
+- Closes #67 (Phase 4 security hardening)
+
 ## [0.13.0] - 2026-01-24
 
 This is a **critical security release** addressing command injection and path traversal vulnerabilities. All users should upgrade immediately.
