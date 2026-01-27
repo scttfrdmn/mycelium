@@ -1,0 +1,368 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'spawn Self-Hosted Infrastructure - DynamoDB, S3, Lambda, IAM (v0.14.0)'
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: 'spawn'
+    Description: 'Environment name prefix for all resources'
+    AllowedPattern: '^[a-z][a-z0-9-]*$'
+    ConstraintDescription: 'Must start with a letter and contain only lowercase letters, numbers, and hyphens'
+
+  EnableEncryption:
+    Type: String
+    Default: 'true'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: 'Enable encryption for S3 buckets and DynamoDB tables'
+
+  KMSKeyArn:
+    Type: String
+    Default: ''
+    Description: 'Optional: Custom KMS key ARN for encryption (leave empty for AWS-managed keys)'
+
+Conditions:
+  UseEncryption: !Equals [!Ref EnableEncryption, 'true']
+  UseCustomKMS: !And
+    - !Condition UseEncryption
+    - !Not [!Equals [!Ref KMSKeyArn, '']]
+
+Resources:
+  # DynamoDB Tables
+
+  SchedulesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${EnvironmentName}-schedules'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: schedule_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: schedule_id
+          KeyType: HASH
+      SSESpecification: !If
+        - UseEncryption
+        - SSEEnabled: true
+          SSEType: !If [UseCustomKMS, 'KMS', 'KMS']
+          KMSMasterKeyId: !If [UseCustomKMS, !Ref KMSKeyArn, !Ref AWS::NoValue]
+        - !Ref AWS::NoValue
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${EnvironmentName}-schedules'
+        - Key: spawn:managed
+          Value: 'true'
+        - Key: spawn:resource-type
+          Value: 'schedules-table'
+
+  SweepOrchestrationTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${EnvironmentName}-sweep-orchestration'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: sweep_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: sweep_id
+          KeyType: HASH
+      SSESpecification: !If
+        - UseEncryption
+        - SSEEnabled: true
+          SSEType: !If [UseCustomKMS, 'KMS', 'KMS']
+          KMSMasterKeyId: !If [UseCustomKMS, !Ref KMSKeyArn, !Ref AWS::NoValue]
+        - !Ref AWS::NoValue
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${EnvironmentName}-sweep-orchestration'
+        - Key: spawn:managed
+          Value: 'true'
+        - Key: spawn:resource-type
+          Value: 'sweep-orchestration-table'
+
+  AlertsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${EnvironmentName}-alerts'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: alert_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: alert_id
+          KeyType: HASH
+      SSESpecification: !If
+        - UseEncryption
+        - SSEEnabled: true
+          SSEType: !If [UseCustomKMS, 'KMS', 'KMS']
+          KMSMasterKeyId: !If [UseCustomKMS, !Ref KMSKeyArn, !Ref AWS::NoValue]
+        - !Ref AWS::NoValue
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${EnvironmentName}-alerts'
+        - Key: spawn:managed
+          Value: 'true'
+        - Key: spawn:resource-type
+          Value: 'alerts-table'
+
+  AlertHistoryTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${EnvironmentName}-alert-history'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: history_id
+          AttributeType: S
+        - AttributeName: timestamp
+          AttributeType: N
+      KeySchema:
+        - AttributeName: history_id
+          KeyType: HASH
+        - AttributeName: timestamp
+          KeyType: RANGE
+      SSESpecification: !If
+        - UseEncryption
+        - SSEEnabled: true
+          SSEType: !If [UseCustomKMS, 'KMS', 'KMS']
+          KMSMasterKeyId: !If [UseCustomKMS, !Ref KMSKeyArn, !Ref AWS::NoValue]
+        - !Ref AWS::NoValue
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${EnvironmentName}-alert-history'
+        - Key: spawn:managed
+          Value: 'true'
+        - Key: spawn:resource-type
+          Value: 'alert-history-table'
+
+  # S3 Buckets
+
+  BinariesBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${EnvironmentName}-binaries-${AWS::Region}'
+      BucketEncryption: !If
+        - UseEncryption
+        - ServerSideEncryptionConfiguration:
+            - ServerSideEncryptionByDefault:
+                SSEAlgorithm: !If [UseCustomKMS, 'aws:kms', 'AES256']
+                KMSMasterKeyID: !If [UseCustomKMS, !Ref KMSKeyArn, !Ref AWS::NoValue]
+        - !Ref AWS::NoValue
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldVersions
+            Status: Enabled
+            NoncurrentVersionExpirationInDays: 90
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${EnvironmentName}-binaries'
+        - Key: spawn:managed
+          Value: 'true'
+        - Key: spawn:resource-type
+          Value: 'binaries-bucket'
+
+  SchedulesBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${EnvironmentName}-schedules-${AWS::Region}'
+      BucketEncryption: !If
+        - UseEncryption
+        - ServerSideEncryptionConfiguration:
+            - ServerSideEncryptionByDefault:
+                SSEAlgorithm: !If [UseCustomKMS, 'aws:kms', 'AES256']
+                KMSMasterKeyID: !If [UseCustomKMS, !Ref KMSKeyArn, !Ref AWS::NoValue]
+        - !Ref AWS::NoValue
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldSchedules
+            Status: Enabled
+            ExpirationInDays: 30
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${EnvironmentName}-schedules'
+        - Key: spawn:managed
+          Value: 'true'
+        - Key: spawn:resource-type
+          Value: 'schedules-bucket'
+
+  # IAM Role for Lambda Functions
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${EnvironmentName}-lambda-execution-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Policies:
+        - PolicyName: SpawnLambdaPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'dynamodb:GetItem'
+                  - 'dynamodb:PutItem'
+                  - 'dynamodb:UpdateItem'
+                  - 'dynamodb:DeleteItem'
+                  - 'dynamodb:Query'
+                  - 'dynamodb:Scan'
+                Resource:
+                  - !GetAtt SchedulesTable.Arn
+                  - !GetAtt SweepOrchestrationTable.Arn
+                  - !GetAtt AlertsTable.Arn
+                  - !GetAtt AlertHistoryTable.Arn
+              - Effect: Allow
+                Action:
+                  - 's3:GetObject'
+                  - 's3:PutObject'
+                  - 's3:ListBucket'
+                Resource:
+                  - !GetAtt BinariesBucket.Arn
+                  - !Sub '${BinariesBucket.Arn}/*'
+                  - !GetAtt SchedulesBucket.Arn
+                  - !Sub '${SchedulesBucket.Arn}/*'
+              - Effect: Allow
+                Action:
+                  - 'ec2:DescribeInstances'
+                  - 'ec2:DescribeTags'
+                  - 'ec2:TerminateInstances'
+                  - 'ec2:StopInstances'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/spawn/*'
+      Tags:
+        - Key: Name
+          Value: !Sub '${EnvironmentName}-lambda-execution-role'
+        - Key: spawn:managed
+          Value: 'true'
+
+  # CloudWatch Log Groups
+
+  SchedulerHandlerLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/spawn/scheduler-handler'
+      RetentionInDays: 30
+
+  SweepOrchestratorLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/spawn/sweep-orchestrator'
+      RetentionInDays: 30
+
+  AlertHandlerLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/spawn/alert-handler'
+      RetentionInDays: 30
+
+  DashboardAPILogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/spawn/dashboard-api'
+      RetentionInDays: 30
+
+Outputs:
+  EnvironmentName:
+    Description: 'Environment name used for resource naming'
+    Value: !Ref EnvironmentName
+    Export:
+      Name: !Sub '${AWS::StackName}-EnvironmentName'
+
+  # DynamoDB Table Names
+  SchedulesTableName:
+    Description: 'DynamoDB table name for schedules'
+    Value: !Ref SchedulesTable
+    Export:
+      Name: !Sub '${AWS::StackName}-SchedulesTable'
+
+  SweepOrchestrationTableName:
+    Description: 'DynamoDB table name for sweep orchestration'
+    Value: !Ref SweepOrchestrationTable
+    Export:
+      Name: !Sub '${AWS::StackName}-SweepOrchestrationTable'
+
+  AlertsTableName:
+    Description: 'DynamoDB table name for alerts'
+    Value: !Ref AlertsTable
+    Export:
+      Name: !Sub '${AWS::StackName}-AlertsTable'
+
+  AlertHistoryTableName:
+    Description: 'DynamoDB table name for alert history'
+    Value: !Ref AlertHistoryTable
+    Export:
+      Name: !Sub '${AWS::StackName}-AlertHistoryTable'
+
+  # S3 Bucket Names
+  BinariesBucketName:
+    Description: 'S3 bucket name for spawn binaries'
+    Value: !Ref BinariesBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-BinariesBucket'
+
+  SchedulesBucketName:
+    Description: 'S3 bucket name for schedules'
+    Value: !Ref SchedulesBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-SchedulesBucket'
+
+  # IAM Role
+  LambdaExecutionRoleArn:
+    Description: 'IAM role ARN for Lambda functions'
+    Value: !GetAtt LambdaExecutionRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-LambdaExecutionRoleArn'
+
+  # Configuration for spawn config file
+  SpawnConfigYAML:
+    Description: 'YAML configuration snippet for ~/.spawn/config.yaml'
+    Value: !Sub |
+      infrastructure:
+        mode: "self-hosted"
+        dynamodb:
+          schedules_table: "${SchedulesTable}"
+          sweep_orchestration_table: "${SweepOrchestrationTable}"
+          alerts_table: "${AlertsTable}"
+          alert_history_table: "${AlertHistoryTable}"
+        s3:
+          binaries_bucket_prefix: "${EnvironmentName}-binaries"
+          schedules_bucket_prefix: "${EnvironmentName}-schedules"
+        cloudwatch:
+          log_group_prefix: "/spawn"
+
+  # Cost Estimate
+  EstimatedMonthlyCost:
+    Description: 'Estimated monthly cost (light usage)'
+    Value: 'DynamoDB: $1-5/mo (on-demand), S3: $0.50-2/mo, Lambda: $0-1/mo, CloudWatch: $0.50-2/mo, Total: ~$2-10/mo'

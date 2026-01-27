@@ -7,17 +7,20 @@ import (
 	"os"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/aws"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/compliance"
 	spawnconfig "github.com/scttfrdmn/mycelium/spawn/pkg/config"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/infrastructure"
 	"github.com/spf13/cobra"
 )
 
 var (
-	validateComplianceMode string
-	validateOutputFormat   string // "text" or "json"
-	validateRegion         string
-	validateInstanceID     string
+	validateComplianceMode   string
+	validateOutputFormat     string // "text" or "json"
+	validateRegion           string
+	validateInstanceID       string
+	validateInfrastructure   bool   // Validate infrastructure resources
 )
 
 var validateCmd = &cobra.Command{
@@ -50,6 +53,7 @@ func init() {
 
 	validateCmd.Flags().StringVar(&validateComplianceMode, "nist-800-171", "", "Validate NIST 800-171 compliance")
 	validateCmd.Flags().StringVar(&validateComplianceMode, "nist-800-53", "", "Validate NIST 800-53 compliance (low, moderate, high)")
+	validateCmd.Flags().BoolVar(&validateInfrastructure, "infrastructure", false, "Validate infrastructure resources (DynamoDB, S3, Lambda)")
 	validateCmd.Flags().StringVar(&validateOutputFormat, "output", "text", "Output format (text, json)")
 	validateCmd.Flags().StringVar(&validateRegion, "region", "", "AWS region to validate (default: all regions)")
 	validateCmd.Flags().StringVar(&validateInstanceID, "instance-id", "", "Specific instance ID to validate")
@@ -57,6 +61,11 @@ func init() {
 
 func runValidate(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
+
+	// Check if infrastructure validation requested
+	if validateInfrastructure {
+		return runInfrastructureValidation(ctx)
+	}
 
 	// Determine compliance mode
 	complianceMode := ""
@@ -71,7 +80,7 @@ func runValidate(cmd *cobra.Command, args []string) error {
 	}
 
 	if complianceMode == "" {
-		return fmt.Errorf("compliance mode required: use --nist-800-171 or --nist-800-53=<low|moderate|high>")
+		return fmt.Errorf("compliance mode required: use --nist-800-171 or --nist-800-53=<low|moderate|high>, or --infrastructure")
 	}
 
 	// Load configuration
@@ -257,6 +266,182 @@ func outputValidationJSON(results map[string]*compliance.ValidationResult, insta
 	output["total_violations"] = totalViolations
 
 	// Marshal to JSON
+	jsonBytes, err := json.MarshalIndent(output, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal JSON: %w", err)
+	}
+
+	fmt.Println(string(jsonBytes))
+	return nil
+}
+
+func runInfrastructureValidation(ctx context.Context) error {
+	// Load infrastructure configuration
+	infraConfig, err := spawnconfig.LoadInfrastructureConfig(ctx, "")
+	if err != nil {
+		return fmt.Errorf("failed to load infrastructure config: %w", err)
+	}
+
+	// Load AWS config
+	awsCfg, err := config.LoadDefaultConfig(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to load AWS config: %w", err)
+	}
+
+	// Determine region
+	region := validateRegion
+	if region == "" {
+		region = awsCfg.Region
+		if region == "" {
+			region = "us-east-1" // Fallback
+		}
+	}
+
+	// Get account ID
+	awsClient, err := aws.NewClient(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to create AWS client: %w", err)
+	}
+	accountID, err := awsClient.GetAccountID(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get account ID: %w", err)
+	}
+
+	// Create resolver and validator
+	resolver := infrastructure.NewResolver(infraConfig, region, accountID)
+	validator := infrastructure.NewValidator(resolver, awsCfg)
+
+	// Validate all resources
+	result, err := validator.ValidateAll(ctx)
+	if err != nil {
+		return fmt.Errorf("validation failed: %w", err)
+	}
+
+	// Output results
+	if validateOutputFormat == "json" {
+		return outputInfrastructureJSON(result, resolver)
+	}
+
+	return outputInfrastructureText(result, resolver, validator)
+}
+
+func outputInfrastructureText(result *infrastructure.ValidationResult, resolver *infrastructure.Resolver, validator *infrastructure.Validator) error {
+	fmt.Println("Infrastructure Validation Report")
+	fmt.Println(strings.Repeat("=", 50))
+	fmt.Println()
+
+	// Show infrastructure mode
+	fmt.Printf("Mode: %s\n", resolver.IsSelfHosted())
+	if resolver.IsSelfHosted() {
+		fmt.Println("  Self-hosted infrastructure (customer account)")
+	} else {
+		fmt.Println("  Shared infrastructure (mycelium-infra account)")
+	}
+	fmt.Println()
+
+	// Group resources by type
+	dynamoDBResources := []infrastructure.ResourceStatus{}
+	s3Resources := []infrastructure.ResourceStatus{}
+	lambdaResources := []infrastructure.ResourceStatus{}
+
+	for name, status := range result.Resources {
+		if strings.HasPrefix(name, "dynamodb_") {
+			dynamoDBResources = append(dynamoDBResources, status)
+		} else if strings.HasPrefix(name, "s3_") {
+			s3Resources = append(s3Resources, status)
+		} else if strings.HasPrefix(name, "lambda_") {
+			lambdaResources = append(lambdaResources, status)
+		}
+	}
+
+	// Print DynamoDB tables
+	fmt.Println("DynamoDB Tables:")
+	accessibleCount := 0
+	for _, res := range dynamoDBResources {
+		if res.Accessible {
+			fmt.Printf("  ✓ %s\n", res.Name)
+			accessibleCount++
+		} else {
+			fmt.Printf("  ✗ %s: %s\n", res.Name, res.Error)
+		}
+	}
+	if len(dynamoDBResources) > 0 {
+		fmt.Printf("  (%d/%d accessible)\n", accessibleCount, len(dynamoDBResources))
+	}
+	fmt.Println()
+
+	// Print S3 buckets
+	fmt.Println("S3 Buckets:")
+	accessibleCount = 0
+	for _, res := range s3Resources {
+		if res.Accessible {
+			fmt.Printf("  ✓ %s\n", res.Name)
+			accessibleCount++
+		} else {
+			fmt.Printf("  ✗ %s: %s\n", res.Name, res.Error)
+		}
+	}
+	if len(s3Resources) > 0 {
+		fmt.Printf("  (%d/%d accessible)\n", accessibleCount, len(s3Resources))
+	}
+	fmt.Println()
+
+	// Print Lambda functions
+	fmt.Println("Lambda Functions:")
+	accessibleCount = 0
+	for _, res := range lambdaResources {
+		if res.Accessible {
+			// Extract function name from ARN for cleaner display
+			funcName := res.Name
+			if strings.Contains(funcName, ":function:") {
+				parts := strings.Split(funcName, ":function:")
+				if len(parts) > 1 {
+					funcName = parts[1]
+				}
+			}
+			fmt.Printf("  ✓ %s\n", funcName)
+			accessibleCount++
+		} else {
+			fmt.Printf("  ✗ %s: %s\n", res.Name, res.Error)
+		}
+	}
+	if len(lambdaResources) > 0 {
+		fmt.Printf("  (%d/%d accessible)\n", accessibleCount, len(lambdaResources))
+	}
+	fmt.Println()
+
+	// Overall status
+	fmt.Println(strings.Repeat("=", 50))
+	if result.Valid {
+		fmt.Println("Status: ✓ All resources accessible")
+	} else {
+		fmt.Printf("Status: ✗ %d errors found\n", len(result.Errors))
+		fmt.Println()
+
+		// Print recommendations
+		recommendations := validator.GetRecommendations(result)
+		if len(recommendations) > 0 {
+			fmt.Println("Recommendations:")
+			for i, rec := range recommendations {
+				fmt.Printf("  %d. %s\n", i+1, rec)
+			}
+		}
+	}
+
+	return nil
+}
+
+func outputInfrastructureJSON(result *infrastructure.ValidationResult, resolver *infrastructure.Resolver) error {
+	output := map[string]interface{}{
+		"valid":       result.Valid,
+		"mode":        resolver.IsSelfHosted(),
+		"errors":      result.Errors,
+		"warnings":    result.Warnings,
+		"resources":   result.Resources,
+		"region":      resolver.GetRegion(),
+		"account_id":  resolver.GetAccountID(),
+	}
+
 	jsonBytes, err := json.MarshalIndent(output, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal JSON: %w", err)
