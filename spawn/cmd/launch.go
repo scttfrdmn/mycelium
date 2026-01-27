@@ -17,7 +17,9 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/google/uuid"
 	"github.com/scttfrdmn/mycelium/pkg/i18n"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/audit"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/aws"
 	spawnconfig "github.com/scttfrdmn/mycelium/spawn/pkg/config"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/input"
@@ -288,6 +290,20 @@ func init() {
 func runLaunch(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 
+	// Get user identity for audit logging
+	cfg, err := config.LoadDefaultConfig(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to load AWS config: %w", err)
+	}
+	stsClient := sts.NewFromConfig(cfg)
+	identity, err := stsClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+	if err != nil {
+		return fmt.Errorf("failed to get caller identity: %w", err)
+	}
+	userID := *identity.Account
+	correlationID := uuid.New().String()
+	auditLog := audit.NewLogger(os.Stderr, userID, correlationID)
+
 	// Detect platform
 	plat, err := platform.Detect()
 	if err != nil {
@@ -301,7 +317,7 @@ func runLaunch(cmd *cobra.Command, args []string) error {
 
 	// Check for batch queue mode FIRST
 	if batchQueueFile != "" || queueTemplate != "" {
-		return launchWithBatchQueue(ctx, plat)
+		return launchWithBatchQueue(ctx, plat, auditLog)
 	}
 
 	// Check for parameter sweep mode (before wizard/config logic)
@@ -312,7 +328,7 @@ func runLaunch(cmd *cobra.Command, args []string) error {
 			Region:       region,
 			InstanceType: instanceType, // May be empty, that's ok for sweeps
 		}
-		return launchParameterSweep(ctx, config, plat)
+		return launchParameterSweep(ctx, config, plat, auditLog)
 	}
 
 	var config *aws.LaunchConfig
@@ -370,10 +386,10 @@ func runLaunch(cmd *cobra.Command, args []string) error {
 	}
 
 	// Launch with progress display
-	return launchWithProgress(ctx, awsClient, config, plat)
+	return launchWithProgress(ctx, awsClient, config, plat, auditLog)
 }
 
-func launchParameterSweep(ctx context.Context, baseConfig *aws.LaunchConfig, plat *platform.Platform) error {
+func launchParameterSweep(ctx context.Context, baseConfig *aws.LaunchConfig, plat *platform.Platform, auditLog *audit.AuditLogger) error {
 	// Validate workflow integration flags
 	if wait && !detach {
 		return fmt.Errorf("--wait requires --detach (only works with Lambda orchestration)")
@@ -828,7 +844,7 @@ func launchWithRollingQueue(ctx context.Context, awsClient *aws.Client, launchCo
 	return launchedInstances, failures, successCount, nil
 }
 
-func launchWithProgress(ctx context.Context, awsClient *aws.Client, config *aws.LaunchConfig, plat *platform.Platform) error {
+func launchWithProgress(ctx context.Context, awsClient *aws.Client, config *aws.LaunchConfig, plat *platform.Platform, auditLog *audit.AuditLogger) error {
 	prog := progress.NewProgress()
 
 	// Step 1: Detect AMI
@@ -875,17 +891,24 @@ func launchWithProgress(ctx context.Context, awsClient *aws.Client, config *aws.
 			instanceProfile, err := awsClient.CreateOrGetInstanceProfile(ctx, iamConfig)
 			if err != nil {
 				prog.Error("Setting up IAM role", err)
+				auditLog.LogOperation("create_iam_role", iamConfig.RoleName, "failed", err)
 				return fmt.Errorf("failed to create IAM instance profile: %w", err)
 			}
 			config.IamInstanceProfile = instanceProfile
+			auditLog.LogOperationWithData("create_iam_role", iamConfig.RoleName, "success",
+				map[string]interface{}{
+					"instance_profile": instanceProfile,
+				}, nil)
 		} else {
 			// Default: use spored IAM role
 			instanceProfile, err := awsClient.SetupSporedIAMRole(ctx)
 			if err != nil {
 				prog.Error("Setting up IAM role", err)
+				auditLog.LogOperation("create_iam_role", "spored-instance-role", "failed", err)
 				return err
 			}
 			config.IamInstanceProfile = instanceProfile
+			auditLog.LogOperation("create_iam_role", "spored-instance-role", "success", nil)
 		}
 	}
 	prog.Complete("Setting up IAM role")
@@ -906,10 +929,16 @@ func launchWithProgress(ctx context.Context, awsClient *aws.Client, config *aws.
 		sgID, err := awsClient.CreateOrGetMPISecurityGroup(ctx, config.Region, vpcID, sgName)
 		if err != nil {
 			prog.Error("Creating MPI security group", err)
+			auditLog.LogOperationWithRegion("create_security_group", sgName, config.Region, "failed", err)
 			return fmt.Errorf("failed to create MPI security group: %w", err)
 		}
 
 		config.SecurityGroupIDs = []string{sgID}
+		auditLog.LogOperationWithData("create_security_group", sgName, "success",
+			map[string]interface{}{
+				"security_group_id": sgID,
+				"region":            config.Region,
+			}, nil)
 		prog.Complete("Creating MPI security group")
 		time.Sleep(300 * time.Millisecond)
 	} else {
@@ -1142,16 +1171,27 @@ func launchWithProgress(ctx context.Context, awsClient *aws.Client, config *aws.
 		if jobArrayName == "" {
 			return fmt.Errorf("--job-array-name is required when --count > 1")
 		}
-		return launchJobArray(ctx, awsClient, config, plat, prog, fsxInfo)
+		return launchJobArray(ctx, awsClient, config, plat, prog, fsxInfo, auditLog)
 	}
 
 	// Step 6: Launch instance
 	prog.Start("Launching instance")
+	auditLog.LogOperationWithData("launch_instance", "single", "initiated",
+		map[string]interface{}{
+			"instance_type": config.InstanceType,
+			"region":        config.Region,
+		}, nil)
 	result, err := awsClient.Launch(ctx, *config)
 	if err != nil {
 		prog.Error("Launching instance", err)
+		auditLog.LogOperationWithRegion("launch_instance", "single", config.Region, "failed", err)
 		return err
 	}
+	auditLog.LogOperationWithData("launch_instance", result.InstanceID, "success",
+		map[string]interface{}{
+			"instance_type": config.InstanceType,
+			"region":        config.Region,
+		}, nil)
 	prog.Complete("Launching instance")
 	time.Sleep(300 * time.Millisecond)
 
@@ -2116,13 +2156,22 @@ func formatInstanceName(template string, jobArrayName string, index int) string 
 }
 
 // launchJobArray launches N instances in parallel as a job array
-func launchJobArray(ctx context.Context, awsClient *aws.Client, baseConfig *aws.LaunchConfig, plat *platform.Platform, prog *progress.Progress, fsxInfo *aws.FSxInfo) error {
+func launchJobArray(ctx context.Context, awsClient *aws.Client, baseConfig *aws.LaunchConfig, plat *platform.Platform, prog *progress.Progress, fsxInfo *aws.FSxInfo, auditLog *audit.AuditLogger) error {
 	// Generate unique job array ID
 	jobArrayID := generateJobArrayID(jobArrayName)
 	createdAt := time.Now()
 
 	fmt.Fprintf(os.Stderr, "\n🚀 Launching job array: %s (%d instances)\n", jobArrayName, count)
 	fmt.Fprintf(os.Stderr, "   Job Array ID: %s\n\n", jobArrayID)
+
+	// Log job array launch initiation
+	auditLog.LogOperationWithData("launch_job_array", jobArrayID, "initiated",
+		map[string]interface{}{
+			"job_array_name": jobArrayName,
+			"instance_count": count,
+			"instance_type":  baseConfig.InstanceType,
+			"region":         baseConfig.Region,
+		}, nil)
 
 	// Phase 1: Launch all instances in parallel
 	prog.Start(fmt.Sprintf("Launching %d instances in parallel", count))
@@ -2281,6 +2330,12 @@ func launchJobArray(ctx context.Context, awsClient *aws.Client, baseConfig *aws.
 	if failureCount > 0 {
 		prog.Error(fmt.Sprintf("Launching %d instances", count), fmt.Errorf("%d/%d instances failed to launch", failureCount, count))
 
+		auditLog.LogOperationWithData("launch_job_array", jobArrayID, "failed",
+			map[string]interface{}{
+				"success_count": successCount,
+				"failure_count": failureCount,
+			}, fmt.Errorf("%d/%d instances failed", failureCount, count))
+
 		// Terminate successfully launched instances
 		if successCount > 0 {
 			fmt.Fprintf(os.Stderr, "\n⚠️  Cleaning up %d successfully launched instances...\n", successCount)
@@ -2293,6 +2348,11 @@ func launchJobArray(ctx context.Context, awsClient *aws.Client, baseConfig *aws.
 		return fmt.Errorf("job array launch failed: %d/%d instances failed:\n  %s",
 			failureCount, count, strings.Join(launchErrors, "\n  "))
 	}
+
+	auditLog.LogOperationWithData("launch_job_array", jobArrayID, "success",
+		map[string]interface{}{
+			"instance_count": successCount,
+		}, nil)
 
 	prog.Complete(fmt.Sprintf("Launching %d instances", count))
 	time.Sleep(300 * time.Millisecond)
@@ -2731,7 +2791,7 @@ func launchSweepDetached(ctx context.Context, paramFormat *ParamFileFormat, base
 }
 
 // launchWithBatchQueue launches a single instance with a batch job queue
-func launchWithBatchQueue(ctx context.Context, plat *platform.Platform) error {
+func launchWithBatchQueue(ctx context.Context, plat *platform.Platform, auditLog *audit.AuditLogger) error {
 	fmt.Fprintf(os.Stderr, "\n📦 Launching Batch Queue Instance\n\n")
 
 	// Load and validate queue configuration

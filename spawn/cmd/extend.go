@@ -9,7 +9,11 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/google/uuid"
 	"github.com/scttfrdmn/mycelium/pkg/i18n"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/audit"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/aws"
 	"github.com/spf13/cobra"
 )
@@ -40,13 +44,27 @@ func init() {
 func runExtend(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 
+	// Get user identity for audit logging
+	cfg, err := config.LoadDefaultConfig(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to load AWS config: %w", err)
+	}
+	stsClient := sts.NewFromConfig(cfg)
+	identity, err := stsClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+	if err != nil {
+		return fmt.Errorf("failed to get caller identity: %w", err)
+	}
+	userID := *identity.Account
+	correlationID := uuid.New().String()
+	auditLog := audit.NewLogger(os.Stderr, userID, correlationID)
+
 	// Determine if extending job array or single instance
 	if extendJobArrayID != "" || extendJobArrayName != "" {
 		// Job array mode
 		if len(args) != 1 {
 			return fmt.Errorf("job array mode requires exactly 1 argument: <duration>")
 		}
-		return extendJobArray(ctx, args[0])
+		return extendJobArrayWithAudit(ctx, args[0], auditLog)
 	}
 
 	// Single instance mode
@@ -76,14 +94,24 @@ func runExtend(cmd *cobra.Command, args []string) error {
 
 	fmt.Fprintf(os.Stderr, "Found instance in %s (current TTL: %s)\n", instance.Region, instance.TTL)
 
+	// Log TTL extension initiation
+	auditLog.LogOperationWithData("extend_ttl", instance.InstanceID, "initiated",
+		map[string]interface{}{
+			"old_ttl": instance.TTL,
+			"new_ttl": newTTL,
+		}, nil)
+
 	// Update the TTL tag
 	fmt.Fprintf(os.Stderr, "Updating TTL to %s...\n", newTTL)
 	err = client.UpdateInstanceTags(ctx, instance.Region, instance.InstanceID, map[string]string{
 		"spawn:ttl": newTTL,
 	})
 	if err != nil {
+		auditLog.LogOperationWithRegion("extend_ttl", instance.InstanceID, instance.Region, "failed", err)
 		return fmt.Errorf("failed to update TTL: %w", err)
 	}
+
+	auditLog.LogOperationWithRegion("extend_ttl", instance.InstanceID, instance.Region, "success", nil)
 
 	fmt.Fprintf(os.Stdout, "\n✅ TTL extended successfully!\n")
 	fmt.Fprintf(os.Stdout, "   Instance: %s\n", instance.InstanceID)
@@ -103,7 +131,7 @@ func runExtend(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func extendJobArray(ctx context.Context, newTTL string) error {
+func extendJobArrayWithAudit(ctx context.Context, newTTL string, auditLog *audit.AuditLogger) error {
 	// Validate TTL format
 	if err := validateTTL(newTTL); err != nil {
 		return fmt.Errorf("invalid TTL format: %w", err)
@@ -149,6 +177,14 @@ func extendJobArray(ctx context.Context, newTTL string) error {
 	fmt.Fprintf(os.Stderr, "Array ID: %s\n", arrayID)
 	fmt.Fprintf(os.Stderr, "\nExtending TTL to %s for all instances...\n", newTTL)
 
+	// Log job array TTL extension initiation
+	auditLog.LogOperationWithData("extend_job_array_ttl", arrayID, "initiated",
+		map[string]interface{}{
+			"array_name":     arrayName,
+			"instance_count": len(jobArrayInstances),
+			"new_ttl":        newTTL,
+		}, nil)
+
 	// Update TTL for each instance
 	successCount := 0
 	failedInstances := []string{}
@@ -178,6 +214,16 @@ func extendJobArray(ctx context.Context, newTTL string) error {
 		for _, id := range failedInstances {
 			fmt.Fprintf(os.Stderr, "   - %s\n", id)
 		}
+		auditLog.LogOperationWithData("extend_job_array_ttl", arrayID, "partial_success",
+			map[string]interface{}{
+				"success_count": successCount,
+				"failed_count":  len(failedInstances),
+			}, nil)
+	} else {
+		auditLog.LogOperationWithData("extend_job_array_ttl", arrayID, "success",
+			map[string]interface{}{
+				"instance_count": successCount,
+			}, nil)
 	}
 
 	return nil

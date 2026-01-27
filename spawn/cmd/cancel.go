@@ -8,6 +8,9 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/google/uuid"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/audit"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/sweep"
 	"github.com/spf13/cobra"
 )
@@ -50,6 +53,19 @@ func runCancel(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to load AWS config: %w", err)
 	}
+
+	// Get user identity for audit logging
+	stsClient := sts.NewFromConfig(cfg)
+	identity, err := stsClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+	if err != nil {
+		return fmt.Errorf("failed to get caller identity: %w", err)
+	}
+	userID := *identity.Account
+	correlationID := uuid.New().String()
+
+	// Initialize audit logger
+	auditLog := audit.NewLogger(os.Stderr, userID, correlationID)
+	auditLog.LogOperation("cancel_sweep", cancelSweepID, "initiated", nil)
 
 	// Query sweep state
 	fmt.Fprintf(os.Stderr, "📊 Querying sweep state...\n")
@@ -110,10 +126,16 @@ func runCancel(cmd *cobra.Command, args []string) error {
 	// Terminate instances if any
 	if totalToTerminate > 0 {
 		fmt.Fprintf(os.Stderr, "⚡ Terminating instances...\n")
+		auditLog.LogOperationWithData("terminate_instances", cancelSweepID, "initiated",
+			map[string]interface{}{
+				"instance_count": totalToTerminate,
+				"region_count":   len(instancesByRegion),
+			}, nil)
 
 		if state.MultiRegion && len(instancesByRegion) > 1 {
 			// Multi-region: terminate concurrently per region
 			if err := terminateMultiRegion(ctx, instancesByRegion); err != nil {
+				auditLog.LogOperation("terminate_instances", cancelSweepID, "failed", err)
 				return fmt.Errorf("failed to terminate instances: %w", err)
 			}
 		} else {
@@ -136,10 +158,16 @@ func runCancel(cmd *cobra.Command, args []string) error {
 			}
 
 			if err := sweep.TerminateSweepInstancesDirect(ctx, devCfg, instances); err != nil {
+				auditLog.LogOperationWithRegion("terminate_instances", cancelSweepID, region, "failed", err)
 				return fmt.Errorf("failed to terminate instances: %w", err)
 			}
 			fmt.Fprintf(os.Stderr, "   Terminated %d instances in %s\n", len(instances), region)
 		}
+
+		auditLog.LogOperationWithData("terminate_instances", cancelSweepID, "success",
+			map[string]interface{}{
+				"instance_count": totalToTerminate,
+			}, nil)
 	}
 
 	// Update sweep status to CANCELLED and set cancel flag
@@ -148,8 +176,11 @@ func runCancel(cmd *cobra.Command, args []string) error {
 	state.Status = "CANCELLED"
 	state.CompletedAt = time.Now().Format(time.RFC3339)
 	if err := sweep.SaveSweepState(ctx, cfg, state); err != nil {
+		auditLog.LogOperation("update_sweep_status", cancelSweepID, "failed", err)
 		return fmt.Errorf("failed to update sweep status: %w", err)
 	}
+
+	auditLog.LogOperation("cancel_sweep", cancelSweepID, "success", nil)
 
 	fmt.Fprintf(os.Stderr, "\n✅ Sweep cancelled successfully!\n")
 	fmt.Fprintf(os.Stderr, "   Sweep ID: %s\n", cancelSweepID)
