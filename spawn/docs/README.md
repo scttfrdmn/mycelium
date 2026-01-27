@@ -22,31 +22,37 @@ This documentation follows the **[Diátaxis](https://diataxis.fr/)** framework, 
 
 ## Quick Navigation
 
-### 🎓 [Tutorials](tutorials/) (Coming Soon)
+### 🎓 [Tutorials](tutorials/)
 **Learning-oriented** - Step-by-step lessons for beginners
 
-- Getting Started (15 min)
-- Your First Instance (20 min)
-- Parameter Sweeps (30 min)
-- Job Arrays (30 min)
-- Batch Queues (45 min)
-- Cost Management (20 min)
-- Monitoring & Alerts (30 min)
+- [Getting Started](tutorials/01-getting-started.md) (15 min)
+- [Your First Instance](tutorials/02-first-instance.md) (20 min)
+- [Parameter Sweeps](tutorials/03-parameter-sweeps.md) (30 min)
+- [Job Arrays](tutorials/04-job-arrays.md) (30 min)
+- [Batch Queues](tutorials/05-batch-queues.md) (45 min)
+- [Cost Management](tutorials/06-cost-management.md) (20 min)
+- [Monitoring & Alerts](tutorials/07-monitoring-alerts.md) (30 min)
 
-### 📖 [How-To Guides](how-to/) (Coming Soon)
+### 📖 [How-To Guides](how-to/)
 **Task-oriented** - Solutions for specific tasks
 
-- Launch Instances
-- Parameter Sweeps
-- Job Arrays
-- Batch Queues
-- HPC Clusters
-- Spot Instances
-- IAM Policies
-- Cost Tracking
-- Monitoring & Alerts
-- Workflow Integration
-- Troubleshooting
+- [Launch Instances](how-to/launch-instances.md)
+- [Parameter Sweeps](how-to/parameter-sweeps.md)
+- [Job Arrays](how-to/job-arrays.md)
+- [Batch Queues](how-to/batch-queues.md)
+- [Spot Instances](how-to/spot-instances.md)
+- [Cost Optimization](how-to/cost-optimization.md)
+- [Security & IAM](how-to/security-iam.md)
+- [SSH Connectivity](how-to/ssh-connectivity.md)
+- [Custom AMIs](how-to/custom-amis.md)
+- [Custom Networking](how-to/custom-networking.md)
+- [Instance Selection](how-to/instance-selection.md)
+- [Debugging](how-to/debugging.md)
+- [Monitoring at Scale](how-to/monitoring-scale.md)
+- [CI/CD Integration](how-to/cicd-integration.md)
+- [Slurm Integration](how-to/slurm-integration.md)
+- [Multi-Account Setup](how-to/multi-account.md)
+- [Disaster Recovery](how-to/disaster-recovery.md)
 
 ### 📚 [Reference](reference/)
 **Information-oriented** - Complete technical reference
@@ -97,12 +103,12 @@ This documentation follows the **[Diátaxis](https://diataxis.fr/)** framework, 
 
 ### New Users
 1. Start with the main **[README](../README.md)** for overview and quick start
-2. Follow **[Getting Started Tutorial](tutorials/01-getting-started.md)** (Coming Soon)
-3. Browse **[How-To Guides](how-to/)** for specific tasks (Coming Soon)
+2. Follow **[Getting Started Tutorial](tutorials/01-getting-started.md)**
+3. Browse **[How-To Guides](how-to/)** for specific tasks
 
 ### Experienced Users
 - Jump to **[Command Reference](reference/README.md)** for detailed flag documentation
-- Check **[How-To Guides](how-to/)** for specific workflows (Coming Soon)
+- Check **[How-To Guides](how-to/)** for specific workflows
 - Read **[Explanation](explanation/)** for deeper understanding (Coming Soon)
 
 ### Developers
@@ -117,45 +123,56 @@ This documentation follows the **[Diátaxis](https://diataxis.fr/)** framework, 
 - [x] Configuration reference
 - [x] Environment variables reference
 - [x] Exit codes reference
-- [x] Core command pages (launch, list)
-- [ ] Remaining command pages
-- [ ] Parameter files reference
-- [ ] Queue configs reference
-- [ ] IAM policies reference
+- [x] All command pages (24 commands)
+- [x] Parameter files reference
+- [x] Queue configs reference
+- [x] IAM policies reference
 
-### 🚧 Phase 2: Getting Started (In Progress)
-- [ ] Tutorial 1: Getting Started
-- [ ] Tutorial 2: First Instance
-- [ ] How-to: Launch instances
-- [ ] How-to: Basic troubleshooting
-- [ ] FAQ basics
+### ✅ Phase 2: Getting Started (Complete)
+- [x] Tutorial 1: Getting Started
+- [x] Tutorial 2: Your First Instance
+- [x] Tutorial 3: Parameter Sweeps
+- [x] Tutorial 4: Job Arrays
+- [x] Tutorial 5: Batch Queues
+- [x] Tutorial 6: Cost Management
+- [x] Tutorial 7: Monitoring & Alerts
+- [x] How-to: Launch Instances
+- [x] How-to: Parameter Sweeps
+- [x] How-to: Job Arrays
+- [x] How-to: Batch Queues
+- [x] How-to: Spot Instances
+- [x] How-to: Cost Optimization
+- [x] How-to: SSH Connectivity
+- [x] How-to: Instance Selection
+- [x] How-to: Custom AMIs
+- [x] How-to: Security & IAM
+- [x] How-to: Custom Networking
+- [x] How-to: Debugging
+- [x] How-to: Monitoring at Scale
+- [x] How-to: CI/CD Integration
+- [x] How-to: Slurm Integration
+- [x] How-to: Multi-Account Setup
+- [x] How-to: Disaster Recovery
 
-### ⏳ Phase 3: Core Features (Planned)
-- [ ] Tutorial 3: Parameter Sweeps
-- [ ] Tutorial 4: Job Arrays
-- [ ] Tutorial 5: Batch Queues
-- [ ] How-to guides for core features
-- [ ] Explanation: Core concepts
+### ⏳ Phase 3: Explanation & Architecture (Planned)
+- [ ] Explanation: Architecture Overview
+- [ ] Explanation: Core Concepts (TTL, idle detection, spot)
+- [ ] Explanation: Security Model
+- [ ] Explanation: Cost Optimization Theory
+- [ ] Explanation: Multi-Account Architecture
+- [ ] Architecture: System Design
+- [ ] Architecture: AWS Resources
+- [ ] Architecture: Data Flow
+- [ ] Architecture: DNS System
+- [ ] Architecture: Agent (spored) Design
 
-### ⏳ Phase 4: Advanced Features (Planned)
-- [ ] Tutorial 6: Cost Management
-- [ ] Tutorial 7: Monitoring & Alerts
-- [ ] How-to: HPC clusters
-- [ ] How-to: Spot instances
-- [ ] Explanation: Cost optimization
-- [ ] Explanation: Security
-
-### ⏳ Phase 5: Architecture & Compliance (Planned)
-- [ ] Architecture documentation
-- [ ] Explanation: Compliance modes
-- [ ] Security best practices
-
-### ⏳ Phase 6: Polish & Finalize (Planned)
+### ⏳ Phase 4: Polish & Finalize (Planned)
 - [ ] Complete FAQ
-- [ ] Migration guides
-- [ ] Contributing guide
+- [ ] Migration guides (Slurm, AWS Batch, etc.)
+- [ ] CONTRIBUTING.md
 - [ ] Architecture diagrams
 - [ ] Video tutorials (optional)
+- [ ] Troubleshooting guide expansion
 
 ## Documentation Conventions
 
