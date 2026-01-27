@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.3] - 2026-01-27
+
+Completes v0.13.0 milestone with Docker Hub automation setup. **All v0.13.0 objectives achieved.**
+
+### Added
+- **Docker Hub Setup Documentation** (`docs/DOCKER_HUB_SETUP.md`)
+  - Complete guide for automated Docker image publishing
+  - Docker Hub access token generation instructions
+  - GitHub repository secrets configuration
+  - Troubleshooting guide for common issues
+  - Security best practices for CI/CD credentials
+  - Manual build fallback instructions
+
+### Milestone
+- ✅ **v0.13.0 COMPLETE** - All 3 issues closed:
+  - Issue #63: Security Hardening
+  - Issue #66: Comprehensive Documentation
+  - Issue #62: Docker Hub Automation
+- 🎯 **v0.14.0 CREATED** - NIST Compliance Framework
+  - Issue #64: NIST 800-171 Rev 3 (CUI protection)
+  - Issue #65: NIST 800-53 Rev 5 / FedRAMP
+  - Target: June 2026
+
+### Infrastructure
+- GitHub Actions workflow ready for automated multi-arch builds
+- Supports `linux/amd64` and `linux/arm64` platforms
+- Publishes versioned tags and `latest` on release
+- BuildKit caching for fast builds
+
 ## [0.13.2] - 2026-01-27
 
 This release completes the v0.13.0 milestone with comprehensive documentation and automated dependency scanning.
