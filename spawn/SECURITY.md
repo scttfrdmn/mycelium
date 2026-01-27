@@ -1,29 +1,137 @@
 # Security Policy
 
-This document describes the security model and policies for the spawn project.
+## Overview
+
+spawn takes security seriously. This document outlines security features, best practices, vulnerability disclosure policy, and compliance guidance for the spawn platform.
+
+**Last Updated:** 2026-01-27
+**Current Version:** v0.13.0
+
+---
 
 ## Table of Contents
 
 - [Reporting Security Issues](#reporting-security-issues)
+- [Security Features](#security-features)
 - [Security Model Overview](#security-model-overview)
 - [IAM Permissions](#iam-permissions)
 - [DNS Security Model](#dns-security-model)
 - [Instance Identity Validation](#instance-identity-validation)
 - [DNSSEC](#dnssec)
 - [Cross-Account Security](#cross-account-security)
+- [Data Protection](#data-protection)
+- [Secrets Management](#secrets-management)
+- [Network Security](#network-security)
+- [Input Validation](#input-validation)
 - [Audit and Logging](#audit-and-logging)
 - [Security Best Practices](#security-best-practices)
+- [Threat Model](#threat-model)
+- [Compliance](#compliance)
+- [Security Updates](#security-updates)
 
 ## Reporting Security Issues
 
-If you discover a security vulnerability in spawn, please report it by:
+### DO NOT create public GitHub issues for security vulnerabilities.
 
-1. **DO NOT** open a public GitHub issue
-2. Email the maintainer directly at the email address in the git commits
-3. Provide detailed information about the vulnerability
-4. Allow reasonable time for a fix before public disclosure
+**Instead, please email:**
+- **Security Contact:** scott@mycelium.dev
+- **PGP Key:** Available at https://mycelium.dev/pgp-key.txt
+- **Subject Line:** `[SECURITY] spawn vulnerability report`
 
-We take security seriously and will respond to legitimate reports promptly.
+### What to Include
+
+Please provide:
+1. **Description** of the vulnerability
+2. **Steps to reproduce** the issue
+3. **Impact assessment** (what an attacker could do)
+4. **Affected versions** (if known)
+5. **Suggested fix** (if you have one)
+6. **Your contact information** for follow-up
+
+### Response Timeline
+
+- **24 hours:** Initial acknowledgment
+- **7 days:** Vulnerability assessment and triage
+- **30 days:** Fix development and testing
+- **90 days:** Public disclosure (coordinated with reporter)
+
+### Disclosure Policy
+
+We follow **coordinated disclosure**:
+1. Reporter notifies us privately
+2. We confirm and assess the vulnerability
+3. We develop and test a fix
+4. We release a patched version
+5. We publicly disclose the vulnerability (after fix is available)
+6. We credit the reporter (if desired)
+
+---
+
+## Security Features
+
+### Authentication & Authorization
+
+**AWS IAM-Based Authentication:**
+- spawn uses AWS IAM credentials exclusively (no spawn-specific credentials)
+- Supports all AWS credential sources: environment variables, config files, IAM roles
+- Instance authentication via temporary IAM instance profile credentials
+- Automatic credential rotation (instance credentials rotate every 6 hours)
+
+**IAM Policy Templates:**
+- Pre-defined least-privilege policy templates (`s3:ReadOnly`, `dynamodb:ReadOnly`, etc.)
+- Custom policy file support for specific requirements
+- Scoped resource policies (region and user-specific)
+- Automatic IAM role creation and reuse
+
+### Encryption
+
+**Data at Rest:**
+- EBS volume encryption with AWS-managed or customer-managed KMS keys
+- S3 server-side encryption enabled by default
+- DynamoDB encryption at rest enabled by default
+- Encrypted secrets storage using AWS KMS
+
+**Data in Transit:**
+- All AWS API calls over HTTPS/TLS 1.2+
+- SSH encrypted connections for instance access
+- Certificate validation enabled and enforced
+
+### Network Security
+
+**Security Groups:**
+- Automatic security group creation with configurable rules
+- Support for restrictive CIDR blocks
+- MPI-specific security groups with cluster-only communication
+- VPC and subnet selection for network isolation
+
+**Private Networking:**
+- Support for private subnets (no public IP)
+- AWS Systems Manager Session Manager support (SSH alternative)
+- VPC endpoint support for private AWS service access
+
+### Input Validation
+
+**Command Injection Prevention:**
+- All user inputs sanitized and validated before shell execution
+- Shell escape functions for command arguments (`pkg/security/shell.go`)
+- Username validation (POSIX-compliant format)
+- Base64 validation for encoded data
+
+**Path Traversal Prevention:**
+- File path validation for user data scripts (`pkg/security/path.go`)
+- Forbidden path checking (no access to `/etc`, `/sys`, `/proc`, `/root`)
+- Symlink traversal prevention
+
+### Audit Logging
+
+**Structured Audit Logs:**
+- All privileged operations logged with correlation IDs (`pkg/audit/logger.go`)
+- User identity tracking for all operations
+- Instance lifecycle events (launch, terminate, extend)
+- IAM policy creation and modification logs
+- Alert configuration changes
+
+---
 
 ## Security Model Overview
 
@@ -406,17 +514,381 @@ Recommended CloudWatch alarms:
 - **Rate limiting** - Alert on API Gateway throttling
 - **Lambda errors** - Alert on Lambda function failures
 
+## Data Protection
+
+### Encryption at Rest
+
+**EBS Volumes:**
+```bash
+# Enable encryption with AWS-managed key
+spawn launch --encrypt-volumes
+
+# Use customer-managed KMS key
+spawn launch --encrypt-volumes --kms-key-id arn:aws:kms:us-east-1:123456789012:key/xxx
+```
+
+**S3 Buckets:**
+- Server-side encryption (SSE-S3) enabled by default
+- Support for SSE-KMS with customer-managed keys
+- Client-side encryption available for sensitive data
+
+**DynamoDB:**
+- Encryption at rest enabled by default on all spawn tables
+- Uses AWS-managed KMS keys
+
+### Encryption in Transit
+
+**AWS API Calls:**
+- All API calls use HTTPS/TLS 1.2+
+- Certificate validation enabled and enforced
+- No option to disable TLS verification
+
+**SSH Connections:**
+- Encrypted by default (SSH protocol)
+- Support for ED25519 and RSA-4096 keys
+- Key-based authentication only (no passwords)
+
+---
+
+## Secrets Management
+
+### AWS Secrets Manager Integration
+
+**Store secrets securely:**
+```bash
+# Store API key
+aws secretsmanager create-secret \
+  --name myapp/api-key \
+  --secret-string "sk-abc123xyz789"
+
+# Launch with Secrets Manager access
+spawn launch \
+  --iam-policy secretsmanager:ReadOnly \
+  --user-data "
+    API_KEY=\$(aws secretsmanager get-secret-value \
+      --secret-id myapp/api-key \
+      --query SecretString \
+      --output text)
+    export API_KEY
+    python app.py
+  "
+```
+
+### SSM Parameter Store
+
+**For less sensitive configuration:**
+```bash
+# Store encrypted parameter
+aws ssm put-parameter \
+  --name /myapp/config \
+  --value "config-value" \
+  --type SecureString
+
+# Retrieve in user data
+spawn launch \
+  --iam-policy ssm:ReadOnly \
+  --user-data "
+    CONFIG=\$(aws ssm get-parameter \
+      --name /myapp/config \
+      --with-decryption \
+      --query Parameter.Value \
+      --output text)
+  "
+```
+
+### Webhook URL Encryption
+
+Webhook URLs for alerts are encrypted using KMS:
+- Stored encrypted in DynamoDB (`pkg/security/secrets.go`)
+- Decrypted only when needed by alert Lambda
+- Masked in CLI output and logs
+
+### Anti-Patterns
+
+**❌ Never hardcode secrets:**
+```bash
+# BAD: Secret in user data
+spawn launch --user-data "
+  export API_KEY=sk-abc123xyz789
+  python app.py
+"
+```
+
+**✅ Use Secrets Manager:**
+```bash
+# GOOD: Retrieve from Secrets Manager
+spawn launch --iam-policy secretsmanager:ReadOnly --user-data "
+  API_KEY=\$(aws secretsmanager get-secret-value \
+    --secret-id myapp/api-key --query SecretString --output text)
+  python app.py
+"
+```
+
+---
+
+## Network Security
+
+### Security Group Best Practices
+
+**Default (Development):**
+```bash
+# Allows SSH from anywhere (0.0.0.0/0)
+spawn launch --instance-type t3.micro
+```
+
+**Restrictive (Production):**
+```bash
+# Create restrictive security group
+MY_IP=$(curl -s ifconfig.me)
+aws ec2 create-security-group \
+  --group-name spawn-secure \
+  --description "Secure spawn instances"
+
+aws ec2 authorize-security-group-ingress \
+  --group-id sg-xxx \
+  --protocol tcp \
+  --port 22 \
+  --cidr $MY_IP/32
+
+# Launch with restricted access
+spawn launch --instance-type t3.micro --security-groups sg-xxx
+```
+
+### Private Subnet Deployment
+
+**For sensitive workloads:**
+```bash
+# Launch in private subnet (no public IP)
+spawn launch \
+  --instance-type t3.micro \
+  --subnet subnet-private-xxx \
+  --no-public-ip \
+  --security-groups sg-private
+
+# Connect via Session Manager (no SSH required)
+spawn connect i-xxx --ssm
+```
+
+### IMDSv2 (Instance Metadata Service v2)
+
+**Prevent SSRF attacks:**
+```bash
+spawn launch --instance-type t3.micro \
+  --metadata-options "HttpTokens=required"
+```
+
+**Why IMDSv2:**
+- Token-based authentication
+- Prevents SSRF credential theft
+- Session-oriented (tokens expire)
+
+---
+
+## Input Validation
+
+spawn implements comprehensive input validation to prevent injection attacks.
+
+### Command Injection Prevention
+
+**Shell Escaping (`pkg/security/shell.go`):**
+```go
+// All user inputs are escaped before shell execution
+sporedCmd := fmt.Sprintf("sudo /usr/local/bin/spored config set %s %s",
+    security.ShellEscape(key),
+    security.ShellEscape(value))
+```
+
+**Username Validation:**
+```go
+// POSIX-compliant username format enforced
+func ValidateUsername(username string) error {
+    matched, _ := regexp.MatchString(`^[a-z][a-z0-9_-]{0,31}$`, username)
+    if !matched {
+        return errors.New("invalid username format")
+    }
+    return nil
+}
+```
+
+### Path Traversal Prevention
+
+**File Path Validation (`pkg/security/path.go`):**
+```go
+// Prevents access to system paths
+func ValidatePathForReading(path string) error {
+    cleaned := filepath.Clean(path)
+
+    // Block path traversal
+    if strings.Contains(cleaned, "..") {
+        return errors.New("path traversal not allowed")
+    }
+
+    // Block system paths
+    forbidden := []string{"/etc/", "/sys/", "/proc/", "/root/"}
+    for _, prefix := range forbidden {
+        if strings.HasPrefix(abs, prefix) {
+            return errors.New("access to system paths not allowed")
+        }
+    }
+
+    return nil
+}
+```
+
+---
+
 ## Security Best Practices
 
 ### For Users
 
-1. **Use IMDSv2** - Enabled by default in spawn
-2. **Rotate SSH keys** - spawn generates unique keys per instance
-3. **Use short TTLs** - `--ttl 2h` for development instances
-4. **Clean up instances** - Use `spawn stop` to terminate instances
-5. **Review DNS records** - Periodically audit `*.spore.host` records
-6. **Enable MFA** - Use MFA on your AWS account
-7. **Use least privilege** - Only grant necessary IAM permissions
+#### 1. Use Restrictive Security Groups
+
+**Don't:**
+```bash
+spawn launch --instance-type t3.micro  # Allows SSH from 0.0.0.0/0
+```
+
+**Do:**
+```bash
+MY_IP=$(curl -s ifconfig.me)
+spawn launch --instance-type t3.micro \
+  --security-groups sg-restrictive-$MY_IP
+```
+
+#### 2. Enable EBS Encryption
+
+**Don't:**
+```bash
+spawn launch --instance-type t3.micro
+```
+
+**Do:**
+```bash
+spawn launch --instance-type t3.micro --encrypt-volumes
+```
+
+#### 3. Use Private Subnets for Sensitive Workloads
+
+**Don't:**
+```bash
+spawn launch --instance-type t3.micro  # Public subnet
+```
+
+**Do:**
+```bash
+spawn launch --instance-type t3.micro \
+  --subnet subnet-private-xxx \
+  --no-public-ip \
+  --security-groups sg-private
+```
+
+#### 4. Use AWS Secrets Manager for Secrets
+
+**Don't:**
+```bash
+spawn launch --user-data "export API_KEY=sk-abc123"
+```
+
+**Do:**
+```bash
+aws secretsmanager create-secret --name myapp/api-key --secret-string "sk-abc123"
+spawn launch --iam-policy secretsmanager:ReadOnly --user-data "
+  API_KEY=\$(aws secretsmanager get-secret-value --secret-id myapp/api-key --query SecretString --output text)
+"
+```
+
+#### 5. Enable IMDSv2
+
+**Do:**
+```bash
+spawn launch --instance-type t3.micro --metadata-options "HttpTokens=required"
+```
+
+#### 6. Use Least-Privilege IAM Policies
+
+**Don't:**
+```bash
+spawn launch --iam-policy-file full-access.json  # Too broad
+```
+
+**Do:**
+```bash
+spawn launch --iam-policy s3:ReadOnly  # Scoped template
+```
+
+#### 7. Tag Instances with Owner
+
+```bash
+spawn launch --instance-type t3.micro \
+  --tags owner=alice,project=ml,cost-center=research
+```
+
+#### 8. Monitor with Alerts
+
+```bash
+spawn alerts create my-sweep \
+  --on-cost-threshold 100 \
+  --email alerts@company.com
+```
+
+#### 9. Use Strong SSH Keys
+
+```bash
+# ED25519 (recommended)
+ssh-keygen -t ed25519 -C "spawn-key" -f ~/.ssh/spawn-ed25519
+
+# Or RSA-4096
+ssh-keygen -t rsa -b 4096 -C "spawn-key" -f ~/.ssh/spawn-rsa
+```
+
+#### 10. Review Audit Logs Regularly
+
+```bash
+# CloudTrail events
+aws cloudtrail lookup-events \
+  --lookup-attributes AttributeKey=ResourceType,AttributeValue=AWS::EC2::Instance
+
+# DynamoDB instance history
+aws dynamodb query \
+  --table-name spawn-instances \
+  --key-condition-expression "user_id = :uid" \
+  --expression-attribute-values '{":uid":{"S":"alice"}}'
+```
+
+#### 11. Use IMDSv2
+
+**Enabled by default in spawn**
+
+#### 12. Rotate SSH Keys
+
+spawn generates unique keys per instance
+
+#### 13. Use Short TTLs
+
+```bash
+spawn launch --ttl 2h  # For development instances
+```
+
+#### 14. Clean Up Instances
+
+```bash
+spawn stop <instance-id>  # Terminate when done
+```
+
+#### 15. Review DNS Records
+
+```bash
+# Periodically audit *.spore.host records
+dig @8.8.8.8 *.spore.host ANY
+```
+
+#### 16. Enable MFA
+
+Use MFA on your AWS account
+
+#### 17. Use Least Privilege
+
+Only grant necessary IAM permissions
 
 ### For Institutions (Custom DNS)
 
@@ -438,22 +910,221 @@ Recommended CloudWatch alarms:
 6. **Enable security scanning** - Use Dependabot, CodeQL
 7. **Follow secure coding** - OWASP guidelines for Go
 
-## Security Considerations
+---
 
-### Threat Model
+## Threat Model
 
-**What spawn protects against**:
+### Assets to Protect
+
+**Credentials:**
+- AWS access keys and secret keys
+- SSH private keys
+- Application API keys and tokens
+- Slack/webhook URLs
+
+**Data:**
+- Source code
+- Training data and model weights
+- Computation results
+- Configuration files
+
+**Infrastructure:**
+- EC2 instances (compute costs)
+- S3 buckets (data storage)
+- DynamoDB tables (metadata)
+- Lambda functions (orchestration)
+
+### Threat Actors
+
+**External Attackers:**
+- Attempting to compromise AWS accounts
+- Scanning for exposed services and ports
+- Exploiting vulnerable instances or applications
+
+**Insider Threats:**
+- Accidental misconfiguration
+- Over-privileged IAM policies
+- Leaked credentials in code repositories
+
+**Supply Chain:**
+- Compromised dependencies (Go modules, Docker images)
+- Malicious AMIs
+- Tampered binaries
+
+### Attack Vectors
+
+**Credential Compromise:**
+- Leaked AWS keys in Git repositories
+- SSH keys with weak passphrases
+- Credentials in environment variables logged
+- Metadata service exploitation (SSRF)
+
+**Network Attacks:**
+- SSH brute force (0.0.0.0/0 security groups)
+- Man-in-the-middle (unencrypted traffic)
+- Lateral movement within VPC
+
+**Injection Attacks:**
+- Command injection in user data scripts
+- Path traversal in file operations
+
+**Resource Abuse:**
+- Cryptocurrency mining on forgotten instances
+- Excessive AWS spending from unmonitored launches
+
+### What spawn Protects Against
+
+- ✅ Command injection (input sanitization)
+- ✅ Path traversal (file path validation)
 - ✅ Unauthorized DNS updates (instance identity validation)
 - ✅ DNS hijacking (DNSSEC)
 - ✅ Cache poisoning (DNSSEC)
 - ✅ Cross-account abuse (tag enforcement + signature validation)
 - ✅ Unauthorized instance access (SSH key management)
+- ✅ Credential leaks (secrets encryption, log sanitization)
 
-**What spawn does NOT protect against**:
+### What spawn Does NOT Protect Against
+
 - ❌ Compromised AWS credentials (use MFA, rotate keys)
 - ❌ Compromised EC2 instances (harden your instances)
 - ❌ AWS account compromise (enable CloudTrail, GuardDuty)
 - ❌ Physical access to infrastructure (AWS's responsibility)
+- ❌ Application-level vulnerabilities (secure your code)
+
+---
+
+## Compliance
+
+spawn is designed to support the following compliance frameworks when configured correctly:
+
+### HIPAA (Health Insurance Portability and Accountability Act)
+
+**Requirements:**
+1. Sign AWS Business Associate Agreement (BAA)
+2. Use HIPAA-eligible services (EC2, S3, DynamoDB, Lambda)
+3. Encrypt all data (EBS, S3)
+4. Enable audit logging (CloudTrail)
+5. Implement access controls (IAM, MFA)
+
+**spawn Configuration:**
+```bash
+spawn launch \
+  --encrypt-volumes \
+  --kms-key-id <hipaa-compliant-key> \
+  --iam-policy <least-privilege-policy> \
+  --no-public-ip \
+  --subnet <private-subnet> \
+  --tags compliance=hipaa,data-class=phi
+```
+
+### PCI DSS (Payment Card Industry Data Security Standard)
+
+**Requirements:**
+1. Network segmentation (separate VPC/subnets)
+2. Encryption (TLS 1.2+, AES-256)
+3. Access controls (MFA, audit logs)
+4. Vulnerability scanning (quarterly)
+
+**spawn Configuration:**
+```bash
+spawn launch \
+  --vpc vpc-pci \
+  --subnet subnet-pci-private \
+  --security-groups sg-pci-restrictive \
+  --encrypt-volumes \
+  --tags compliance=pci-dss,cardholder-data=yes
+```
+
+### SOC 2 Type II
+
+**Requirements:**
+1. Access control policies
+2. Encryption (data at rest and in transit)
+3. Audit logging (all administrative actions)
+4. Change management
+
+**spawn Alignment:**
+- ✅ IAM-based access control
+- ✅ Optional EBS/S3 encryption
+- ✅ CloudTrail audit logs
+- ✅ DynamoDB state tracking
+- ⚠️ Manual change management required
+
+### NIST 800-171 Rev 3
+
+**Status:** Planned (issue #64)
+
+Controlled Unclassified Information (CUI) handling:
+- Enhanced access controls
+- Incident response procedures
+- Configuration management
+- System and communications protection
+
+### NIST 800-53 Rev 5 (FedRAMP)
+
+**Status:** Planned (issue #65)
+
+Federal Risk and Authorization Management Program:
+- Low/Moderate/High impact levels
+- Continuous monitoring
+- Enhanced security controls
+
+### Compliance Checklist
+
+- [ ] **Encryption:** EBS volumes encrypted with customer-managed KMS keys
+- [ ] **Networking:** Private subnets, restrictive security groups
+- [ ] **IAM:** Least-privilege policies, no long-term credentials
+- [ ] **Audit:** CloudTrail enabled, logs retained 90+ days
+- [ ] **Tagging:** Compliance tags on all resources
+- [ ] **Secrets:** No credentials in user data, use Secrets Manager
+- [ ] **Access:** MFA enabled, Systems Manager Session Manager
+- [ ] **Monitoring:** CloudWatch alarms, centralized logging
+- [ ] **Documentation:** Architecture diagrams, security policies
+- [ ] **Testing:** Quarterly vulnerability scans, annual penetration tests
+
+---
+
+## Security Updates
+
+### Notification Channels
+
+Subscribe to security updates:
+- **GitHub Watch:** "Releases only" or "All activity"
+- **Security Advisories:** https://github.com/scttfrdmn/mycelium/security/advisories
+
+### Release Notes Format
+
+Security fixes are clearly marked:
+- 🔒 **SECURITY:** Critical security update
+- ⚠️ **WARNING:** Breaking change for security reasons
+
+**Example:**
+```
+## v0.13.1 - 2026-02-01
+
+🔒 SECURITY FIXES:
+- Fixed command injection vulnerability in config command (CVE-2026-XXXX)
+- Updated AWS SDK to fix credential leak in error messages
+
+IMPACT: High
+AFFECTED VERSIONS: v0.1.0 - v0.13.0
+UPGRADE URGENCY: Immediate
+```
+
+### Update Policy
+
+- **Critical vulnerabilities:** Patched within 7 days
+- **High vulnerabilities:** Patched within 30 days
+- **Medium/Low vulnerabilities:** Included in next regular release
+
+**Supported Versions:**
+- **Latest minor version:** Full support (security + bug fixes)
+- **Previous minor version:** Security fixes only (6 months)
+- **Older versions:** No support (please upgrade)
+
+---
+
+## Security Considerations
 
 ### Known Limitations
 
@@ -485,15 +1156,54 @@ Spawn is designed with compliance in mind:
 
 Institutions should conduct their own compliance assessment based on their specific requirements.
 
-## References
+## Additional Resources
 
+### spawn Documentation
+
+- [Architecture Overview](docs/explanation/architecture.md)
+- [Security Model Explanation](docs/explanation/security-model.md)
+- [IAM Policies Reference](docs/reference/iam-policies.md)
+- [How-To: Security & IAM](docs/how-to/security-iam.md)
+- [CONTRIBUTING.md](CONTRIBUTING.md)
+
+### AWS Security Resources
+
+- [AWS Security Best Practices](https://aws.amazon.com/architecture/security-identity-compliance/)
 - [AWS Instance Identity Documents](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-identity-documents.html)
 - [IMDSv2 Documentation](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-service.html)
 - [Route53 DNSSEC](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/dns-configuring-dnssec.html)
 - [AWS KMS Best Practices](https://docs.aws.amazon.com/kms/latest/developerguide/best-practices.html)
+- [CIS AWS Foundations Benchmark](https://www.cisecurity.org/benchmark/amazon_web_services)
+
+### Security Standards & Frameworks
+
 - [OWASP Secure Coding Practices](https://owasp.org/www-project-secure-coding-practices-quick-reference-guide/)
+- [NIST Cybersecurity Framework](https://www.nist.gov/cyberframework)
+- [NIST 800-171 Rev 3](https://csrc.nist.gov/publications/detail/sp/800-171/rev-3/final)
+- [NIST 800-53 Rev 5](https://csrc.nist.gov/publications/detail/sp/800-53/rev-5/final)
+
+### Security Tools
+
+**For Users:**
+- [AWS IAM Policy Simulator](https://policysim.aws.amazon.com/)
+- [ScoutSuite](https://github.com/nccgroup/ScoutSuite) - AWS security auditing
+- [Prowler](https://github.com/prowler-cloud/prowler) - AWS security assessment
+
+**For Developers:**
+- [gosec](https://github.com/securego/gosec) - Go security scanner
+- [nancy](https://github.com/sonatype-nexus-community/nancy) - Dependency vulnerability scanner
+- [trivy](https://github.com/aquasecurity/trivy) - Docker image scanner
+- [golangci-lint](https://golangci-lint.run/) - Go linters aggregator
 
 ---
 
-**Last Updated**: 2025-12-21
-**Version**: 1.0.0
+## Acknowledgments
+
+We would like to thank the following security researchers for responsible disclosure:
+
+- *No disclosed vulnerabilities yet*
+
+---
+
+**Last Updated**: 2026-01-27
+**Version**: 1.1.0 (v0.13.0)
