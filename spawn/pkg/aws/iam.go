@@ -24,6 +24,96 @@ type IAMRoleConfig struct {
 	Tags            map[string]string // Tags for role
 }
 
+// GenerateScopedS3Policy creates an S3 policy scoped to spawn resources
+func GenerateScopedS3Policy(region, accountID string) string {
+	return fmt.Sprintf(`{
+		"Version": "2012-10-17",
+		"Statement": [
+			{
+				"Effect": "Allow",
+				"Action": [
+					"s3:GetObject",
+					"s3:GetObjectVersion"
+				],
+				"Resource": [
+					"arn:aws:s3:::spawn-binaries-%s/*",
+					"arn:aws:s3:::spawn-binaries-*/*"
+				]
+			},
+			{
+				"Effect": "Allow",
+				"Action": [
+					"s3:PutObject",
+					"s3:PutObjectAcl"
+				],
+				"Resource": [
+					"arn:aws:s3:::spawn-results-%s/*"
+				]
+			},
+			{
+				"Effect": "Allow",
+				"Action": [
+					"s3:ListBucket",
+					"s3:GetBucketLocation"
+				],
+				"Resource": [
+					"arn:aws:s3:::spawn-binaries-%s",
+					"arn:aws:s3:::spawn-results-%s"
+				]
+			}
+		]
+	}`, region, region, region, region)
+}
+
+// GenerateScopedDynamoDBPolicy creates a DynamoDB policy scoped to spawn tables
+func GenerateScopedDynamoDBPolicy(region, accountID string) string {
+	return fmt.Sprintf(`{
+		"Version": "2012-10-17",
+		"Statement": [{
+			"Effect": "Allow",
+			"Action": [
+				"dynamodb:BatchGetItem",
+				"dynamodb:BatchWriteItem",
+				"dynamodb:DescribeTable",
+				"dynamodb:GetItem",
+				"dynamodb:PutItem",
+				"dynamodb:Query",
+				"dynamodb:Scan",
+				"dynamodb:UpdateItem",
+				"dynamodb:DeleteItem"
+			],
+			"Resource": [
+				"arn:aws:dynamodb:%s:%s:table/spawn-alerts",
+				"arn:aws:dynamodb:%s:%s:table/spawn-alert-history",
+				"arn:aws:dynamodb:%s:%s:table/spawn-schedules",
+				"arn:aws:dynamodb:%s:%s:table/spawn-queues",
+				"arn:aws:dynamodb:%s:%s:table/spawn-alerts/index/*",
+				"arn:aws:dynamodb:%s:%s:table/spawn-schedules/index/*"
+			]
+		}]
+	}`, region, accountID, region, accountID, region, accountID, region, accountID, region, accountID, region, accountID)
+}
+
+// GenerateScopedCloudWatchLogsPolicy creates a CloudWatch Logs policy for audit logs
+func GenerateScopedCloudWatchLogsPolicy(region, accountID string) string {
+	return fmt.Sprintf(`{
+		"Version": "2012-10-17",
+		"Statement": [{
+			"Effect": "Allow",
+			"Action": [
+				"logs:CreateLogGroup",
+				"logs:CreateLogStream",
+				"logs:PutLogEvents",
+				"logs:DescribeLogStreams"
+			],
+			"Resource": [
+				"arn:aws:logs:%s:%s:log-group:/aws/spawn/audit",
+				"arn:aws:logs:%s:%s:log-group:/aws/spawn/audit:*"
+			]
+		}]
+	}`, region, accountID, region, accountID)
+}
+
 // PolicyTemplates provides built-in policy templates for common services
 var PolicyTemplates = map[string]string{
 	"s3:FullAccess": `{
@@ -267,8 +357,14 @@ func (c *Client) hashPolicies(config IAMRoleConfig) string {
 
 // createIAMRole creates a new IAM role with policies
 func (c *Client) createIAMRole(ctx context.Context, iamClient *iam.Client, roleName string, config IAMRoleConfig) error {
-	// Build trust policy
-	trustPolicy := c.buildTrustPolicy(config.TrustServices)
+	// Get current account ID for trust policy conditions
+	accountID, err := c.GetAccountID(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get account ID: %w", err)
+	}
+
+	// Build trust policy with account condition
+	trustPolicy := c.buildTrustPolicyWithAccount(config.TrustServices, accountID)
 	trustPolicyJSON, err := json.Marshal(trustPolicy)
 	if err != nil {
 		return fmt.Errorf("failed to marshal trust policy: %w", err)
@@ -334,7 +430,7 @@ func (c *Client) createIAMRole(ctx context.Context, iamClient *iam.Client, roleN
 	return nil
 }
 
-// buildTrustPolicy creates an assume role policy document
+// buildTrustPolicy creates an assume role policy document (legacy, no account condition)
 func (c *Client) buildTrustPolicy(services []string) map[string]interface{} {
 	// Build service principals
 	servicePrincipals := make([]string, len(services))
@@ -351,6 +447,34 @@ func (c *Client) buildTrustPolicy(services []string) map[string]interface{} {
 					"Service": servicePrincipals,
 				},
 				"Action": "sts:AssumeRole",
+			},
+		},
+	}
+}
+
+// buildTrustPolicyWithAccount creates an assume role policy with account condition
+// This prevents cross-account role assumption for enhanced security
+func (c *Client) buildTrustPolicyWithAccount(services []string, accountID string) map[string]interface{} {
+	// Build service principals
+	servicePrincipals := make([]string, len(services))
+	for i, service := range services {
+		servicePrincipals[i] = fmt.Sprintf("%s.amazonaws.com", service)
+	}
+
+	return map[string]interface{}{
+		"Version": "2012-10-17",
+		"Statement": []map[string]interface{}{
+			{
+				"Effect": "Allow",
+				"Principal": map[string]interface{}{
+					"Service": servicePrincipals,
+				},
+				"Action": "sts:AssumeRole",
+				"Condition": map[string]interface{}{
+					"StringEquals": map[string]interface{}{
+						"aws:SourceAccount": accountID,
+					},
+				},
 			},
 		},
 	}
