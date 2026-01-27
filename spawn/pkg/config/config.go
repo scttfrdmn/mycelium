@@ -26,7 +26,9 @@ const (
 
 // Config represents the spawn configuration
 type Config struct {
-	DNS DNSConfig `yaml:"dns"`
+	DNS            DNSConfig            `yaml:"dns"`
+	Compliance     ComplianceConfig     `yaml:"compliance"`
+	Infrastructure InfrastructureConfig `yaml:"infrastructure"`
 }
 
 // DNSConfig represents DNS configuration

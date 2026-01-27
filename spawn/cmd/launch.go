@@ -21,6 +21,7 @@ import (
 	"github.com/scttfrdmn/mycelium/pkg/i18n"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/audit"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/aws"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/compliance"
 	spawnconfig "github.com/scttfrdmn/mycelium/spawn/pkg/config"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/input"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/locality"
@@ -151,6 +152,10 @@ var (
 	outputIDFile string
 	wait         bool
 	waitTimeout  string
+
+	// Compliance (parsed from flags)
+	complianceMode   string
+	complianceStrict bool
 )
 
 var launchCmd = &cobra.Command{
@@ -273,6 +278,11 @@ func init() {
 	launchCmd.Flags().BoolVar(&waitForSSH, "wait-for-ssh", true, "Wait until SSH is ready")
 	launchCmd.Flags().BoolVar(&skipRegionCheck, "skip-region-check", false, "Skip data locality region mismatch warnings")
 
+	// Compliance
+	launchCmd.Flags().Bool("nist-800-171", false, "Enable NIST 800-171 Rev 3 compliance mode")
+	launchCmd.Flags().String("nist-800-53", "", "Enable NIST 800-53 compliance (low, moderate, high)")
+	launchCmd.Flags().Bool("compliance-strict", false, "Strict mode: fail on warnings (default: show warnings only)")
+
 	// Workflow integration
 	launchCmd.Flags().StringVar(&outputIDFile, "output-id", "", "Write sweep/instance ID to file for scripting")
 	launchCmd.Flags().BoolVar(&wait, "wait", false, "Wait for sweep/launch to complete (requires --detach)")
@@ -383,6 +393,88 @@ func runLaunch(cmd *cobra.Command, args []string) error {
 	awsClient, err := aws.NewClient(ctx)
 	if err != nil {
 		return i18n.Te("error.aws_client_init", err)
+	}
+
+	// Determine compliance mode from flags
+	if cmd.Flags().Changed("nist-800-171") {
+		complianceMode = "nist-800-171"
+	} else if cmd.Flags().Changed("nist-800-53") {
+		val, _ := cmd.Flags().GetString("nist-800-53")
+		if val == "" {
+			val = "low"
+		}
+		complianceMode = fmt.Sprintf("nist-800-53-%s", val)
+	}
+	if cmd.Flags().Changed("compliance-strict") {
+		complianceStrict, _ = cmd.Flags().GetBool("compliance-strict")
+	}
+
+	// Load compliance configuration and validate if enabled
+	if complianceMode != "" {
+		complianceConfig, err := spawnconfig.LoadComplianceConfig(ctx, complianceMode, complianceStrict)
+		if err != nil {
+			return fmt.Errorf("failed to load compliance config: %w", err)
+		}
+
+		infraConfig, err := spawnconfig.LoadInfrastructureConfig(ctx, "")
+		if err != nil {
+			return fmt.Errorf("failed to load infrastructure config: %w", err)
+		}
+
+		// Apply compliance enforcement to launch config
+		validator := compliance.NewValidator(complianceConfig, infraConfig)
+		if err := validator.EnforceLaunchConfig(config); err != nil {
+			return fmt.Errorf("failed to enforce compliance: %w", err)
+		}
+
+		// Mark compliance mode in config for enforcement in aws client
+		config.EBSEncrypted = complianceConfig.EnforceEncryptedEBS
+		config.IMDSv2Enforced = complianceConfig.EnforceIMDSv2
+		config.IMDSv2HopLimit = 1
+
+		// Validate launch configuration
+		result, err := validator.ValidateLaunchConfig(ctx, config)
+		if err != nil {
+			return fmt.Errorf("compliance validation failed: %w", err)
+		}
+
+		// Handle validation warnings
+		if result.HasWarnings() {
+			for _, warning := range result.Warnings {
+				fmt.Fprintf(os.Stderr, "⚠️  %s\n", warning)
+			}
+		}
+
+		// Handle validation violations
+		if result.HasViolations() {
+			if validator.IsStrictMode() {
+				// Strict mode: fail on violations
+				fmt.Fprintf(os.Stderr, "\n❌ Compliance validation failed (%d violations):\n", len(result.Violations))
+				for _, violation := range result.Violations {
+					fmt.Fprintf(os.Stderr, "  [%s] %s: %s\n", violation.ControlID, violation.ControlName, violation.Description)
+				}
+				return fmt.Errorf("compliance validation failed in strict mode")
+			} else {
+				// Non-strict mode: show warnings but continue
+				fmt.Fprintf(os.Stderr, "\n⚠️  Compliance warnings (%d):\n", len(result.Violations))
+				for _, violation := range result.Violations {
+					fmt.Fprintf(os.Stderr, "  [%s] %s: %s\n", violation.ControlID, violation.ControlName, violation.Description)
+				}
+				fmt.Fprintf(os.Stderr, "\nContinuing launch with warnings. Use --compliance-strict to fail on violations.\n\n")
+			}
+		}
+
+		// Show compliance summary
+		if !quiet {
+			fmt.Fprintf(os.Stderr, "\n✓ Compliance mode: %s\n", complianceConfig.GetModeDisplayName())
+			if config.EBSEncrypted {
+				fmt.Fprintf(os.Stderr, "✓ EBS encryption: enforced\n")
+			}
+			if config.IMDSv2Enforced {
+				fmt.Fprintf(os.Stderr, "✓ IMDSv2: enforced\n")
+			}
+			fmt.Fprintf(os.Stderr, "\n")
+		}
 	}
 
 	// Launch with progress display

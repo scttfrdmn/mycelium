@@ -115,6 +115,12 @@ type LaunchConfig struct {
 	FSxExportPath      string // S3 export path (s3://bucket/prefix)
 	FSxMountPoint      string // FSx mount point (default: /fsx)
 
+	// Compliance settings
+	EBSEncrypted   bool   // Force EBS encryption (compliance requirement)
+	EBSKMSKeyID    string // Customer-managed KMS key for EBS encryption
+	IMDSv2Enforced bool   // Require IMDSv2 (no IMDSv1 fallback)
+	IMDSv2HopLimit int    // IMDSv2 hop limit (default: 1)
+
 	// Metadata
 	Name string
 	Tags map[string]string
@@ -242,6 +248,20 @@ func (c *Client) Launch(ctx context.Context, launchConfig LaunchConfig) (*Launch
 		}
 	}
 
+	// Add IMDSv2 configuration if enforced (compliance requirement)
+	if launchConfig.IMDSv2Enforced {
+		hopLimit := int32(1) // Default: only local access
+		if launchConfig.IMDSv2HopLimit > 0 {
+			hopLimit = int32(launchConfig.IMDSv2HopLimit)
+		}
+
+		input.MetadataOptions = &types.InstanceMetadataOptionsRequest{
+			HttpTokens:              types.HttpTokensStateRequired, // Require IMDSv2
+			HttpPutResponseHopLimit: aws.Int32(hopLimit),
+			HttpEndpoint:            types.InstanceMetadataEndpointStateEnabled,
+		}
+	}
+
 	// Launch instance
 	result, err := ec2Client.RunInstances(ctx, input)
 	if err != nil {
@@ -364,15 +384,25 @@ func buildBlockDevices(config LaunchConfig) []types.BlockDeviceMapping {
 		volumeSize = estimateVolumeSize(config.InstanceType)
 	}
 
+	// Determine encryption settings
+	encrypted := config.Hibernate || config.EBSEncrypted
+
+	ebs := &types.EbsBlockDevice{
+		VolumeSize:          aws.Int32(volumeSize),
+		VolumeType:          types.VolumeTypeGp3,
+		DeleteOnTermination: aws.Bool(true),
+		Encrypted:           aws.Bool(encrypted),
+	}
+
+	// Add customer-managed KMS key if specified
+	if encrypted && config.EBSKMSKeyID != "" {
+		ebs.KmsKeyId = aws.String(config.EBSKMSKeyID)
+	}
+
 	return []types.BlockDeviceMapping{
 		{
 			DeviceName: aws.String("/dev/xvda"),
-			Ebs: &types.EbsBlockDevice{
-				VolumeSize:          aws.Int32(volumeSize),
-				VolumeType:          types.VolumeTypeGp3,
-				DeleteOnTermination: aws.Bool(true),
-				Encrypted:           aws.Bool(config.Hibernate), // Required for hibernation
-			},
+			Ebs:        ebs,
 		},
 	}
 }
