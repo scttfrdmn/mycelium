@@ -8,16 +8,19 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
-	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
+	snstypes "github.com/aws/aws-sdk-go-v2/service/sns/types"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/security"
 )
 
 const (
@@ -96,11 +99,14 @@ type SlackField struct {
 }
 
 var (
-	dynamoClient *dynamodb.Client
-	snsClient    *sns.Client
-	httpClient   *http.Client
-	region       string
-	accountID    string
+	dynamoClient         *dynamodb.Client
+	snsClient            *sns.Client
+	kmsClient            *kms.Client
+	httpClient           *http.Client
+	region               string
+	accountID            string
+	kmsKeyID             string
+	encryptionEnabled    bool
 )
 
 func init() {
@@ -112,10 +118,20 @@ func init() {
 
 	dynamoClient = dynamodb.NewFromConfig(cfg)
 	snsClient = sns.NewFromConfig(cfg)
+	kmsClient = kms.NewFromConfig(cfg)
 	httpClient = &http.Client{Timeout: 10 * time.Second}
 
 	region = cfg.Region
 	accountID = "966362334030" // mycelium-infra account
+
+	// Enable webhook encryption if KMS key is configured
+	kmsKeyID = os.Getenv("WEBHOOK_KMS_KEY_ID")
+	encryptionEnabled = kmsKeyID != ""
+	if encryptionEnabled {
+		log.Printf("Webhook encryption enabled with KMS key: %s", kmsKeyID)
+	} else {
+		log.Printf("Webhook encryption disabled (no KMS key configured)")
+	}
 }
 
 func handler(ctx context.Context, event SweepEvent) error {
@@ -222,6 +238,24 @@ func getAlertsForSweep(ctx context.Context, sweepID string) ([]*AlertConfig, err
 			log.Printf("Error unmarshaling alert: %v", err)
 			continue
 		}
+
+		// Decrypt webhook URLs if encryption is enabled
+		if encryptionEnabled {
+			for i, dest := range alert.Destinations {
+				if dest.Type == DestinationSlack || dest.Type == DestinationWebhook {
+					// Only decrypt if encrypted
+					if security.IsEncrypted(dest.Target) {
+						decrypted, err := security.DecryptSecret(ctx, kmsClient, dest.Target)
+						if err != nil {
+							log.Printf("Error decrypting webhook URL for alert %s: %v", alert.AlertID, err)
+							continue
+						}
+						alert.Destinations[i].Target = decrypted
+					}
+				}
+			}
+		}
+
 		alerts = append(alerts, &alert)
 	}
 
@@ -258,7 +292,12 @@ func sendNotifications(ctx context.Context, alert *AlertConfig, event SweepEvent
 		}
 
 		if err != nil {
-			log.Printf("Error sending to %s (%s): %v", dest.Target, dest.Type, err)
+			// Mask webhook URLs in logs
+			target := dest.Target
+			if dest.Type == DestinationSlack || dest.Type == DestinationWebhook {
+				target = security.MaskURL(dest.Target)
+			}
+			log.Printf("Error sending to %s (%s): %v", target, dest.Type, err)
 			lastErr = err
 		}
 	}
@@ -293,7 +332,7 @@ Status: %s
 		TopicArn: aws.String(topicArn),
 		Subject:  aws.String(subject),
 		Message:  aws.String(body),
-		MessageAttributes: map[string]types.MessageAttributeValue{
+		MessageAttributes: map[string]snstypes.MessageAttributeValue{
 			"email": {
 				DataType:    aws.String("String"),
 				StringValue: aws.String(email),

@@ -9,7 +9,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/google/uuid"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/security"
 )
 
 const (
@@ -74,12 +76,28 @@ type AlertHistory struct {
 
 // Client provides alert management operations
 type Client struct {
-	db *dynamodb.Client
+	db        *dynamodb.Client
+	kms       *kms.Client
+	kmsKeyID  string
+	encryptionEnabled bool
 }
 
 // NewClient creates a new alerts client
 func NewClient(db *dynamodb.Client) *Client {
-	return &Client{db: db}
+	return &Client{
+		db: db,
+		encryptionEnabled: false, // Backward compatible: encryption disabled by default
+	}
+}
+
+// NewClientWithEncryption creates a new alerts client with KMS encryption
+func NewClientWithEncryption(db *dynamodb.Client, kmsClient *kms.Client, kmsKeyID string) *Client {
+	return &Client{
+		db:                db,
+		kms:               kmsClient,
+		kmsKeyID:          kmsKeyID,
+		encryptionEnabled: true,
+	}
 }
 
 // CreateAlert creates a new alert configuration
@@ -100,6 +118,22 @@ func (c *Client) CreateAlert(ctx context.Context, config *AlertConfig) error {
 	// Validate
 	if err := config.Validate(); err != nil {
 		return fmt.Errorf("validate alert config: %w", err)
+	}
+
+	// Encrypt webhook URLs if encryption is enabled
+	if c.encryptionEnabled && c.kms != nil {
+		for i, dest := range config.Destinations {
+			if dest.Type == DestinationSlack || dest.Type == DestinationWebhook {
+				// Only encrypt if not already encrypted
+				if !security.IsEncrypted(dest.Target) {
+					encrypted, err := security.EncryptSecret(ctx, c.kms, c.kmsKeyID, dest.Target)
+					if err != nil {
+						return fmt.Errorf("encrypt webhook URL: %w", err)
+					}
+					config.Destinations[i].Target = encrypted
+				}
+			}
+		}
 	}
 
 	// Marshal to DynamoDB item
@@ -141,7 +175,34 @@ func (c *Client) GetAlert(ctx context.Context, alertID string) (*AlertConfig, er
 		return nil, fmt.Errorf("unmarshal alert: %w", err)
 	}
 
+	// Decrypt webhook URLs if encryption is enabled
+	if err := c.decryptDestinations(ctx, &config); err != nil {
+		return nil, fmt.Errorf("decrypt destinations: %w", err)
+	}
+
 	return &config, nil
+}
+
+// decryptDestinations decrypts webhook URLs in alert destinations
+func (c *Client) decryptDestinations(ctx context.Context, config *AlertConfig) error {
+	if !c.encryptionEnabled || c.kms == nil {
+		return nil
+	}
+
+	for i, dest := range config.Destinations {
+		if dest.Type == DestinationSlack || dest.Type == DestinationWebhook {
+			// Only decrypt if encrypted
+			if security.IsEncrypted(dest.Target) {
+				decrypted, err := security.DecryptSecret(ctx, c.kms, dest.Target)
+				if err != nil {
+					return fmt.Errorf("decrypt webhook URL: %w", err)
+				}
+				config.Destinations[i].Target = decrypted
+			}
+		}
+	}
+
+	return nil
 }
 
 // ListAlerts lists all alerts for a user, optionally filtered by sweep ID
@@ -183,6 +244,12 @@ func (c *Client) ListAlerts(ctx context.Context, userID string, sweepID string) 
 		if err := attributevalue.UnmarshalMap(item, &config); err != nil {
 			return nil, fmt.Errorf("unmarshal alert: %w", err)
 		}
+
+		// Decrypt webhook URLs if encryption is enabled
+		if err := c.decryptDestinations(ctx, &config); err != nil {
+			return nil, fmt.Errorf("decrypt destinations: %w", err)
+		}
+
 		alerts = append(alerts, &config)
 	}
 
