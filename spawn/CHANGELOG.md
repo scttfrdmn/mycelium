@@ -5,6 +5,134 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.2] - 2026-01-27
+
+This release completes the v0.13.0 milestone with comprehensive documentation and automated dependency scanning.
+
+### Documentation - Complete User Guide (Issue #66)
+
+#### Tutorials (Learning-Oriented) - 7 Complete Guides
+- **01-getting-started.md**: Installation, AWS setup, first instance launch
+- **02-first-instance.md**: Instance types, SSH access, TTL, hibernation
+- **03-parameter-sweeps.md**: YAML parameter files, Cartesian products, detached sweeps
+- **04-job-arrays.md**: Multi-instance coordination, peer discovery, MPI
+- **05-batch-queues.md**: Sequential jobs, dependencies, retry strategies
+- **06-cost-management.md**: Spot instances, budgets, cost tracking
+- **07-monitoring-alerts.md**: Slack/email/SNS alerts, cost thresholds
+
+#### How-To Guides (Task-Oriented) - 19 Practical Recipes
+**Core Operations**:
+- launch-instances.md, parameter-sweeps.md, job-arrays.md, batch-queues.md
+
+**Cost & Performance**:
+- spot-instances.md, cost-optimization.md, instance-selection.md
+
+**HPC & Scientific Computing**:
+- hpc-mpi.md, slurm-conversion.md
+
+**Advanced Topics**:
+- ssh-advanced.md, custom-amis.md, security-iam.md, custom-networking.md
+- debugging.md, monitoring-alerts.md, ci-cd-integration.md
+- multi-account.md, disaster-recovery.md
+
+**New**: cloudtrail-audit.md - Complete CloudTrail audit logging setup
+
+#### Explanation (Understanding-Oriented) - 4 Deep Dives
+- **architecture.md**: System design, components, data flow, security model
+- **core-concepts.md**: TTL countdown, idle detection algorithm, spot interruption handling
+- **security-model.md**: Threat model, authentication, encryption, compliance
+- **cost-optimization.md**: Economics of ephemeral compute, optimization strategies, TCO analysis
+
+#### Reference Documentation - 16 Command References
+**Complete command reference** for all spawn commands with synopsis, flags, examples, exit codes
+
+**Additional reference docs**:
+- parameter-files.md, queue-configs.md, iam-policies.md
+
+#### Contributing & Security
+- **CONTRIBUTING.md**: Development setup, coding standards, testing, PR process
+- **SECURITY.md**: Security features, best practices, compliance guidance (1000+ lines)
+  - Comprehensive security disclaimers
+  - Technically accurate compliance framework descriptions
+  - HIPAA, PCI DSS, SOC 2, NIST 800-171, NIST 800-53, HITRUST CSF coverage
+  - CloudTrail integration guidance
+
+**Documentation Statistics**:
+- 40+ documentation pages
+- 20,000+ lines of documentation
+- Complete Diátaxis framework implementation
+- Professional-grade documentation for production use
+
+### Security - Dependency Scanning (Issue #63)
+
+#### Dependabot Configuration (`.github/dependabot.yml`)
+**Automated security scanning for**:
+- Go modules (spawn and truffle) - weekly scans
+- Docker images - weekly scans
+- GitHub Actions - weekly scans
+
+**Features**:
+- Automatic security update PRs
+- Grouped minor/patch updates to reduce PR volume
+- AWS SDK updates grouped separately
+- Monday morning scan schedule (9:00 AM PST)
+- Up to 10 open PRs per ecosystem
+
+**Benefits**:
+- Proactive vulnerability detection
+- Automated dependency updates
+- Reduced security response time
+- Compliance support (dependency auditing)
+
+#### CloudTrail Audit Logging Guide
+**Complete documentation** for CloudTrail integration:
+- Step-by-step setup instructions
+- CloudWatch Logs integration
+- Example queries (AWS CLI, CloudWatch Logs Insights)
+- S3 log analysis patterns
+- Integration with spawn audit logging (pkg/audit)
+- CloudWatch alarms for security events
+- Compliance retention policies (HIPAA, PCI DSS, SOC 2)
+- S3 bucket security (encryption, MFA delete, versioning)
+- Complete audit setup script
+- Troubleshooting guide
+
+**Audit Coverage**:
+- EC2 operations (RunInstances, TerminateInstances)
+- IAM operations (CreateRole, PutRolePolicy)
+- DynamoDB operations (state tracking)
+- Lambda invocations (orchestration)
+- Security group modifications
+- S3 artifact access
+
+### Milestone Completion
+
+**Issue #66** (Documentation) - ✅ **COMPLETE**
+- All tutorials, how-to guides, explanations, and reference docs complete
+- Professional documentation following Diátaxis framework
+- Comprehensive coverage of all spawn features
+
+**Issue #63** (Security Hardening) - ✅ **COMPLETE**
+- Input validation & injection prevention ✅
+- IAM policy hardening ✅
+- Credential encryption ✅
+- Audit logging system ✅
+- SECURITY.md documentation ✅
+- Dependency scanning (Dependabot) ✅
+- CloudTrail integration documentation ✅
+
+### Related Issues
+- Closes #66 (Comprehensive documentation)
+- Closes #63 (Security hardening and audit)
+
+### Upgrade Notes
+- No breaking changes
+- Documentation available immediately
+- Dependabot will begin scanning on next Monday
+- CloudTrail setup optional but recommended for production
+
+---
+
 ## [0.13.1] - 2026-01-27
 
 This release completes Phase 4 of security hardening (issue #67) with IAM policy scoping, comprehensive audit logging, and webhook URL encryption.
