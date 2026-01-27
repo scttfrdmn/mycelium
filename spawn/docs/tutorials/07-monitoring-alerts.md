@@ -271,7 +271,7 @@ View results:
 
 **Example webhook URL:**
 ```
-https://discord.com/api/webhooks/123456789012345678/AbCdEfGhIjKlMnOpQrStUvWxYz
+https://discord.com/api/webhooks/{WEBHOOK_ID}/{WEBHOOK_TOKEN}
 ```
 
 ### Step 2: Create Alert
