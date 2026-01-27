@@ -1036,24 +1036,25 @@ Only grant necessary IAM permissions
 **spawn and spore.host make NO representations, warranties, or certifications regarding compliance with any regulatory framework, standard, or requirement, including but not limited to HIPAA, PCI DSS, SOC 2, NIST 800-171, NIST 800-53, FedRAMP, GDPR, or any other compliance framework.**
 
 **Key Points:**
-- spawn is an **open-source tool** that CAN BE CONFIGURED to support security controls
+- spawn **actively works to align with** common compliance frameworks by implementing security controls and features
+- spawn is an **open-source tool** that CAN BE CONFIGURED to support your compliance efforts
 - **You are solely responsible** for your own compliance assessments and certifications
 - **You must conduct your own** security audits, risk assessments, and compliance validations
 - **No warranties** are provided regarding the suitability of spawn for any specific compliance requirement
 - **The spore.host service** is provided as-is without any compliance certifications or guarantees
 - **Consult your compliance officers** and legal counsel before using spawn for regulated workloads
 
-**This section provides INFORMATIONAL GUIDANCE ONLY** on how spawn features may align with common compliance controls. It is NOT a certification, attestation, or guarantee of compliance.
+**This section provides INFORMATIONAL GUIDANCE** on how spawn features are designed to align with common compliance controls. It is NOT a certification, attestation, or guarantee of compliance.
 
 ---
 
-The following information describes how spawn CAN BE CONFIGURED to support common compliance requirements. Users must perform their own compliance assessments:
+spawn is designed to support common compliance frameworks through security features and controls. The following information describes how spawn CAN BE CONFIGURED to support your compliance requirements. Users must perform their own compliance assessments:
 
 ### HIPAA (Health Insurance Portability and Accountability Act)
 
-**⚠️ spawn is NOT HIPAA compliant and makes no representations regarding HIPAA compliance.**
+**⚠️ spawn is NOT HIPAA certified and makes no representations regarding HIPAA compliance. However, spawn is designed to support HIPAA compliance efforts through security controls and features.**
 
-**INFORMATIONAL ONLY:** If you are attempting to meet HIPAA requirements, some general requirements include:
+spawn provides security features aligned with common HIPAA requirements. If you are working to meet HIPAA requirements, typical requirements include:
 1. Sign AWS Business Associate Agreement (BAA) with AWS (separate from spawn)
 2. Use HIPAA-eligible AWS services (EC2, S3, DynamoDB, Lambda)
 3. Encrypt all data (EBS, S3)
@@ -1061,7 +1062,7 @@ The following information describes how spawn CAN BE CONFIGURED to support commo
 5. Implement access controls (IAM, MFA)
 6. Conduct your own HIPAA compliance assessment and audit
 
-**Example spawn configuration** (for informational purposes only - does NOT guarantee HIPAA compliance):
+**Example spawn configuration to support HIPAA requirements** (user must conduct own compliance assessment):
 ```bash
 spawn launch \
   --encrypt-volumes \
@@ -1074,16 +1075,16 @@ spawn launch \
 
 ### PCI DSS (Payment Card Industry Data Security Standard)
 
-**⚠️ spawn is NOT PCI DSS compliant and makes no representations regarding PCI DSS compliance.**
+**⚠️ spawn is NOT PCI DSS certified and makes no representations regarding PCI DSS compliance. However, spawn is designed to support PCI DSS compliance efforts through security controls and features.**
 
-**INFORMATIONAL ONLY:** If you are attempting to meet PCI DSS requirements, some general requirements include:
+spawn provides security features aligned with common PCI DSS requirements. If you are working to meet PCI DSS requirements, typical requirements include:
 1. Network segmentation (separate VPC/subnets)
 2. Encryption (TLS 1.2+, AES-256)
 3. Access controls (MFA, audit logs)
 4. Vulnerability scanning (quarterly)
 5. Conduct your own PCI DSS assessment and audit
 
-**Example spawn configuration** (for informational purposes only - does NOT guarantee PCI DSS compliance):
+**Example spawn configuration to support PCI DSS requirements** (user must conduct own compliance assessment):
 ```bash
 spawn launch \
   --vpc vpc-pci \
@@ -1095,16 +1096,16 @@ spawn launch \
 
 ### SOC 2 Type II
 
-**⚠️ spawn is NOT SOC 2 certified and makes no representations regarding SOC 2 compliance.**
+**⚠️ spawn is NOT SOC 2 certified and makes no representations regarding SOC 2 compliance. However, spawn is designed to support SOC 2 compliance efforts through security controls and features.**
 
-**INFORMATIONAL ONLY:** If you are attempting to meet SOC 2 requirements, some general requirements include:
+spawn provides security features aligned with common SOC 2 requirements. If you are working to meet SOC 2 requirements, typical requirements include:
 1. Access control policies
 2. Encryption (data at rest and in transit)
 3. Audit logging (all administrative actions)
 4. Change management
 5. Obtain SOC 2 audit from qualified auditor
 
-**spawn security features** (informational only - does NOT constitute SOC 2 certification):
+**spawn security features designed to support SOC 2 requirements** (user must obtain SOC 2 audit):
 - IAM-based access control (available)
 - Optional EBS/S3 encryption (user-configured)
 - CloudTrail audit logs (user-configured)
@@ -1113,11 +1114,11 @@ spawn launch \
 
 ### NIST 800-171 Rev 3
 
-**⚠️ spawn is NOT NIST 800-171 compliant and makes no representations regarding NIST 800-171 compliance.**
+**⚠️ spawn is NOT NIST 800-171 certified and makes no representations regarding NIST 800-171 compliance. However, spawn is designed to support NIST 800-171 compliance efforts through security controls and features.**
 
-**Status:** Compliance mode features planned but NOT implemented (issue #64)
+**Status:** Enhanced compliance mode features planned but NOT yet implemented (issue #64)
 
-**INFORMATIONAL ONLY:** NIST 800-171 addresses Controlled Unclassified Information (CUI) handling and includes requirements for:
+NIST 800-171 addresses Controlled Unclassified Information (CUI) handling. spawn provides security features aligned with common NIST 800-171 requirements including:
 - Enhanced access controls
 - Incident response procedures
 - Configuration management
@@ -1126,11 +1127,11 @@ spawn launch \
 
 ### NIST 800-53 Rev 5 (FedRAMP)
 
-**⚠️ spawn is NOT NIST 800-53 compliant, NOT FedRAMP authorized, and makes no representations regarding NIST 800-53 or FedRAMP compliance.**
+**⚠️ spawn is NOT NIST 800-53 certified, NOT FedRAMP authorized, and makes no representations regarding NIST 800-53 or FedRAMP compliance. However, spawn is designed to support NIST 800-53 compliance efforts through security controls and features.**
 
-**Status:** Compliance mode features planned but NOT implemented (issue #65)
+**Status:** Enhanced compliance mode features planned but NOT yet implemented (issue #65)
 
-**INFORMATIONAL ONLY:** NIST 800-53 is the Federal Risk and Authorization Management Program framework and includes:
+NIST 800-53 is the Federal Risk and Authorization Management Program (FedRAMP) framework. spawn provides security features aligned with common NIST 800-53 requirements including:
 - Low/Moderate/High impact level controls
 - Continuous monitoring requirements
 - Comprehensive security controls
@@ -1217,20 +1218,23 @@ UPGRADE URGENCY: Immediate
 
 ## Compliance Notes
 
-**⚠️ NO COMPLIANCE CERTIFICATIONS:** spawn and spore.host are NOT certified, audited, or compliant with any regulatory framework. The following information is provided for reference only.
+**⚠️ NO COMPLIANCE CERTIFICATIONS:** spawn and spore.host are NOT certified, audited, or compliant with any regulatory framework. However, spawn is actively designed with compliance frameworks in mind.
 
-**Security capabilities that MAY support compliance efforts** (subject to your own assessment):
+**Security capabilities designed to support compliance efforts** (subject to your own assessment):
 
-- **Audit Logging** - CloudWatch Logs, CloudTrail integration
-- **Access Controls** - IAM-based authentication, least-privilege policies
-- **Encryption** - Optional EBS encryption, S3 server-side encryption
+- **Audit Logging** - CloudWatch Logs, CloudTrail integration, structured audit events
+- **Access Controls** - IAM-based authentication, least-privilege policy templates
+- **Encryption** - EBS encryption, S3 server-side encryption, KMS integration
+- **Input Validation** - Command injection prevention, path traversal protection
+- **Secrets Management** - KMS-encrypted webhook storage, Secrets Manager integration
+- **Network Security** - Private subnet support, security group management, IMDSv2
 - **Data Handling** - No PII stored by spore.host (only instance IDs, IP addresses)
 - **Regional Support** - Compatible with AWS GovCloud regions (user-deployed)
 
 **⚠️ YOU are responsible for:**
-- Conducting compliance assessments
-- Implementing required security controls
-- Obtaining certifications and audits
+- Conducting compliance assessments and audits
+- Implementing all required security controls
+- Obtaining certifications and attestations
 - Meeting all regulatory requirements
 - Consulting compliance and legal counsel
 
