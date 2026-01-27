@@ -1052,15 +1052,17 @@ spawn is designed to support common compliance frameworks through security featu
 
 ### HIPAA (Health Insurance Portability and Accountability Act)
 
-**⚠️ spawn is NOT HIPAA certified and makes no representations regarding HIPAA compliance. However, spawn is designed to support HIPAA compliance efforts through security controls and features.**
+**⚠️ spawn makes no representations regarding HIPAA compliance. HIPAA compliance is a risk acceptance framework - there is no "HIPAA certification." However, spawn is designed to support HIPAA compliance efforts through security controls and features.**
 
-spawn provides security features aligned with common HIPAA requirements. If you are working to meet HIPAA requirements, typical requirements include:
+spawn provides security features aligned with common HIPAA security and privacy requirements. If you are working to meet HIPAA requirements, typical elements of a HIPAA compliance program include:
 1. Sign AWS Business Associate Agreement (BAA) with AWS (separate from spawn)
 2. Use HIPAA-eligible AWS services (EC2, S3, DynamoDB, Lambda)
-3. Encrypt all data (EBS, S3)
-4. Enable audit logging (CloudTrail)
-5. Implement access controls (IAM, MFA)
-6. Conduct your own HIPAA compliance assessment and audit
+3. Encrypt all ePHI (Electronic Protected Health Information)
+4. Enable audit logging (CloudTrail, access logs)
+5. Implement access controls (IAM, MFA, role-based access)
+6. Conduct risk assessments and document policies/procedures
+7. Implement administrative, physical, and technical safeguards
+8. Execute Business Associate Agreements with service providers
 
 **Example spawn configuration to support HIPAA requirements** (user must conduct own compliance assessment):
 ```bash
@@ -1075,14 +1077,15 @@ spawn launch \
 
 ### PCI DSS (Payment Card Industry Data Security Standard)
 
-**⚠️ spawn is NOT PCI DSS certified and makes no representations regarding PCI DSS compliance. However, spawn is designed to support PCI DSS compliance efforts through security controls and features.**
+**⚠️ spawn has NOT been assessed for PCI DSS compliance and makes no representations regarding PCI DSS compliance. However, spawn is designed to support PCI DSS compliance efforts through security controls and features.**
 
-spawn provides security features aligned with common PCI DSS requirements. If you are working to meet PCI DSS requirements, typical requirements include:
-1. Network segmentation (separate VPC/subnets)
-2. Encryption (TLS 1.2+, AES-256)
-3. Access controls (MFA, audit logs)
-4. Vulnerability scanning (quarterly)
-5. Conduct your own PCI DSS assessment and audit
+spawn provides security features aligned with common PCI DSS requirements. If you are working to meet PCI DSS requirements (for cardholder data environment), typical requirements include:
+1. Network segmentation (separate VPC/subnets for CDE)
+2. Encryption (TLS 1.2+, AES-256 for data at rest and in transit)
+3. Access controls (MFA, unique IDs, audit logs)
+4. Vulnerability scanning (quarterly by ASV)
+5. Penetration testing (annually)
+6. Obtain PCI DSS attestation from Qualified Security Assessor (QSA)
 
 **Example spawn configuration to support PCI DSS requirements** (user must conduct own compliance assessment):
 ```bash
@@ -1096,14 +1099,17 @@ spawn launch \
 
 ### SOC 2 Type II
 
-**⚠️ spawn is NOT SOC 2 certified and makes no representations regarding SOC 2 compliance. However, spawn is designed to support SOC 2 compliance efforts through security controls and features.**
+**⚠️ spawn has NOT undergone a SOC 2 audit and makes no representations regarding SOC 2 compliance. However, spawn is designed to support SOC 2 compliance efforts through security controls and features.**
 
-spawn provides security features aligned with common SOC 2 requirements. If you are working to meet SOC 2 requirements, typical requirements include:
-1. Access control policies
-2. Encryption (data at rest and in transit)
-3. Audit logging (all administrative actions)
-4. Change management
-5. Obtain SOC 2 audit from qualified auditor
+spawn provides security features aligned with common SOC 2 Trust Services Criteria. If you are working to obtain a SOC 2 Type II report, typical requirements include:
+1. Security policies and procedures (documented)
+2. Access control policies and implementation
+3. Encryption (data at rest and in transit)
+4. Audit logging (all administrative actions)
+5. Change management processes
+6. Incident response procedures
+7. Vendor management program
+8. Obtain SOC 2 Type II audit from qualified CPA firm
 
 **spawn security features designed to support SOC 2 requirements** (user must obtain SOC 2 audit):
 - IAM-based access control (available)
@@ -1114,29 +1120,65 @@ spawn provides security features aligned with common SOC 2 requirements. If you 
 
 ### NIST 800-171 Rev 3
 
-**⚠️ spawn is NOT NIST 800-171 certified and makes no representations regarding NIST 800-171 compliance. However, spawn is designed to support NIST 800-171 compliance efforts through security controls and features.**
+**⚠️ spawn has NOT been assessed for NIST 800-171 compliance and makes no representations regarding NIST 800-171 compliance. However, spawn is designed to support NIST 800-171 compliance efforts through security controls and features.**
 
 **Status:** Enhanced compliance mode features planned but NOT yet implemented (issue #64)
 
-NIST 800-171 addresses Controlled Unclassified Information (CUI) handling. spawn provides security features aligned with common NIST 800-171 requirements including:
-- Enhanced access controls
-- Incident response procedures
-- Configuration management
-- System and communications protection
-- Conduct your own NIST 800-171 assessment
+NIST 800-171 addresses Controlled Unclassified Information (CUI) protection requirements for federal contractors. spawn provides security features aligned with NIST 800-171 security requirements:
+- Access control (AC) - IAM-based authentication, least privilege
+- Audit and accountability (AU) - CloudWatch Logs, CloudTrail
+- Configuration management (CM) - Infrastructure as code support
+- Identification and authentication (IA) - IAM roles, MFA support
+- System and communications protection (SC) - Encryption, network segmentation
+- System and information integrity (SI) - Input validation, security monitoring
+
+Organizations must conduct their own NIST 800-171 self-assessment or third-party assessment
 
 ### NIST 800-53 Rev 5 (FedRAMP)
 
-**⚠️ spawn is NOT NIST 800-53 certified, NOT FedRAMP authorized, and makes no representations regarding NIST 800-53 or FedRAMP compliance. However, spawn is designed to support NIST 800-53 compliance efforts through security controls and features.**
+**⚠️ spawn is NOT FedRAMP authorized and has NOT been assessed for NIST 800-53 compliance. spawn makes no representations regarding NIST 800-53 or FedRAMP compliance. However, spawn is designed to support NIST 800-53 compliance efforts through security controls and features.**
 
 **Status:** Enhanced compliance mode features planned but NOT yet implemented (issue #65)
 
-NIST 800-53 is the Federal Risk and Authorization Management Program (FedRAMP) framework. spawn provides security features aligned with common NIST 800-53 requirements including:
-- Low/Moderate/High impact level controls
-- Continuous monitoring requirements
-- Comprehensive security controls
-- FedRAMP authorization process (separate from spawn)
-- Conduct your own NIST 800-53 assessment
+NIST 800-53 provides comprehensive security controls used by the Federal Risk and Authorization Management Program (FedRAMP). spawn provides security features aligned with NIST 800-53 control families:
+- Access Control (AC) - IAM-based authentication and authorization
+- Audit and Accountability (AU) - Comprehensive logging and monitoring
+- Configuration Management (CM) - Infrastructure state tracking
+- Identification and Authentication (IA) - Multi-factor authentication support
+- System and Communications Protection (SC) - Encryption, network security
+- System and Information Integrity (SI) - Input validation, integrity checking
+
+FedRAMP authorization requires:
+- Authorization Boundary documentation
+- System Security Plan (SSP)
+- Continuous monitoring
+- Third-party assessment by 3PAO (FedRAMP Authorized Assessor)
+- ATO (Authority to Operate) from sponsoring agency
+
+Organizations must pursue their own FedRAMP authorization process
+
+### HITRUST CSF (Common Security Framework)
+
+**⚠️ spawn is NOT HITRUST certified and makes no representations regarding HITRUST certification. However, spawn is designed to support HITRUST CSF compliance efforts through security controls and features.**
+
+HITRUST CSF is a certifiable framework widely adopted in healthcare that incorporates controls from HIPAA, NIST, ISO, and other standards. spawn provides security features aligned with HITRUST CSF requirements:
+
+**HITRUST Control Categories supported:**
+- **Access Control** - IAM-based authentication, role-based access, MFA support
+- **Audit Logging & Monitoring** - CloudWatch Logs, CloudTrail, structured audit events
+- **Data Protection & Privacy** - Encryption at rest and in transit, KMS integration
+- **Risk Management** - Security features designed with risk-based approach
+- **Incident Management** - Logging and monitoring capabilities for incident detection
+- **Configuration Management** - Infrastructure state tracking, change control support
+- **Network Protection** - Security groups, private subnets, network segmentation
+
+**HITRUST Certification Process:**
+HITRUST CSF has formal certification levels:
+- **HITRUST i1 Implementation** - Self-assessment
+- **HITRUST r2 Report** - Validated assessment (external assessor)
+- **HITRUST Certified** - Full certification (comprehensive assessment)
+
+Organizations must engage a HITRUST assessor and pursue their own HITRUST certification. spawn provides security controls that can support a HITRUST CSF implementation.
 
 ### General Security Checklist
 
