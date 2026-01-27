@@ -1,0 +1,100 @@
+# Dependabot configuration for automated dependency updates
+# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+updates:
+  # Go modules for spawn
+  - package-ecosystem: "gomod"
+    directory: "/spawn"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/Los_Angeles"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "component:spawn"
+      - "type:security"
+    commit-message:
+      prefix: "deps(spawn)"
+      include: "scope"
+    reviewers:
+      - "scttfrdmn"
+    # Group minor and patch updates
+    groups:
+      aws-sdk:
+        patterns:
+          - "github.com/aws/aws-sdk-go-v2*"
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Go modules for truffle
+  - package-ecosystem: "gomod"
+    directory: "/truffle"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/Los_Angeles"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "component:truffle"
+      - "type:security"
+    commit-message:
+      prefix: "deps(truffle)"
+      include: "scope"
+    reviewers:
+      - "scttfrdmn"
+    groups:
+      aws-sdk:
+        patterns:
+          - "github.com/aws/aws-sdk-go-v2*"
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Docker for spawn
+  - package-ecosystem: "docker"
+    directory: "/spawn"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/Los_Angeles"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "component:spawn"
+      - "type:security"
+    commit-message:
+      prefix: "deps(docker)"
+      include: "scope"
+    reviewers:
+      - "scttfrdmn"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/Los_Angeles"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "type:infra"
+    commit-message:
+      prefix: "deps(actions)"
+      include: "scope"
+    reviewers:
+      - "scttfrdmn"
+    groups:
+      github-actions:
+        patterns:
+          - "actions/*"
