@@ -36,6 +36,7 @@ type Client struct {
 	lambdaARN       string
 	roleARN         string
 	accountID       string
+	tableName       string
 }
 
 // NewClient creates a new scheduler client
@@ -46,6 +47,19 @@ func NewClient(cfg aws.Config, lambdaARN, roleARN, accountID string) *Client {
 		lambdaARN:       lambdaARN,
 		roleARN:         roleARN,
 		accountID:       accountID,
+		tableName:       "spawn-schedules", // Default for backward compatibility
+	}
+}
+
+// NewClientWithTableName creates a new scheduler client with custom table name
+func NewClientWithTableName(cfg aws.Config, lambdaARN, roleARN, accountID, tableName string) *Client {
+	return &Client{
+		schedulerClient: scheduler.NewFromConfig(cfg),
+		dynamoClient:    dynamodb.NewFromConfig(cfg),
+		lambdaARN:       lambdaARN,
+		roleARN:         roleARN,
+		accountID:       accountID,
+		tableName:       tableName,
 	}
 }
 
@@ -115,7 +129,7 @@ func (c *Client) SaveSchedule(ctx context.Context, record *ScheduleRecord) error
 	}
 
 	_, err = c.dynamoClient.PutItem(ctx, &dynamodb.PutItemInput{
-		TableName: aws.String("spawn-schedules"),
+		TableName: aws.String(c.tableName),
 		Item:      item,
 	})
 	if err != nil {
@@ -128,7 +142,7 @@ func (c *Client) SaveSchedule(ctx context.Context, record *ScheduleRecord) error
 // GetSchedule retrieves schedule metadata from DynamoDB
 func (c *Client) GetSchedule(ctx context.Context, scheduleID string) (*ScheduleRecord, error) {
 	result, err := c.dynamoClient.GetItem(ctx, &dynamodb.GetItemInput{
-		TableName: aws.String("spawn-schedules"),
+		TableName: aws.String(c.tableName),
 		Key: map[string]dynamodbtypes.AttributeValue{
 			"schedule_id": &dynamodbtypes.AttributeValueMemberS{Value: scheduleID},
 		},
@@ -152,7 +166,7 @@ func (c *Client) GetSchedule(ctx context.Context, scheduleID string) (*ScheduleR
 // ListSchedulesByUser retrieves all schedules for a user
 func (c *Client) ListSchedulesByUser(ctx context.Context, userID string) ([]ScheduleRecord, error) {
 	result, err := c.dynamoClient.Query(ctx, &dynamodb.QueryInput{
-		TableName:              aws.String("spawn-schedules"),
+		TableName:              aws.String(c.tableName),
 		IndexName:              aws.String("user_id-next_execution_time-index"),
 		KeyConditionExpression: aws.String("user_id = :user_id"),
 		ExpressionAttributeValues: map[string]dynamodbtypes.AttributeValue{
@@ -178,7 +192,7 @@ func (c *Client) ListSchedulesByUser(ctx context.Context, userID string) ([]Sche
 // UpdateScheduleStatus updates the status of a schedule
 func (c *Client) UpdateScheduleStatus(ctx context.Context, scheduleID string, status ScheduleStatus) error {
 	_, err := c.dynamoClient.UpdateItem(ctx, &dynamodb.UpdateItemInput{
-		TableName: aws.String("spawn-schedules"),
+		TableName: aws.String(c.tableName),
 		Key: map[string]dynamodbtypes.AttributeValue{
 			"schedule_id": &dynamodbtypes.AttributeValueMemberS{Value: scheduleID},
 		},
@@ -228,7 +242,7 @@ func (c *Client) DeleteSchedule(ctx context.Context, scheduleID string) error {
 
 	// Delete DynamoDB record
 	_, err = c.dynamoClient.DeleteItem(ctx, &dynamodb.DeleteItemInput{
-		TableName: aws.String("spawn-schedules"),
+		TableName: aws.String(c.tableName),
 		Key: map[string]dynamodbtypes.AttributeValue{
 			"schedule_id": &dynamodbtypes.AttributeValueMemberS{Value: scheduleID},
 		},
@@ -310,7 +324,7 @@ func (c *Client) UpdateScheduleMetadata(ctx context.Context, scheduleID, sweepID
 	}
 
 	_, err := c.dynamoClient.UpdateItem(ctx, &dynamodb.UpdateItemInput{
-		TableName: aws.String("spawn-schedules"),
+		TableName: aws.String(c.tableName),
 		Key: map[string]dynamodbtypes.AttributeValue{
 			"schedule_id": &dynamodbtypes.AttributeValueMemberS{Value: scheduleID},
 		},

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/aws/aws-lambda-go/lambda"
@@ -18,10 +19,13 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Environment variables for self-hosted infrastructure (with fallbacks to shared infrastructure)
 const (
-	schedulesTable       = "spawn-schedules"
-	historyTable         = "spawn-schedule-history"
-	sweepOrchestratorArn = "arn:aws:lambda:%s:%s:function:sweep-orchestrator"
+	defaultSchedulesTable       = "spawn-schedules"
+	defaultHistoryTable         = "spawn-schedule-history"
+	defaultSchedulesBucketTmpl  = "spawn-schedules-%s" // %s = region
+	defaultOrchestratorFuncName = "sweep-orchestrator"
+	defaultAccountID            = "966362334030" // mycelium-infra account
 )
 
 // Event is the input from EventBridge Scheduler
@@ -75,10 +79,14 @@ type SweepConfig struct {
 }
 
 var (
-	dynamoClient *dynamodb.Client
-	lambdaClient *lambdasvc.Client
-	s3Client     *s3.Client
-	accountID    string
+	dynamoClient           *dynamodb.Client
+	lambdaClient           *lambdasvc.Client
+	s3Client               *s3.Client
+	accountID              string
+	schedulesTable         string
+	historyTable           string
+	schedulesBucketTmpl    string
+	orchestratorFuncName   string
 )
 
 func init() {
@@ -92,8 +100,22 @@ func init() {
 	lambdaClient = lambdasvc.NewFromConfig(cfg)
 	s3Client = s3.NewFromConfig(cfg)
 
-	// Get account ID (could also be passed as environment variable)
-	accountID = "966362334030" // mycelium-infra account
+	// Load configuration from environment variables with fallbacks
+	accountID = getEnv("SPAWN_ACCOUNT_ID", defaultAccountID)
+	schedulesTable = getEnv("SPAWN_SCHEDULES_TABLE", defaultSchedulesTable)
+	historyTable = getEnv("SPAWN_SCHEDULE_HISTORY_TABLE", defaultHistoryTable)
+	schedulesBucketTmpl = getEnv("SPAWN_SCHEDULES_BUCKET_TEMPLATE", defaultSchedulesBucketTmpl)
+	orchestratorFuncName = getEnv("SPAWN_ORCHESTRATOR_FUNCTION_NAME", defaultOrchestratorFuncName)
+
+	log.Printf("Configuration: account=%s, schedules_table=%s, history_table=%s, orchestrator=%s",
+		accountID, schedulesTable, historyTable, orchestratorFuncName)
+}
+
+func getEnv(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
 }
 
 func handler(ctx context.Context, event Event) error {
@@ -151,7 +173,7 @@ func handler(ctx context.Context, event Event) error {
 		"force_download": false,
 	})
 
-	orchestratorArn := fmt.Sprintf(sweepOrchestratorArn, schedule.Region, accountID)
+	orchestratorArn := fmt.Sprintf("arn:aws:lambda:%s:%s:function:%s", schedule.Region, accountID, orchestratorFuncName)
 	_, err = lambdaClient.Invoke(ctx, &lambdasvc.InvokeInput{
 		FunctionName:   aws.String(orchestratorArn),
 		InvocationType: "Event", // Asynchronous
@@ -201,7 +223,7 @@ func getScheduleRecord(ctx context.Context, scheduleID string) (*ScheduleRecord,
 }
 
 func downloadParams(ctx context.Context, s3Key, region string) (*ParamFileFormat, error) {
-	bucket := fmt.Sprintf("spawn-schedules-%s", region)
+	bucket := fmt.Sprintf(schedulesBucketTmpl, region)
 
 	result, err := s3Client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(bucket),

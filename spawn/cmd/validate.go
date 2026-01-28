@@ -331,11 +331,10 @@ func outputInfrastructureText(result *infrastructure.ValidationResult, resolver 
 	fmt.Println()
 
 	// Show infrastructure mode
-	fmt.Printf("Mode: %s\n", resolver.IsSelfHosted())
 	if resolver.IsSelfHosted() {
-		fmt.Println("  Self-hosted infrastructure (customer account)")
+		fmt.Println("Mode: Self-hosted infrastructure (customer account)")
 	} else {
-		fmt.Println("  Shared infrastructure (mycelium-infra account)")
+		fmt.Println("Mode: Shared infrastructure (mycelium-infra account)")
 	}
 	fmt.Println()
 

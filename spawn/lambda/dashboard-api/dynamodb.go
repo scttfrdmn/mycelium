@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -12,8 +13,24 @@ import (
 )
 
 const (
-	dynamoDBTableName = "spawn-user-accounts"
+	defaultDynamoDBTableName = "spawn-user-accounts"
 )
+
+var (
+	dynamoDBTableName string
+)
+
+func init() {
+	// Load table name from environment variable with fallback
+	dynamoDBTableName = getEnvOrDefault("SPAWN_USER_ACCOUNTS_TABLE", defaultDynamoDBTableName)
+}
+
+func getEnvOrDefault(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
 
 // getUserAccount retrieves user account info from DynamoDB
 func getUserAccount(ctx context.Context, cfg aws.Config, userID string) (*UserAccountRecord, error) {

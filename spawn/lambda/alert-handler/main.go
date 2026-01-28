@@ -23,10 +23,12 @@ import (
 	"github.com/scttfrdmn/mycelium/spawn/pkg/security"
 )
 
+// Default configuration for shared infrastructure (with environment variable overrides)
 const (
-	alertsTable         = "spawn-alerts"
-	alertHistoryTable   = "spawn-alert-history"
-	sweepAlertsTopicArn = "arn:aws:sns:%s:%s:spawn-sweep-alerts"
+	defaultAlertsTable             = "spawn-alerts"
+	defaultAlertHistoryTable       = "spawn-alert-history"
+	defaultSweepAlertsTopicArnTmpl = "arn:aws:sns:%s:%s:spawn-sweep-alerts"
+	defaultAccountID               = "966362334030" // mycelium-infra account
 )
 
 // TriggerType represents the type of event that triggers an alert
@@ -107,6 +109,9 @@ var (
 	accountID            string
 	kmsKeyID             string
 	encryptionEnabled    bool
+	alertsTable          string
+	alertHistoryTable    string
+	sweepAlertsTopicArn  string
 )
 
 func init() {
@@ -122,7 +127,18 @@ func init() {
 	httpClient = &http.Client{Timeout: 10 * time.Second}
 
 	region = cfg.Region
-	accountID = "966362334030" // mycelium-infra account
+	accountID = getEnv("SPAWN_ACCOUNT_ID", defaultAccountID)
+
+	// Load table names from environment variables with fallbacks
+	alertsTable = getEnv("SPAWN_ALERTS_TABLE", defaultAlertsTable)
+	alertHistoryTable = getEnv("SPAWN_ALERT_HISTORY_TABLE", defaultAlertHistoryTable)
+
+	// Build SNS topic ARN
+	sweepAlertsTopicArn = fmt.Sprintf(
+		getEnv("SPAWN_SWEEP_ALERTS_TOPIC_ARN_TEMPLATE", defaultSweepAlertsTopicArnTmpl),
+		region,
+		accountID,
+	)
 
 	// Enable webhook encryption if KMS key is configured
 	kmsKeyID = os.Getenv("WEBHOOK_KMS_KEY_ID")
@@ -132,6 +148,16 @@ func init() {
 	} else {
 		log.Printf("Webhook encryption disabled (no KMS key configured)")
 	}
+
+	log.Printf("Configuration: account=%s, alerts_table=%s, alert_history_table=%s",
+		accountID, alertsTable, alertHistoryTable)
+}
+
+func getEnv(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
 }
 
 func handler(ctx context.Context, event SweepEvent) error {
@@ -327,9 +353,8 @@ Status: %s
 	body += "\nView details: spawn status " + event.SweepID + "\n"
 
 	// Send via SNS topic with email subscription
-	topicArn := fmt.Sprintf(sweepAlertsTopicArn, region, accountID)
 	_, err := snsClient.Publish(ctx, &sns.PublishInput{
-		TopicArn: aws.String(topicArn),
+		TopicArn: aws.String(sweepAlertsTopicArn),
 		Subject:  aws.String(subject),
 		Message:  aws.String(body),
 		MessageAttributes: map[string]snstypes.MessageAttributeValue{

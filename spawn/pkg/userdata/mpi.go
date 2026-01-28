@@ -18,6 +18,7 @@ type MPIConfig struct {
 	MPICommand          string
 	SkipInstall         bool
 	EFAEnabled          bool
+	BinariesBucket      string // S3 bucket for binaries (defaults to spawn-binaries-{region})
 }
 
 // GenerateMPIUserData generates the MPI setup script for inclusion in user-data
@@ -81,11 +82,11 @@ source /etc/profile.d/mpi.sh
 if [ "{{.JobArrayIndex}}" -eq 0 ]; then
   mkdir -p /root/.ssh
   ssh-keygen -t rsa -N "" -f /root/.ssh/id_rsa -q
-  aws s3 cp /root/.ssh/id_rsa.pub s3://spawn-binaries-{{.Region}}/mpi-keys/{{.JobArrayID}}/id_rsa.pub
+  aws s3 cp /root/.ssh/id_rsa.pub s3://{{.BinariesBucket}}/mpi-keys/{{.JobArrayID}}/id_rsa.pub
   cat /root/.ssh/id_rsa.pub >> /root/.ssh/authorized_keys
 else
   for i in {1..60}; do
-    aws s3 cp s3://spawn-binaries-{{.Region}}/mpi-keys/{{.JobArrayID}}/id_rsa.pub /tmp/key.pub 2>/dev/null && break
+    aws s3 cp s3://{{.BinariesBucket}}/mpi-keys/{{.JobArrayID}}/id_rsa.pub /tmp/key.pub 2>/dev/null && break
     sleep 2
   done
   mkdir -p /root/.ssh

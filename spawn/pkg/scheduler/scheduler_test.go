@@ -172,6 +172,7 @@ func TestCreateSchedule(t *testing.T) {
 				schedulerClient: mockSched,
 				lambdaARN:       "arn:aws:lambda:us-east-1:123456789012:function:scheduler-handler",
 				roleARN:         "arn:aws:iam::123456789012:role/EventBridgeSchedulerRole",
+				tableName:       "spawn-schedules",
 			}
 
 			_, err := client.CreateSchedule(context.Background(), tt.record)
@@ -232,6 +233,7 @@ func TestGetSchedule(t *testing.T) {
 
 			client := &Client{
 				dynamoClient: mockDDB,
+				tableName:    "spawn-schedules",
 			}
 
 			record, err := client.GetSchedule(context.Background(), tt.scheduleID)
@@ -283,6 +285,7 @@ func TestDeleteSchedule(t *testing.T) {
 			client := &Client{
 				dynamoClient:    mockDDB,
 				schedulerClient: mockSched,
+				tableName:       "spawn-schedules",
 			}
 
 			err := client.DeleteSchedule(context.Background(), tt.scheduleID)
@@ -349,6 +352,7 @@ func TestUpdateScheduleStatus(t *testing.T) {
 			client := &Client{
 				dynamoClient:    mockDDB,
 				schedulerClient: mockSched,
+				tableName:       "spawn-schedules",
 			}
 
 			err := client.UpdateScheduleStatus(context.Background(), tt.scheduleID, tt.status)
@@ -406,6 +410,7 @@ func TestRecordExecution(t *testing.T) {
 
 			client := &Client{
 				dynamoClient: mockDDB,
+				tableName:    "spawn-schedules",
 			}
 
 			history := &ExecutionHistory{
@@ -553,6 +558,7 @@ func TestListSchedulesByUser(t *testing.T) {
 
 			client := &Client{
 				dynamoClient: mockDDB,
+				tableName:    "spawn-schedules",
 			}
 
 			schedules, err := client.ListSchedulesByUser(context.Background(), tt.userID)
@@ -605,6 +611,7 @@ func TestSaveSchedule(t *testing.T) {
 
 			client := &Client{
 				dynamoClient: mockDDB,
+				tableName:    "spawn-schedules",
 			}
 
 			err := client.SaveSchedule(context.Background(), tt.record)
@@ -689,6 +696,7 @@ func TestGetExecutionHistory(t *testing.T) {
 
 			client := &Client{
 				dynamoClient: mockDDB,
+				tableName:    "spawn-schedules",
 			}
 
 			history, err := client.GetExecutionHistory(context.Background(), tt.scheduleID, tt.limit)

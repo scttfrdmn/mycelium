@@ -20,10 +20,50 @@ import (
 )
 
 const (
-	dynamoTableName = "spawn-sweep-orchestration"
-	s3BucketPattern = "spawn-sweeps-%s"
-	lambdaFuncName  = "spawn-sweep-orchestrator"
+	// Default resource names for backward compatibility
+	defaultDynamoTableName = "spawn-sweep-orchestration"
+	defaultS3BucketPattern = "spawn-sweeps-%s"
+	defaultLambdaFuncName  = "spawn-sweep-orchestrator"
 )
+
+// ResourceNames holds configurable resource names for sweep operations
+type ResourceNames struct {
+	DynamoTableName string
+	S3BucketPattern string // Pattern with %s for region
+	LambdaFuncName  string
+}
+
+// DefaultResourceNames returns the default resource names
+func DefaultResourceNames() *ResourceNames {
+	return &ResourceNames{
+		DynamoTableName: defaultDynamoTableName,
+		S3BucketPattern: defaultS3BucketPattern,
+		LambdaFuncName:  defaultLambdaFuncName,
+	}
+}
+
+// Helper functions to get resource names (for backward compatibility)
+func getDynamoTableName(names *ResourceNames) string {
+	if names != nil && names.DynamoTableName != "" {
+		return names.DynamoTableName
+	}
+	return defaultDynamoTableName
+}
+
+func getS3BucketName(names *ResourceNames, region string) string {
+	pattern := defaultS3BucketPattern
+	if names != nil && names.S3BucketPattern != "" {
+		pattern = names.S3BucketPattern
+	}
+	return fmt.Sprintf(pattern, region)
+}
+
+func getLambdaFuncName(names *ResourceNames) string {
+	if names != nil && names.LambdaFuncName != "" {
+		return names.LambdaFuncName
+	}
+	return defaultLambdaFuncName
+}
 
 // SweepRecord represents the DynamoDB record structure
 type SweepRecord struct {
@@ -139,7 +179,7 @@ func GroupParamsByRegion(params []map[string]interface{}, defaults map[string]in
 func UploadParamsToS3(ctx context.Context, cfg aws.Config, paramFormat *ParamFileFormat, sweepID, region string) (string, error) {
 	s3Client := s3.NewFromConfig(cfg)
 
-	bucket := fmt.Sprintf(s3BucketPattern, region)
+	bucket := getS3BucketName(nil, region)
 	key := fmt.Sprintf("sweeps/%s/params.json", sweepID)
 
 	// Marshal params to JSON
@@ -193,7 +233,7 @@ func CreateSweepRecord(ctx context.Context, cfg aws.Config, record *SweepRecord)
 
 	// Put item to DynamoDB
 	_, err = dynamodbClient.PutItem(ctx, &dynamodb.PutItemInput{
-		TableName: aws.String(dynamoTableName),
+		TableName: aws.String(getDynamoTableName(nil)),
 		Item:      item,
 	})
 	if err != nil {
@@ -217,7 +257,7 @@ func InvokeSweepOrchestrator(ctx context.Context, cfg aws.Config, sweepID string
 
 	// Invoke Lambda asynchronously
 	_, err = lambdaClient.Invoke(ctx, &lambda.InvokeInput{
-		FunctionName:   aws.String(lambdaFuncName),
+		FunctionName:   aws.String(getLambdaFuncName(nil)),
 		InvocationType: "Event", // Async invocation
 		Payload:        payload,
 	})
@@ -233,7 +273,7 @@ func QuerySweepStatus(ctx context.Context, cfg aws.Config, sweepID string) (*Swe
 	dynamodbClient := dynamodb.NewFromConfig(cfg)
 
 	result, err := dynamodbClient.GetItem(ctx, &dynamodb.GetItemInput{
-		TableName: aws.String(dynamoTableName),
+		TableName: aws.String(getDynamoTableName(nil)),
 		Key: map[string]types.AttributeValue{
 			"sweep_id": &types.AttributeValueMemberS{Value: sweepID},
 		},
@@ -271,7 +311,7 @@ func SaveSweepState(ctx context.Context, cfg aws.Config, record *SweepRecord) er
 	}
 
 	_, err = dynamodbClient.PutItem(ctx, &dynamodb.PutItemInput{
-		TableName: aws.String(dynamoTableName),
+		TableName: aws.String(getDynamoTableName(nil)),
 		Item:      item,
 	})
 	if err != nil {

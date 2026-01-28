@@ -76,27 +76,43 @@ type AlertHistory struct {
 
 // Client provides alert management operations
 type Client struct {
-	db        *dynamodb.Client
-	kms       *kms.Client
-	kmsKeyID  string
-	encryptionEnabled bool
+	db                    *dynamodb.Client
+	kms                   *kms.Client
+	kmsKeyID              string
+	encryptionEnabled     bool
+	alertsTableName       string
+	alertHistoryTableName string
 }
 
 // NewClient creates a new alerts client
 func NewClient(db *dynamodb.Client) *Client {
 	return &Client{
-		db: db,
-		encryptionEnabled: false, // Backward compatible: encryption disabled by default
+		db:                    db,
+		encryptionEnabled:     false, // Backward compatible: encryption disabled by default
+		alertsTableName:       AlertsTableName,
+		alertHistoryTableName: AlertHistoryTableName,
 	}
 }
 
 // NewClientWithEncryption creates a new alerts client with KMS encryption
 func NewClientWithEncryption(db *dynamodb.Client, kmsClient *kms.Client, kmsKeyID string) *Client {
 	return &Client{
-		db:                db,
-		kms:               kmsClient,
-		kmsKeyID:          kmsKeyID,
-		encryptionEnabled: true,
+		db:                    db,
+		kms:                   kmsClient,
+		kmsKeyID:              kmsKeyID,
+		encryptionEnabled:     true,
+		alertsTableName:       AlertsTableName,
+		alertHistoryTableName: AlertHistoryTableName,
+	}
+}
+
+// NewClientWithTableNames creates a new alerts client with custom table names
+func NewClientWithTableNames(db *dynamodb.Client, alertsTable, historyTable string) *Client {
+	return &Client{
+		db:                    db,
+		encryptionEnabled:     false,
+		alertsTableName:       alertsTable,
+		alertHistoryTableName: historyTable,
 	}
 }
 
@@ -144,7 +160,7 @@ func (c *Client) CreateAlert(ctx context.Context, config *AlertConfig) error {
 
 	// Put item
 	_, err = c.db.PutItem(ctx, &dynamodb.PutItemInput{
-		TableName: aws.String(AlertsTableName),
+		TableName: aws.String(c.alertsTableName),
 		Item:      item,
 	})
 	if err != nil {
@@ -157,7 +173,7 @@ func (c *Client) CreateAlert(ctx context.Context, config *AlertConfig) error {
 // GetAlert retrieves an alert configuration by ID
 func (c *Client) GetAlert(ctx context.Context, alertID string) (*AlertConfig, error) {
 	result, err := c.db.GetItem(ctx, &dynamodb.GetItemInput{
-		TableName: aws.String(AlertsTableName),
+		TableName: aws.String(c.alertsTableName),
 		Key: map[string]types.AttributeValue{
 			"alert_id": &types.AttributeValueMemberS{Value: alertID},
 		},
@@ -212,7 +228,7 @@ func (c *Client) ListAlerts(ctx context.Context, userID string, sweepID string) 
 	if sweepID != "" {
 		// Query by sweep_id
 		input = &dynamodb.QueryInput{
-			TableName:              aws.String(AlertsTableName),
+			TableName:              aws.String(c.alertsTableName),
 			IndexName:              aws.String("sweep_id-index"),
 			KeyConditionExpression: aws.String("sweep_id = :sweep_id"),
 			ExpressionAttributeValues: map[string]types.AttributeValue{
@@ -224,7 +240,7 @@ func (c *Client) ListAlerts(ctx context.Context, userID string, sweepID string) 
 	} else {
 		// Query by user_id
 		input = &dynamodb.QueryInput{
-			TableName:              aws.String(AlertsTableName),
+			TableName:              aws.String(c.alertsTableName),
 			IndexName:              aws.String("user_id-index"),
 			KeyConditionExpression: aws.String("user_id = :user_id"),
 			ExpressionAttributeValues: map[string]types.AttributeValue{
@@ -259,7 +275,7 @@ func (c *Client) ListAlerts(ctx context.Context, userID string, sweepID string) 
 // DeleteAlert deletes an alert configuration
 func (c *Client) DeleteAlert(ctx context.Context, alertID string) error {
 	_, err := c.db.DeleteItem(ctx, &dynamodb.DeleteItemInput{
-		TableName: aws.String(AlertsTableName),
+		TableName: aws.String(c.alertsTableName),
 		Key: map[string]types.AttributeValue{
 			"alert_id": &types.AttributeValueMemberS{Value: alertID},
 		},
@@ -286,7 +302,7 @@ func (c *Client) RecordAlertHistory(ctx context.Context, history *AlertHistory) 
 	}
 
 	_, err = c.db.PutItem(ctx, &dynamodb.PutItemInput{
-		TableName: aws.String(AlertHistoryTableName),
+		TableName: aws.String(c.alertHistoryTableName),
 		Item:      item,
 	})
 	if err != nil {
@@ -299,7 +315,7 @@ func (c *Client) RecordAlertHistory(ctx context.Context, history *AlertHistory) 
 // ListAlertHistory lists alert history for an alert ID
 func (c *Client) ListAlertHistory(ctx context.Context, alertID string) ([]*AlertHistory, error) {
 	result, err := c.db.Query(ctx, &dynamodb.QueryInput{
-		TableName:              aws.String(AlertHistoryTableName),
+		TableName:              aws.String(c.alertHistoryTableName),
 		KeyConditionExpression: aws.String("alert_id = :alert_id"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":alert_id": &types.AttributeValueMemberS{Value: alertID},

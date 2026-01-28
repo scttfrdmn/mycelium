@@ -15,6 +15,7 @@ func TestGenerateMPIUserData_Basic(t *testing.T) {
 		MPICommand:          "mpirun -np 32 ./my-program",
 		SkipInstall:         false,
 		EFAEnabled:          false,
+		BinariesBucket:      "spawn-binaries-us-east-1",
 	}
 
 	script, err := GenerateMPIUserData(config)
@@ -157,13 +158,14 @@ func TestGenerateMPIUserData_HeadNode(t *testing.T) {
 
 func TestGenerateMPIUserData_WorkerNode(t *testing.T) {
 	config := MPIConfig{
-		Region:        "us-east-1",
-		JobArrayID:    "test-job",
-		JobArrayIndex: 2, // Worker node (not 0)
-		JobArraySize:  4,
-		MPICommand:    "mpirun -np 16 ./app",
-		SkipInstall:   false,
-		EFAEnabled:    false,
+		Region:          "us-east-1",
+		JobArrayID:      "test-job",
+		JobArrayIndex:   2, // Worker node (not 0)
+		JobArraySize:    4,
+		MPICommand:      "mpirun -np 16 ./app",
+		SkipInstall:     false,
+		EFAEnabled:      false,
+		BinariesBucket:  "spawn-binaries-us-east-1",
 	}
 
 	script, err := GenerateMPIUserData(config)
@@ -237,12 +239,13 @@ func TestGenerateMPIUserData_RegionSubstitution(t *testing.T) {
 
 	for _, region := range regions {
 		config := MPIConfig{
-			Region:        region,
-			JobArrayID:    "test-job",
-			JobArrayIndex: 0,
-			JobArraySize:  2,
-			SkipInstall:   false,
-			EFAEnabled:    false,
+			Region:         region,
+			JobArrayID:     "test-job",
+			JobArrayIndex:  0,
+			JobArraySize:   2,
+			SkipInstall:    false,
+			EFAEnabled:     false,
+			BinariesBucket: "spawn-binaries-" + region,
 		}
 
 		script, err := GenerateMPIUserData(config)

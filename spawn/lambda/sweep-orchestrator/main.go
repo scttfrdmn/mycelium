@@ -26,11 +26,12 @@ import (
 	"github.com/scttfrdmn/mycelium/spawn/pkg/availability"
 )
 
+// Default configuration for shared infrastructure (with environment variable overrides)
 const (
-	tableName        = "spawn-sweep-orchestration"
-	maxExecutionDur  = 13 * time.Minute
-	pollInterval     = 10 * time.Second
-	crossAccountRole = "arn:aws:iam::%s:role/SpawnSweepCrossAccountRole"
+	defaultTableName        = "spawn-sweep-orchestration"
+	defaultCrossAccountRole = "arn:aws:iam::%s:role/SpawnSweepCrossAccountRole"
+	maxExecutionDur         = 13 * time.Minute
+	pollInterval            = 10 * time.Second
 )
 
 // Capacity error codes from EC2 API
@@ -167,11 +168,13 @@ type RegionalOrchestrator struct {
 }
 
 var (
-	awsCfg         aws.Config
-	dynamodbClient *dynamodb.Client
-	s3Client       *s3.Client
-	lambdaClient   *lambdasvc.Client
-	stsClient      *sts.Client
+	awsCfg           aws.Config
+	dynamodbClient   *dynamodb.Client
+	s3Client         *s3.Client
+	lambdaClient     *lambdasvc.Client
+	stsClient        *sts.Client
+	tableName        string
+	crossAccountRole string
 )
 
 func init() {
@@ -185,6 +188,19 @@ func init() {
 	s3Client = s3.NewFromConfig(awsCfg)
 	lambdaClient = lambdasvc.NewFromConfig(awsCfg)
 	stsClient = sts.NewFromConfig(awsCfg)
+
+	// Load configuration from environment variables with fallbacks
+	tableName = getEnv("SPAWN_SWEEP_ORCHESTRATION_TABLE", defaultTableName)
+	crossAccountRole = getEnv("SPAWN_CROSS_ACCOUNT_ROLE_TEMPLATE", defaultCrossAccountRole)
+
+	log.Printf("Configuration: table=%s, cross_account_role_template=%s", tableName, crossAccountRole)
+}
+
+func getEnv(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
 }
 
 func main() {
