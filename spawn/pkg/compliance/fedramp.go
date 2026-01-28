@@ -83,6 +83,8 @@ func GetFedRAMPRequirements() map[FedRAMPLevel][]string {
 		},
 		FedRAMPModerate: {
 			"All FedRAMP Low requirements",
+			"Annual assessment by 3PAO",
+			"Continuous monitoring",
 			"Enhanced incident response (24/7)",
 			"Vulnerability scanning",
 			"Penetration testing (annual)",
@@ -90,7 +92,8 @@ func GetFedRAMPRequirements() map[FedRAMPLevel][]string {
 		},
 		FedRAMPHigh: {
 			"All FedRAMP Moderate requirements",
-			"Enhanced monitoring and alerting",
+			"More frequent assessment by 3PAO",
+			"Enhanced continuous monitoring and alerting",
 			"Insider threat program",
 			"Supply chain risk management",
 			"Penetration testing (more frequent)",

@@ -135,7 +135,7 @@ func generateRecommendations(result *ValidationResult, framework, baseline strin
 	if baseline == "moderate" || baseline == "high" || baseline == "fedramp-moderate" || baseline == "fedramp-high" {
 		hasInfraWarning := false
 		for _, warning := range result.Warnings {
-			if strings.Contains(warning, "self-hosted") {
+			if strings.Contains(strings.ToLower(warning), "self-hosted") {
 				hasInfraWarning = true
 				break
 			}
