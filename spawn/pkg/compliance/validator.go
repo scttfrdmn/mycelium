@@ -37,18 +37,18 @@ func (v *Validator) ValidateLaunchConfig(ctx context.Context, cfg *aws.LaunchCon
 	switch v.complianceConfig.Mode {
 	case config.ComplianceModeNIST80171:
 		controlSet = NIST80171ControlSet()
-	case config.ComplianceModeNIST80053, config.ComplianceModeBaseLow, config.ComplianceModeFedRAMPLow:
-		// Will be implemented in Phase 3
-		result.AddWarning("NIST 800-53 Low baseline validation not yet implemented")
-		return result, nil
-	case config.ComplianceModeBaseMod, config.ComplianceModeFedRAMPMod:
-		// Will be implemented in Phase 3
-		result.AddWarning("NIST 800-53 Moderate baseline validation not yet implemented")
-		return result, nil
-	case config.ComplianceModeBaseHigh, config.ComplianceModeFedRAMPHi:
-		// Will be implemented in Phase 3
-		result.AddWarning("NIST 800-53 High baseline validation not yet implemented")
-		return result, nil
+	case config.ComplianceModeNIST80053, config.ComplianceModeBaseLow:
+		controlSet = NIST80053ControlSet(BaselineLow)
+	case config.ComplianceModeBaseMod:
+		controlSet = NIST80053ControlSet(BaselineModerate)
+	case config.ComplianceModeBaseHigh:
+		controlSet = NIST80053ControlSet(BaselineHigh)
+	case config.ComplianceModeFedRAMPLow:
+		controlSet = FedRAMPControlSet(FedRAMPLow)
+	case config.ComplianceModeFedRAMPMod:
+		controlSet = FedRAMPControlSet(FedRAMPModerate)
+	case config.ComplianceModeFedRAMPHi:
+		controlSet = FedRAMPControlSet(FedRAMPHigh)
 	default:
 		return nil, fmt.Errorf("unknown compliance mode: %s", v.complianceConfig.Mode)
 	}
@@ -93,15 +93,18 @@ func (v *Validator) EnforceLaunchConfig(cfg *aws.LaunchConfig) error {
 	switch v.complianceConfig.Mode {
 	case config.ComplianceModeNIST80171:
 		controlSet = NIST80171ControlSet()
-	case config.ComplianceModeNIST80053, config.ComplianceModeBaseLow, config.ComplianceModeFedRAMPLow:
-		// Will be implemented in Phase 3
-		return nil
-	case config.ComplianceModeBaseMod, config.ComplianceModeFedRAMPMod:
-		// Will be implemented in Phase 3
-		return nil
-	case config.ComplianceModeBaseHigh, config.ComplianceModeFedRAMPHi:
-		// Will be implemented in Phase 3
-		return nil
+	case config.ComplianceModeNIST80053, config.ComplianceModeBaseLow:
+		controlSet = NIST80053ControlSet(BaselineLow)
+	case config.ComplianceModeBaseMod:
+		controlSet = NIST80053ControlSet(BaselineModerate)
+	case config.ComplianceModeBaseHigh:
+		controlSet = NIST80053ControlSet(BaselineHigh)
+	case config.ComplianceModeFedRAMPLow:
+		controlSet = FedRAMPControlSet(FedRAMPLow)
+	case config.ComplianceModeFedRAMPMod:
+		controlSet = FedRAMPControlSet(FedRAMPModerate)
+	case config.ComplianceModeFedRAMPHi:
+		controlSet = FedRAMPControlSet(FedRAMPHigh)
 	default:
 		return fmt.Errorf("unknown compliance mode: %s", v.complianceConfig.Mode)
 	}
@@ -127,15 +130,18 @@ func (v *Validator) ValidateInstances(ctx context.Context, instances []aws.Insta
 	switch v.complianceConfig.Mode {
 	case config.ComplianceModeNIST80171:
 		controlSet = NIST80171ControlSet()
-	case config.ComplianceModeNIST80053, config.ComplianceModeBaseLow, config.ComplianceModeFedRAMPLow:
-		// Will be implemented in Phase 3
-		return results, nil
-	case config.ComplianceModeBaseMod, config.ComplianceModeFedRAMPMod:
-		// Will be implemented in Phase 3
-		return results, nil
-	case config.ComplianceModeBaseHigh, config.ComplianceModeFedRAMPHi:
-		// Will be implemented in Phase 3
-		return results, nil
+	case config.ComplianceModeNIST80053, config.ComplianceModeBaseLow:
+		controlSet = NIST80053ControlSet(BaselineLow)
+	case config.ComplianceModeBaseMod:
+		controlSet = NIST80053ControlSet(BaselineModerate)
+	case config.ComplianceModeBaseHigh:
+		controlSet = NIST80053ControlSet(BaselineHigh)
+	case config.ComplianceModeFedRAMPLow:
+		controlSet = FedRAMPControlSet(FedRAMPLow)
+	case config.ComplianceModeFedRAMPMod:
+		controlSet = FedRAMPControlSet(FedRAMPModerate)
+	case config.ComplianceModeFedRAMPHi:
+		controlSet = FedRAMPControlSet(FedRAMPHigh)
 	default:
 		return nil, fmt.Errorf("unknown compliance mode: %s", v.complianceConfig.Mode)
 	}
@@ -180,15 +186,18 @@ func (v *Validator) GetControlList() ([]Control, error) {
 	switch v.complianceConfig.Mode {
 	case config.ComplianceModeNIST80171:
 		controlSet = NIST80171ControlSet()
-	case config.ComplianceModeNIST80053, config.ComplianceModeBaseLow, config.ComplianceModeFedRAMPLow:
-		// Will be implemented in Phase 3
-		return nil, fmt.Errorf("NIST 800-53 Low baseline not yet implemented")
-	case config.ComplianceModeBaseMod, config.ComplianceModeFedRAMPMod:
-		// Will be implemented in Phase 3
-		return nil, fmt.Errorf("NIST 800-53 Moderate baseline not yet implemented")
-	case config.ComplianceModeBaseHigh, config.ComplianceModeFedRAMPHi:
-		// Will be implemented in Phase 3
-		return nil, fmt.Errorf("NIST 800-53 High baseline not yet implemented")
+	case config.ComplianceModeNIST80053, config.ComplianceModeBaseLow:
+		controlSet = NIST80053ControlSet(BaselineLow)
+	case config.ComplianceModeBaseMod:
+		controlSet = NIST80053ControlSet(BaselineModerate)
+	case config.ComplianceModeBaseHigh:
+		controlSet = NIST80053ControlSet(BaselineHigh)
+	case config.ComplianceModeFedRAMPLow:
+		controlSet = FedRAMPControlSet(FedRAMPLow)
+	case config.ComplianceModeFedRAMPMod:
+		controlSet = FedRAMPControlSet(FedRAMPModerate)
+	case config.ComplianceModeFedRAMPHi:
+		controlSet = FedRAMPControlSet(FedRAMPHigh)
 	default:
 		return nil, fmt.Errorf("unknown compliance mode: %s", v.complianceConfig.Mode)
 	}
