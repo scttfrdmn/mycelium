@@ -1,156 +1,142 @@
-# NIST 800-171 Rev 3 Compliance Quickstart
+# NIST 800-171 Rev 3 Quickstart Guide
 
 ## Overview
 
-spawn v0.14.0 introduces compliance mode support for NIST 800-171 Rev 3, enabling government and regulated organizations to use spawn while meeting Controlled Unclassified Information (CUI) protection requirements.
+NIST 800-171 Rev 3 "Protecting Controlled Unclassified Information in Nonfederal Systems and Organizations" establishes security requirements for protecting Controlled Unclassified Information (CUI) when it resides in nonfederal systems.
 
-## What is NIST 800-171?
+**Who needs this:** Organizations that handle CUI for federal contracts, grants, or partnerships.
 
-NIST SP 800-171 Revision 3 provides security requirements for protecting Controlled Unclassified Information (CUI) in nonfederal systems and organizations. It contains 110 security controls across 14 families.
+**What spawn provides:** Technical control implementation for 10 of 110 NIST 800-171 requirements. Organizational controls (policies, procedures, training) remain your responsibility.
 
 ## Quick Start
 
-### Enable NIST 800-171 Compliance
+### 1. Enable NIST 800-171 Compliance Mode
 
-Launch an instance with compliance mode enabled:
-
-```bash
-spawn launch \
-  --instance-type t3.micro \
-  --ttl 2h \
-  --nist-800-171
-```
-
-### What Gets Enforced
-
-When you enable `--nist-800-171`, spawn automatically enforces:
-
-- **EBS Encryption (SC-28)**: All EBS volumes encrypted at rest using AWS KMS
-- **IMDSv2 Required (AC-17)**: Instance metadata service requires authentication tokens
-- **Audit Logging (AU-02)**: Structured audit logs generated for all operations
-- **Security Groups (SC-07)**: Boundary protection via AWS security groups
-- **TLS Encryption (SC-08, SC-13)**: All API communications use TLS 1.2+
-- **IAM Authentication (IA-02, IA-05)**: AWS IAM for identity and access management
-- **Least Privilege (AC-06)**: IAM roles scoped to minimum required permissions
-
-### Validation
-
-Validate existing instances against NIST 800-171 controls:
-
-```bash
-# Validate all spawn-managed instances
-spawn validate --nist-800-171
-
-# Validate specific instance
-spawn validate --instance-id i-0abc123 --nist-800-171
-
-# Output as JSON for automation
-spawn validate --nist-800-171 --output json
-```
-
-### Configuration File
-
-Create `~/.spawn/config.yaml` to set compliance mode permanently:
-
-```yaml
-compliance:
-  mode: "nist-800-171"
-  enforce_encrypted_ebs: true
-  enforce_imdsv2: true
-  audit_logging_required: true
-  allow_shared_infrastructure: true  # Show warnings, but allow shared infra
-  strict_mode: false  # Show warnings instead of errors
-
-infrastructure:
-  mode: "shared"  # Use mycelium-infra account resources (default)
-```
-
-### Environment Variables
-
-Set compliance mode via environment variables:
-
-```bash
-export SPAWN_COMPLIANCE_MODE=nist-800-171
-export SPAWN_COMPLIANCE_ENFORCE_ENCRYPTED_EBS=true
-export SPAWN_COMPLIANCE_ENFORCE_IMDSV2=true
-export SPAWN_COMPLIANCE_STRICT_MODE=false
-
-spawn launch --instance-type t3.micro --ttl 2h
-```
-
-### Strict Mode
-
-Enable strict mode to fail launches on any compliance violations:
+Launch instances with automatic compliance enforcement:
 
 ```bash
 spawn launch \
   --instance-type t3.micro \
-  --ttl 2h \
   --nist-800-171 \
-  --compliance-strict
+  --region us-east-1
 ```
 
-In strict mode, any configuration that violates compliance controls will cause the launch to fail with clear error messages referencing the specific control IDs.
+The `--nist-800-171` flag automatically:
+- Enables EBS encryption (SC-28)
+- Enforces IMDSv2 (AC-17)
+- Validates configuration before launch
+- Tags instances with compliance metadata
 
-## Control Mapping
+### 2. Validate Before Launch
 
-spawn implements the following NIST 800-171 controls:
+Check compliance without launching:
 
-| Control ID | Name | Implementation |
-|------------|------|----------------|
+```bash
+spawn validate --nist-800-171 --config myconfig.yaml
+```
+
+### 3. Audit Running Instances
+
+Scan all spawn-managed instances:
+
+```bash
+spawn validate --nist-800-171
+```
+
+Output shows:
+- Compliant instances
+- Non-compliant instances with violation details
+- Remediation recommendations
+
+## Technical Controls Implemented
+
+spawn implements these NIST 800-171 requirements:
+
+| Control | Requirement | Implementation |
+|---------|-------------|----------------|
+| **SC-28** | Protection of Information at Rest | EBS encryption enforced |
+| **AC-17** | Remote Access | IMDSv2 enforced (no IMDSv1 fallback) |
 | **AC-06** | Least Privilege | IAM role scoping (v0.13.0) |
-| **AC-17** | Remote Access | IMDSv2 enforcement, SSH key management |
-| **AU-02** | Event Logging | Structured audit logging (v0.13.0) |
+| **AU-02** | Audit Events | Structured audit logging (v0.13.0) |
 | **IA-02** | Identification and Authentication | AWS IAM authentication |
-| **IA-05** | Authenticator Management | KMS secrets encryption (v0.13.0), SSH key pairs |
+| **IA-05** | Authenticator Management | KMS secrets encryption (v0.13.0) |
 | **SC-07** | Boundary Protection | Security group configuration |
 | **SC-08** | Transmission Confidentiality | TLS for all API calls (AWS SDK) |
-| **SC-12** | Cryptographic Key Management | KMS integration (v0.13.0) |
-| **SC-13** | Cryptographic Protection | EBS encryption, TLS |
-| **SC-28** | Protection at Rest | EBS encryption, S3 encryption |
+| **SC-12** | Cryptographic Key Establishment | KMS integration (v0.13.0) |
+| **SC-13** | Cryptographic Protection | FIPS-validated cryptography |
 
-**Note**: spawn implements **technical controls**. Organizational controls (policies, procedures, training, physical security) remain the customer's responsibility.
+## Configuration Examples
 
-## Infrastructure Modes
+### Basic Launch (Shared Infrastructure)
 
-### Shared Infrastructure (Default)
-
-By default, spawn uses infrastructure resources in the mycelium-infra account (DynamoDB, S3, Lambda). This is suitable for NIST 800-171 compliance, but generates warnings:
-
+```bash
+# Default: uses shared mycelium-infra infrastructure
+spawn launch \
+  --instance-type t3.micro \
+  --nist-800-171 \
+  --ttl 4h
 ```
-⚠️  Using shared infrastructure with compliance mode enabled.
-    For full compliance, consider deploying self-hosted infrastructure.
-    Run 'spawn config init --self-hosted' to configure.
-```
+
+**Warning:** Using shared infrastructure with compliance mode generates warnings. For full compliance, use self-hosted infrastructure.
 
 ### Self-Hosted Infrastructure (Recommended)
 
-For full compliance and data isolation, deploy spawn infrastructure in your own AWS account:
-
 ```bash
-# Interactive wizard to configure self-hosted infrastructure
+# 1. Configure self-hosted mode
 spawn config init --self-hosted
 
-# Deploy CloudFormation stack
+# 2. Deploy infrastructure (one-time)
 cd deployment/cloudformation
 aws cloudformation create-stack \
-  --stack-name spawn-infrastructure \
+  --stack-name spawn-self-hosted \
   --template-body file://self-hosted-stack.yaml \
   --capabilities CAPABILITY_IAM
 
-# Update config with stack outputs
-spawn config init --self-hosted
+# 3. Launch with self-hosted infrastructure
+spawn launch \
+  --instance-type t3.micro \
+  --nist-800-171 \
+  --ttl 4h
 ```
 
-See [Self-Hosted Infrastructure Guide](../how-to/self-hosted-infrastructure.md) for detailed instructions.
+### Customer-Managed KMS Keys (Enhanced Security)
+
+```bash
+# Create customer-managed KMS key
+KEY_ID=$(aws kms create-key \
+  --description "spawn NIST 800-171 encryption key" \
+  --query 'KeyMetadata.KeyId' \
+  --output text)
+
+# Launch with customer key
+spawn launch \
+  --instance-type t3.micro \
+  --nist-800-171 \
+  --ebs-kms-key-id $KEY_ID
+```
+
+### Private Subnet Deployment
+
+```bash
+# Launch in private subnet (no public IP)
+spawn launch \
+  --instance-type t3.micro \
+  --nist-800-171 \
+  --subnet-id subnet-0abc123 \
+  --security-group-ids sg-0def456
+```
 
 ## Validation Reports
 
 ### Text Output (Default)
 
 ```bash
-$ spawn validate --nist-800-171
+spawn validate --nist-800-171
+```
 
+Example output:
+
+```
 Compliance Validation Report (NIST 800-171 Rev 3)
 ==================================================
 
@@ -160,137 +146,163 @@ Non-Compliant: 2
 
 Non-Compliant Instances:
   i-0abc123 (my-instance):
-    ✗ [SC-28] Protection of Information at Rest: EBS volumes not encrypted
-    ✗ [AC-17] Remote Access: IMDSv2 not enforced
-
-  i-0def456 (worker-2):
-    ✗ [AC-17] Remote Access: IMDSv2 not enforced
+    ✗ EBS volumes not encrypted (SC-28)
+    ✗ IMDSv2 not enforced (AC-17)
 
 Recommendations:
-  1. Terminate and relaunch non-compliant instances with --nist-800-171
+  1. Terminate and relaunch with --nist-800-171
   2. Enable default EBS encryption: aws ec2 enable-ebs-encryption-by-default
-  3. Review networking configuration for compliance requirements
 ```
 
-### JSON Output
+### JSON Output (Automation)
 
 ```bash
-$ spawn validate --nist-800-171 --output json
-
-{
-  "compliance_mode": "NIST 800-171 Rev 3",
-  "instances_scanned": 12,
-  "compliant_count": 10,
-  "non_compliant_count": 2,
-  "total_violations": 3,
-  "instances": [
-    {
-      "instance_id": "i-0abc123",
-      "name": "my-instance",
-      "region": "us-east-1",
-      "type": "t3.micro",
-      "state": "running",
-      "compliant": false,
-      "violations": [
-        {
-          "control_id": "SC-28",
-          "control_name": "Protection of Information at Rest",
-          "description": "EBS volumes not encrypted",
-          "severity": "high",
-          "remediation": ""
-        }
-      ]
-    }
-  ]
-}
+spawn validate --nist-800-171 --output json > compliance-report.json
 ```
 
-## Common Scenarios
+Use for:
+- CI/CD pipeline integration
+- Automated compliance dashboards
+- Historical tracking
 
-### Development/Testing
+## Common Issues and Solutions
 
-For development and testing, shared infrastructure with compliance mode is sufficient:
+### Issue: "EBS encryption required"
+
+**Problem:** Launching without EBS encryption enabled.
+
+**Solution:**
+```bash
+# Option 1: Use --nist-800-171 flag (automatic)
+spawn launch --instance-type t3.micro --nist-800-171
+
+# Option 2: Enable account-wide default
+aws ec2 enable-ebs-encryption-by-default --region us-east-1
+
+# Option 3: Explicit flag
+spawn launch --instance-type t3.micro --ebs-encrypted
+```
+
+### Issue: "IMDSv2 required"
+
+**Problem:** Instance launched with IMDSv1 allowed.
+
+**Solution:** Use `--nist-800-171` flag to automatically enforce IMDSv2.
+
+### Issue: "Self-hosted infrastructure recommended"
+
+**Problem:** Using shared infrastructure with compliance mode.
+
+**Solution:**
+```bash
+# Deploy self-hosted infrastructure
+spawn config init --self-hosted
+# Follow prompts to configure customer-owned resources
+```
+
+## Strict Mode
+
+Strict mode treats warnings as errors:
 
 ```bash
-spawn launch --instance-type t3.micro --ttl 1h --nist-800-171
+# Set via environment variable
+export SPAWN_COMPLIANCE_STRICT_MODE=true
+
+# Or via config file
+cat > ~/.spawn/config.yaml <<EOF
+compliance:
+  mode: nist-800-171
+  strict_mode: true
+EOF
 ```
 
-### Production/Regulated Workloads
+**Effect:** Launch fails if ANY compliance issues detected (including warnings).
 
-For production or regulated workloads, use self-hosted infrastructure:
+**Use case:** Prevent accidental non-compliant launches in production.
+
+## Configuration File
+
+Create `~/.spawn/config.yaml`:
 
 ```yaml
-# ~/.spawn/config.yaml
 compliance:
-  mode: "nist-800-171"
-  strict_mode: true
+  mode: nist-800-171
+  enforce_encrypted_ebs: true
+  enforce_imdsv2: true
+  strict_mode: false
   allow_shared_infrastructure: false
 
 infrastructure:
-  mode: "self-hosted"
-  dynamodb:
-    schedules_table: "my-spawn-schedules"
-  s3:
-    binaries_bucket_prefix: "my-spawn-binaries"
-  lambda:
-    scheduler_handler_arn: "arn:aws:lambda:us-east-1:123456789012:function:my-spawn-scheduler"
+  mode: shared  # or "self-hosted"
 ```
 
-### CI/CD Pipelines
+## Environment Variables
 
-Export compliance settings as environment variables in CI/CD:
+Override settings without editing config:
 
-```yaml
-# .gitlab-ci.yml
-variables:
-  SPAWN_COMPLIANCE_MODE: "nist-800-171"
-  SPAWN_COMPLIANCE_STRICT_MODE: "true"
+```bash
+# Enable compliance mode
+export SPAWN_COMPLIANCE_MODE=nist-800-171
 
-test:
-  script:
-    - spawn launch --instance-type t3.micro --ttl 30m
-    - # Run tests on instance
-    - spawn terminate
+# Enable strict mode
+export SPAWN_COMPLIANCE_STRICT_MODE=true
+
+# Enforce specific controls
+export SPAWN_COMPLIANCE_ENFORCE_ENCRYPTED_EBS=true
+export SPAWN_COMPLIANCE_ENFORCE_IMDSV2=true
 ```
 
-## Troubleshooting
+## Customer Responsibilities
 
-### Launch Fails with Compliance Violations
+spawn implements **technical controls only**. You are responsible for:
 
-**Problem**: Launch fails immediately with compliance error messages.
+### Organizational Controls (100 of 110 requirements)
+- Security policies and procedures
+- Personnel security (background checks, training)
+- Physical security
+- Incident response procedures
+- Configuration management
+- Risk assessments
+- Continuous monitoring processes
+- Third-party assessments
 
-**Solution**: Check the error message for the specific control ID and violation. Common issues:
-- Missing security groups (SC-07)
-- Attempting to disable encryption (SC-28)
-- Invalid network configuration
+### Documentation
+- System Security Plan (SSP)
+- Policies and procedures
+- Training records
+- Audit logs retention
+- Incident response playbooks
 
-### Warnings About Shared Infrastructure
+### Ongoing Operations
+- Security awareness training
+- Access control reviews
+- Vulnerability management
+- Patch management
+- Security audits
 
-**Problem**: Warnings about using shared infrastructure with compliance mode.
+## FedRAMP Pathway
 
-**Solution**: These are informational. Options:
-1. Acknowledge and continue (acceptable for NIST 800-171)
-2. Deploy self-hosted infrastructure (recommended for production)
-3. Disable warnings: `allow_shared_infrastructure: true` in config
+NIST 800-171 is a subset of NIST 800-53 Low baseline. If pursuing FedRAMP authorization:
 
-### Validation Shows Non-Compliant Instances
+1. **Start with NIST 800-171** - Implement technical controls
+2. **Upgrade to NIST 800-53 Low** - `--nist-800-53=low`
+3. **Deploy self-hosted infrastructure** - Required for FedRAMP
+4. **Contract 3PAO** - Third-party assessment organization
+5. **Prepare SSP** - System Security Plan
+6. **FedRAMP authorization** - Agency or PMO authorization
 
-**Problem**: `spawn validate` reports instances as non-compliant.
+See [FedRAMP documentation](fedramp-quickstart.md) for details.
 
-**Solution**: Instances launched before enabling compliance mode won't be compliant. Options:
-1. Terminate and relaunch with `--nist-800-171`
-2. Document as legacy instances with waiver/exception
-3. Enable default EBS encryption in AWS account settings
+## Additional Resources
 
-## Next Steps
+- [NIST 800-171 Rev 3 Full Text](https://csrc.nist.gov/publications/detail/sp/800-171/rev-3/final)
+- [NIST 800-53 Baselines Guide](nist-800-53-baselines.md)
+- [Self-Hosted Infrastructure Guide](../how-to/self-hosted-infrastructure.md)
+- [Control Matrix](control-matrix.md)
 
-- **Self-Hosted Infrastructure**: See [Self-Hosted Infrastructure Guide](../how-to/self-hosted-infrastructure.md)
-- **NIST 800-53 Baselines**: For FedRAMP requirements, see [NIST 800-53 Baselines Guide](./nist-800-53-baselines.md)
-- **Control Matrix**: Full control mapping in [Control Matrix](./control-matrix.md)
-- **Audit Evidence**: Generating audit evidence in [Audit Evidence Guide](./audit-evidence.md)
+## Support
 
-## References
-
-- [NIST SP 800-171 Rev 3](https://csrc.nist.gov/publications/detail/sp/800-171/rev-3/final)
-- [AWS Compliance Programs](https://aws.amazon.com/compliance/programs/)
-- [spawn Security Architecture](../architecture/security.md)
+Questions or issues:
+- GitHub Issues: https://github.com/scttfrdmn/mycelium/issues
+- Command help: `spawn validate --help`
+- Config help: `spawn config --help`
