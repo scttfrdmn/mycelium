@@ -19,6 +19,8 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	lambdasvc "github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/sns"
+	snstypes "github.com/aws/aws-sdk-go-v2/service/sns/types"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/pipeline"
 )
 
@@ -38,6 +40,7 @@ var (
 	dynamodbClient *dynamodb.Client
 	s3Client       *s3.Client
 	lambdaClient   *lambdasvc.Client
+	snsClient      *sns.Client
 	tableName      string
 )
 
@@ -51,6 +54,7 @@ func init() {
 	dynamodbClient = dynamodb.NewFromConfig(awsCfg)
 	s3Client = s3.NewFromConfig(awsCfg)
 	lambdaClient = lambdasvc.NewFromConfig(awsCfg)
+	snsClient = sns.NewFromConfig(awsCfg)
 
 	tableName = getEnv("SPAWN_PIPELINE_ORCHESTRATION_TABLE", defaultTableName)
 	log.Printf("Configuration: table=%s", tableName)
@@ -421,6 +425,15 @@ func runPipelinePollingLoop(ctx context.Context, state *pipeline.PipelineState, 
 						state.Status = pipeline.StatusCancelled
 						state.CompletedAt = timePtr(time.Now())
 						skipRemainingStages(state, order, stageID)
+
+						// Send budget exceeded notification
+						msg := fmt.Sprintf("Pipeline %s (%s) cancelled due to budget exceeded.\n\nCurrent cost: $%.2f\nBudget limit: $%.2f\nStages completed: %d/%d",
+							state.PipelineID, state.PipelineName, state.CurrentCostUSD, *state.MaxCostUSD,
+							state.CompletedStages, state.TotalStages)
+						if err := sendNotification(ctx, state, "Spawn Pipeline: Budget Exceeded", msg); err != nil {
+							log.Printf("Warning: Failed to send budget notification: %v", err)
+						}
+
 						break
 					}
 
@@ -448,6 +461,18 @@ func runPipelinePollingLoop(ctx context.Context, state *pipeline.PipelineState, 
 			if err := savePipelineState(ctx, state); err != nil {
 				return fmt.Errorf("failed to save completion state: %w", err)
 			}
+
+			// Send completion notification
+			duration := state.CompletedAt.Sub(state.CreatedAt)
+			subject := fmt.Sprintf("Spawn Pipeline: %s", state.Status)
+			msg := fmt.Sprintf("Pipeline %s (%s) %s.\n\nStages completed: %d\nStages failed: %d\nTotal cost: $%.2f\nDuration: %v\n\nPipeline ID: %s",
+				state.PipelineName, state.PipelineID, strings.ToLower(string(state.Status)),
+				state.CompletedStages, state.FailedStages, state.CurrentCostUSD, duration.Round(time.Second),
+				state.PipelineID)
+			if err := sendNotification(ctx, state, subject, msg); err != nil {
+				log.Printf("Warning: Failed to send completion notification: %v", err)
+			}
+
 			cleanupPipelineResources(ctx, state)
 			return nil
 		}
@@ -687,6 +712,77 @@ func reinvokeSelf(ctx context.Context, pipelineID string) error {
 		FunctionName:   aws.String(functionName),
 		InvocationType: "Event", // Async invocation
 		Payload:        payload,
+	})
+
+	return err
+}
+
+// sendNotification sends an SNS notification if NotificationEmail is configured
+func sendNotification(ctx context.Context, state *pipeline.PipelineState, subject, message string) error {
+	if state.NotificationEmail == "" {
+		return nil // No notification configured
+	}
+
+	// Get or create SNS topic
+	topicARN, err := getOrCreateNotificationTopic(ctx, state.PipelineID)
+	if err != nil {
+		return fmt.Errorf("get notification topic: %w", err)
+	}
+
+	// Subscribe email if not already subscribed
+	if err := ensureEmailSubscription(ctx, topicARN, state.NotificationEmail); err != nil {
+		log.Printf("Warning: Failed to ensure email subscription: %v", err)
+	}
+
+	// Publish message
+	_, err = snsClient.Publish(ctx, &sns.PublishInput{
+		TopicArn: aws.String(topicARN),
+		Subject:  aws.String(subject),
+		Message:  aws.String(message),
+	})
+
+	return err
+}
+
+func getOrCreateNotificationTopic(ctx context.Context, pipelineID string) (string, error) {
+	topicName := fmt.Sprintf("spawn-pipeline-%s", pipelineID)
+
+	// Try to create topic (idempotent)
+	result, err := snsClient.CreateTopic(ctx, &sns.CreateTopicInput{
+		Name: aws.String(topicName),
+		Tags: []snstypes.Tag{
+			{Key: aws.String("spawn:pipeline-id"), Value: aws.String(pipelineID)},
+		},
+	})
+
+	if err != nil {
+		return "", err
+	}
+
+	return *result.TopicArn, nil
+}
+
+func ensureEmailSubscription(ctx context.Context, topicARN, email string) error {
+	// List existing subscriptions
+	output, err := snsClient.ListSubscriptionsByTopic(ctx, &sns.ListSubscriptionsByTopicInput{
+		TopicArn: aws.String(topicARN),
+	})
+	if err != nil {
+		return err
+	}
+
+	// Check if email already subscribed
+	for _, sub := range output.Subscriptions {
+		if sub.Endpoint != nil && *sub.Endpoint == email {
+			return nil // Already subscribed
+		}
+	}
+
+	// Subscribe email
+	_, err = snsClient.Subscribe(ctx, &sns.SubscribeInput{
+		TopicArn: aws.String(topicARN),
+		Protocol: aws.String("email"),
+		Endpoint: aws.String(email),
 	})
 
 	return err

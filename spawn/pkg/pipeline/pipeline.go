@@ -139,6 +139,7 @@ type PipelineState struct {
 	OnFailure         string  `json:"on_failure"`
 	MaxCostUSD        *float64 `json:"max_cost_usd,omitempty"`
 	CurrentCostUSD    float64  `json:"current_cost_usd"`
+	NotificationEmail string  `json:"notification_email,omitempty"`
 
 	// Progress tracking
 	TotalStages     int `json:"total_stages"`
