@@ -67,7 +67,7 @@ type DataConfig struct {
 	Pattern      string   `json:"pattern,omitempty"`
 
 	// Stream mode
-	Protocol string `json:"protocol,omitempty"` // "tcp" or "grpc"
+	Protocol string `json:"protocol,omitempty"` // "tcp", "grpc", or "zmq"
 	Port     int    `json:"port,omitempty"`
 }
 
@@ -302,8 +302,8 @@ func (d *DataConfig) ValidateInput(validStageIDs map[string]bool) error {
 	}
 
 	if d.Mode == "stream" {
-		if d.Protocol != "tcp" && d.Protocol != "grpc" {
-			return fmt.Errorf("stream mode requires protocol 'tcp' or 'grpc', got '%s'", d.Protocol)
+		if d.Protocol != "tcp" && d.Protocol != "grpc" && d.Protocol != "zmq" {
+			return fmt.Errorf("stream mode requires protocol 'tcp', 'grpc', or 'zmq', got '%s'", d.Protocol)
 		}
 		if d.SourceStage == "" {
 			return fmt.Errorf("stream mode requires source_stage")
@@ -329,8 +329,8 @@ func (d *DataConfig) ValidateOutput() error {
 	}
 
 	if d.Mode == "stream" {
-		if d.Protocol != "tcp" && d.Protocol != "grpc" {
-			return fmt.Errorf("stream mode requires protocol 'tcp' or 'grpc', got '%s'", d.Protocol)
+		if d.Protocol != "tcp" && d.Protocol != "grpc" && d.Protocol != "zmq" {
+			return fmt.Errorf("stream mode requires protocol 'tcp', 'grpc', or 'zmq', got '%s'", d.Protocol)
 		}
 		if d.Port < 1 || d.Port > 65535 {
 			return fmt.Errorf("port must be 1-65535, got %d", d.Port)

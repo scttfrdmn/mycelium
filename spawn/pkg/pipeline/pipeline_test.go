@@ -351,7 +351,7 @@ func TestDataConfigValidate(t *testing.T) {
 			},
 			isInput: true,
 			wantErr: true,
-			errMsg:  "requires protocol 'tcp' or 'grpc'",
+			errMsg:  "requires protocol 'tcp', 'grpc', or 'zmq'",
 		},
 		{
 			name: "stream_output_invalid_port",
