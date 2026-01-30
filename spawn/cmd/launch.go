@@ -115,6 +115,7 @@ var (
 	maxConcurrentPerRegion int
 	launchDelay            string
 	detach                 bool
+	noDetach               bool
 	sweepName              string
 	estimateOnly           bool
 	autoYes                bool
@@ -244,7 +245,8 @@ func init() {
 	launchCmd.Flags().IntVar(&maxConcurrent, "max-concurrent", 0, "Max instances running simultaneously (0 = unlimited)")
 	launchCmd.Flags().IntVar(&maxConcurrentPerRegion, "max-concurrent-per-region", 0, "Max instances running simultaneously per region (0 = unlimited)")
 	launchCmd.Flags().StringVar(&launchDelay, "launch-delay", "0s", "Delay between instance launches (e.g., 5s)")
-	launchCmd.Flags().BoolVar(&detach, "detach", false, "Run sweep orchestration in Lambda (survives disconnect)")
+	launchCmd.Flags().BoolVar(&detach, "detach", false, "Run sweep orchestration in Lambda (auto-enabled for parameter sweeps)")
+	launchCmd.Flags().BoolVar(&noDetach, "no-detach", false, "Disable auto-detach for parameter sweeps (requires --ttl or --idle-timeout)")
 	launchCmd.Flags().StringVar(&sweepName, "sweep-name", "", "Human-readable sweep identifier (auto-generated if empty)")
 	launchCmd.Flags().Float64Var(&budget, "budget", 0, "Budget limit in dollars (0 = no limit)")
 	launchCmd.Flags().BoolVar(&estimateOnly, "estimate-only", false, "Show cost estimate and exit without launching")
@@ -482,6 +484,11 @@ func runLaunch(cmd *cobra.Command, args []string) error {
 }
 
 func launchParameterSweep(ctx context.Context, baseConfig *aws.LaunchConfig, plat *platform.Platform, auditLog *audit.AuditLogger) error {
+	// Validate mutually exclusive flags
+	if detach && noDetach {
+		return fmt.Errorf("--detach and --no-detach are mutually exclusive")
+	}
+
 	// Validate workflow integration flags
 	if wait && !detach {
 		return fmt.Errorf("--wait requires --detach (only works with Lambda orchestration)")
@@ -501,6 +508,40 @@ func launchParameterSweep(ctx context.Context, baseConfig *aws.LaunchConfig, pla
 		return fmt.Errorf("inline --params not yet implemented, use --param-file for now")
 	} else {
 		return fmt.Errorf("either --param-file or --params must be specified for parameter sweep")
+	}
+
+	// AUTO-ENABLE DETACHED MODE for parameter sweeps to prevent zombie instances
+	// If the CLI disconnects (laptop sleep/shutdown), detached mode ensures:
+	// - Sweep state persists in DynamoDB
+	// - Lambda continues orchestration
+	// - User can resume monitoring with 'spawn sweep status <sweep-id>'
+	if !detach && !noDetach {
+		detach = true
+		fmt.Fprintf(os.Stderr, "\n⚠️  Auto-enabling --detach for parameter sweep\n")
+		fmt.Fprintf(os.Stderr, "   This prevents zombie instances if CLI disconnects.\n")
+		fmt.Fprintf(os.Stderr, "   Resume monitoring with: spawn sweep status <sweep-id>\n")
+
+		// If maxConcurrent is 0 (launch all at once), set a reasonable default
+		if maxConcurrent == 0 {
+			// Default to number of params or 10, whichever is less
+			defaultConcurrent := len(paramFormat.Params)
+			if defaultConcurrent > 10 {
+				defaultConcurrent = 10
+			}
+			maxConcurrent = defaultConcurrent
+			fmt.Fprintf(os.Stderr, "   Setting --max-concurrent=%d for controlled launch\n", maxConcurrent)
+			fmt.Fprintf(os.Stderr, "   (Override with --max-concurrent=N if needed)\n")
+		}
+		fmt.Fprintf(os.Stderr, "\n")
+	} else if noDetach {
+		// User explicitly disabled detached mode - warn about zombie instances
+		fmt.Fprintf(os.Stderr, "\n⚠️  WARNING: --no-detach specified\n")
+		fmt.Fprintf(os.Stderr, "   If CLI disconnects (laptop sleep/shutdown), instances may become zombies.\n")
+		if ttl == "" && idleTimeout == "" {
+			fmt.Fprintf(os.Stderr, "\n❌ ERROR: --no-detach requires --ttl or --idle-timeout to prevent zombie instances\n")
+			return fmt.Errorf("--no-detach requires --ttl or --idle-timeout for safety")
+		}
+		fmt.Fprintf(os.Stderr, "   Using safeguards: ttl=%s, idle-timeout=%s\n\n", ttl, idleTimeout)
 	}
 
 	// Generate sweep ID
