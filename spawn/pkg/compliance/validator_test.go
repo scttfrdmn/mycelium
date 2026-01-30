@@ -291,32 +291,32 @@ func TestValidator_ValidateInstances_DisabledCompliance(t *testing.T) {
 
 func TestValidator_GetComplianceSummary(t *testing.T) {
 	tests := []struct {
-		name            string
-		complianceMode  config.ComplianceMode
-		infraMode       config.InfrastructureMode
-		expectDisabled  bool
-		expectWarning   bool
+		name           string
+		complianceMode config.ComplianceMode
+		infraMode      config.InfrastructureMode
+		expectDisabled bool
+		expectWarning  bool
 	}{
 		{
-			name:            "Compliance disabled",
-			complianceMode:  config.ComplianceModeNone,
-			infraMode:       config.InfrastructureModeShared,
-			expectDisabled:  true,
-			expectWarning:   false,
+			name:           "Compliance disabled",
+			complianceMode: config.ComplianceModeNone,
+			infraMode:      config.InfrastructureModeShared,
+			expectDisabled: true,
+			expectWarning:  false,
 		},
 		{
-			name:            "NIST 800-171 with shared",
-			complianceMode:  config.ComplianceModeNIST80171,
-			infraMode:       config.InfrastructureModeShared,
-			expectDisabled:  false,
-			expectWarning:   false, // Warning only shown with AllowSharedInfrastructure=true
+			name:           "NIST 800-171 with shared",
+			complianceMode: config.ComplianceModeNIST80171,
+			infraMode:      config.InfrastructureModeShared,
+			expectDisabled: false,
+			expectWarning:  false, // Warning only shown with AllowSharedInfrastructure=true
 		},
 		{
-			name:            "NIST 800-53 Moderate with shared",
-			complianceMode:  config.ComplianceModeBaseMod,
-			infraMode:       config.InfrastructureModeShared,
-			expectDisabled:  false,
-			expectWarning:   true,
+			name:           "NIST 800-53 Moderate with shared",
+			complianceMode: config.ComplianceModeBaseMod,
+			infraMode:      config.InfrastructureModeShared,
+			expectDisabled: false,
+			expectWarning:  true,
 		},
 	}
 
@@ -445,11 +445,11 @@ func TestValidator_GetControlList_DisabledCompliance(t *testing.T) {
 
 func TestValidator_SelfHostedInfrastructureWarnings(t *testing.T) {
 	tests := []struct {
-		name                       string
-		complianceMode             config.ComplianceMode
-		infraMode                  config.InfrastructureMode
-		allowSharedInfrastructure  bool
-		expectWarning              bool
+		name                      string
+		complianceMode            config.ComplianceMode
+		infraMode                 config.InfrastructureMode
+		allowSharedInfrastructure bool
+		expectWarning             bool
 	}{
 		{
 			name:                      "Moderate requires self-hosted",

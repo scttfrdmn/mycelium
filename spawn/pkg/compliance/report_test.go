@@ -10,10 +10,10 @@ import (
 
 func TestGenerateComplianceReport(t *testing.T) {
 	tests := []struct {
-		name      string
-		result    *ValidationResult
-		framework string
-		baseline  string
+		name         string
+		result       *ValidationResult
+		framework    string
+		baseline     string
 		expectStatus string
 	}{
 		{
@@ -103,10 +103,10 @@ func TestGenerateComplianceReport(t *testing.T) {
 
 func TestGenerateRecommendations(t *testing.T) {
 	tests := []struct {
-		name         string
-		result       *ValidationResult
-		framework    string
-		baseline     string
+		name           string
+		result         *ValidationResult
+		framework      string
+		baseline       string
 		expectKeywords []string
 	}{
 		{

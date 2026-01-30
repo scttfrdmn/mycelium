@@ -79,14 +79,14 @@ type SweepConfig struct {
 }
 
 var (
-	dynamoClient           *dynamodb.Client
-	lambdaClient           *lambdasvc.Client
-	s3Client               *s3.Client
-	accountID              string
-	schedulesTable         string
-	historyTable           string
-	schedulesBucketTmpl    string
-	orchestratorFuncName   string
+	dynamoClient         *dynamodb.Client
+	lambdaClient         *lambdasvc.Client
+	s3Client             *s3.Client
+	accountID            string
+	schedulesTable       string
+	historyTable         string
+	schedulesBucketTmpl  string
+	orchestratorFuncName string
 )
 
 func init() {

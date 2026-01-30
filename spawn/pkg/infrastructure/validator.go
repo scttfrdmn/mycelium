@@ -12,10 +12,10 @@ import (
 
 // ValidationResult represents the result of infrastructure validation
 type ValidationResult struct {
-	Valid      bool
-	Errors     []string
-	Warnings   []string
-	Resources  map[string]ResourceStatus
+	Valid     bool
+	Errors    []string
+	Warnings  []string
+	Resources map[string]ResourceStatus
 }
 
 // ResourceStatus represents the status of a single resource
@@ -77,9 +77,9 @@ func (v *Validator) validateDynamoDBTables(ctx context.Context, result *Validati
 
 	for name, tableName := range tables {
 		status := ResourceStatus{
-			Name:   tableName,
-			Type:   "DynamoDB Table",
-			Exists: false,
+			Name:       tableName,
+			Type:       "DynamoDB Table",
+			Exists:     false,
 			Accessible: false,
 		}
 

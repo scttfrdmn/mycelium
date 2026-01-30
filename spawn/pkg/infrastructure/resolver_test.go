@@ -15,7 +15,7 @@ func TestResolver_DynamoDBTables(t *testing.T) {
 		{
 			name: "default shared infrastructure",
 			cfg: &config.InfrastructureConfig{
-				Mode: config.InfrastructureModeShared,
+				Mode:     config.InfrastructureModeShared,
 				DynamoDB: config.DynamoDBConfig{},
 			},
 			wantTables: map[string]string{
@@ -182,10 +182,10 @@ func TestResolver_LambdaFunctions(t *testing.T) {
 
 func TestResolver_CloudWatch(t *testing.T) {
 	tests := []struct {
-		name            string
-		cfg             *config.InfrastructureConfig
-		serviceName     string
-		wantLogGroup    string
+		name         string
+		cfg          *config.InfrastructureConfig
+		serviceName  string
+		wantLogGroup string
 	}{
 		{
 			name: "default log group prefix",
@@ -220,12 +220,12 @@ func TestResolver_CloudWatch(t *testing.T) {
 
 func TestResolver_Helpers(t *testing.T) {
 	tests := []struct {
-		name                  string
-		cfg                   *config.InfrastructureConfig
-		region                string
-		accountID             string
-		wantSelfHosted        bool
-		wantInfraAccount      string
+		name             string
+		cfg              *config.InfrastructureConfig
+		region           string
+		accountID        string
+		wantSelfHosted   bool
+		wantInfraAccount string
 	}{
 		{
 			name: "shared infrastructure",

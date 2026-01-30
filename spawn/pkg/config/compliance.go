@@ -28,14 +28,14 @@ type ComplianceConfig struct {
 	Mode ComplianceMode `yaml:"mode"`
 
 	// Enforcement settings
-	EnforceEncryptedEBS      bool `yaml:"enforce_encrypted_ebs"`
-	EnforceIMDSv2            bool `yaml:"enforce_imdsv2"`
-	EnforcePrivateSubnets    bool `yaml:"enforce_private_subnets"`
-	EnforceNoPublicIP        bool `yaml:"enforce_no_public_ip"`
-	EnforceVPCEndpoints      bool `yaml:"enforce_vpc_endpoints"`
-	EnforceMultiAZ           bool `yaml:"enforce_multi_az"`
-	EnforceCustomerKMS       bool `yaml:"enforce_customer_kms"`
-	AuditLoggingRequired     bool `yaml:"audit_logging_required"`
+	EnforceEncryptedEBS       bool `yaml:"enforce_encrypted_ebs"`
+	EnforceIMDSv2             bool `yaml:"enforce_imdsv2"`
+	EnforcePrivateSubnets     bool `yaml:"enforce_private_subnets"`
+	EnforceNoPublicIP         bool `yaml:"enforce_no_public_ip"`
+	EnforceVPCEndpoints       bool `yaml:"enforce_vpc_endpoints"`
+	EnforceMultiAZ            bool `yaml:"enforce_multi_az"`
+	EnforceCustomerKMS        bool `yaml:"enforce_customer_kms"`
+	AuditLoggingRequired      bool `yaml:"audit_logging_required"`
 	AllowSharedInfrastructure bool `yaml:"allow_shared_infrastructure"`
 
 	// Validation settings
@@ -49,17 +49,17 @@ type ComplianceConfig struct {
 // 4. Defaults (no compliance enforcement)
 func LoadComplianceConfig(ctx context.Context, flagMode string, flagStrict bool) (*ComplianceConfig, error) {
 	cfg := &ComplianceConfig{
-		Mode:                     ComplianceModeNone,
-		EnforceEncryptedEBS:      false,
-		EnforceIMDSv2:            false,
-		EnforcePrivateSubnets:    false,
-		EnforceNoPublicIP:        false,
-		EnforceVPCEndpoints:      false,
-		EnforceMultiAZ:           false,
-		EnforceCustomerKMS:       false,
-		AuditLoggingRequired:     true, // Always enabled by default
+		Mode:                      ComplianceModeNone,
+		EnforceEncryptedEBS:       false,
+		EnforceIMDSv2:             false,
+		EnforcePrivateSubnets:     false,
+		EnforceNoPublicIP:         false,
+		EnforceVPCEndpoints:       false,
+		EnforceMultiAZ:            false,
+		EnforceCustomerKMS:        false,
+		AuditLoggingRequired:      true, // Always enabled by default
 		AllowSharedInfrastructure: true, // Allow shared infra by default
-		StrictMode:               false,
+		StrictMode:                false,
 	}
 
 	// 3. Try config file

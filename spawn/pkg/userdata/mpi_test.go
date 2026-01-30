@@ -158,14 +158,14 @@ func TestGenerateMPIUserData_HeadNode(t *testing.T) {
 
 func TestGenerateMPIUserData_WorkerNode(t *testing.T) {
 	config := MPIConfig{
-		Region:          "us-east-1",
-		JobArrayID:      "test-job",
-		JobArrayIndex:   2, // Worker node (not 0)
-		JobArraySize:    4,
-		MPICommand:      "mpirun -np 16 ./app",
-		SkipInstall:     false,
-		EFAEnabled:      false,
-		BinariesBucket:  "spawn-binaries-us-east-1",
+		Region:         "us-east-1",
+		JobArrayID:     "test-job",
+		JobArrayIndex:  2, // Worker node (not 0)
+		JobArraySize:   4,
+		MPICommand:     "mpirun -np 16 ./app",
+		SkipInstall:    false,
+		EFAEnabled:     false,
+		BinariesBucket: "spawn-binaries-us-east-1",
 	}
 
 	script, err := GenerateMPIUserData(config)

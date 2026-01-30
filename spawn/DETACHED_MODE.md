@@ -22,6 +22,8 @@ Technical guide to Lambda-orchestrated parameter sweeps in spawn CLI.
 
 **Detached mode** enables parameter sweeps to run independently of the CLI by orchestrating launches via AWS Lambda. The Lambda function polls EC2 instance states and launches new instances as capacity becomes available, implementing a rolling queue pattern.
 
+> **⚠️ DEFAULT BEHAVIOR**: As of v0.15.0, detached mode is **automatically enabled** for all parameter sweeps to prevent zombie instances. Users launching parameter sweeps without `--detach` will see it auto-enabled. To opt-out, use `--no-detach` (requires `--ttl` or `--idle-timeout` for safety).
+
 ### Key Benefits
 
 - **Survives disconnection** - Sweep continues if laptop sleeps, network drops, or terminal closes
