@@ -121,37 +121,37 @@ type StageState struct {
 
 // PipelineState tracks runtime state of entire pipeline
 type PipelineState struct {
-	PipelineID      string         `json:"pipeline_id"`
-	PipelineName    string         `json:"pipeline_name"`
-	UserID          string         `json:"user_id"`
-	CreatedAt       time.Time      `json:"created_at"`
-	UpdatedAt       time.Time      `json:"updated_at"`
-	CompletedAt     *time.Time     `json:"completed_at,omitempty"`
-	Status          PipelineStatus `json:"status"`
-	CancelRequested bool           `json:"cancel_requested"`
+	PipelineID      string         `json:"pipeline_id" dynamodbav:"pipeline_id"`
+	PipelineName    string         `json:"pipeline_name" dynamodbav:"pipeline_name"`
+	UserID          string         `json:"user_id" dynamodbav:"user_id"`
+	CreatedAt       time.Time      `json:"created_at" dynamodbav:"created_at"`
+	UpdatedAt       time.Time      `json:"updated_at" dynamodbav:"updated_at"`
+	CompletedAt     *time.Time     `json:"completed_at,omitempty" dynamodbav:"completed_at,omitempty"`
+	Status          PipelineStatus `json:"status" dynamodbav:"status"`
+	CancelRequested bool           `json:"cancel_requested" dynamodbav:"cancel_requested"`
 
 	// Configuration
-	S3ConfigKey       string   `json:"s3_config_key"`
-	S3Bucket          string   `json:"s3_bucket"`
-	S3Prefix          string   `json:"s3_prefix"`
-	ResultS3Bucket    string   `json:"result_s3_bucket"`
-	ResultS3Prefix    string   `json:"result_s3_prefix"`
-	OnFailure         string   `json:"on_failure"`
-	MaxCostUSD        *float64 `json:"max_cost_usd,omitempty"`
-	CurrentCostUSD    float64  `json:"current_cost_usd"`
-	NotificationEmail string   `json:"notification_email,omitempty"`
+	S3ConfigKey       string   `json:"s3_config_key" dynamodbav:"s3_config_key"`
+	S3Bucket          string   `json:"s3_bucket" dynamodbav:"s3_bucket"`
+	S3Prefix          string   `json:"s3_prefix" dynamodbav:"s3_prefix"`
+	ResultS3Bucket    string   `json:"result_s3_bucket" dynamodbav:"result_s3_bucket"`
+	ResultS3Prefix    string   `json:"result_s3_prefix" dynamodbav:"result_s3_prefix"`
+	OnFailure         string   `json:"on_failure" dynamodbav:"on_failure"`
+	MaxCostUSD        *float64 `json:"max_cost_usd,omitempty" dynamodbav:"max_cost_usd,omitempty"`
+	CurrentCostUSD    float64  `json:"current_cost_usd" dynamodbav:"current_cost_usd"`
+	NotificationEmail string   `json:"notification_email,omitempty" dynamodbav:"notification_email,omitempty"`
 
 	// Progress tracking
-	TotalStages     int `json:"total_stages"`
-	CompletedStages int `json:"completed_stages"`
-	FailedStages    int `json:"failed_stages"`
+	TotalStages     int `json:"total_stages" dynamodbav:"total_stages"`
+	CompletedStages int `json:"completed_stages" dynamodbav:"completed_stages"`
+	FailedStages    int `json:"failed_stages" dynamodbav:"failed_stages"`
 
 	// Stage details
-	Stages []StageState `json:"stages"`
+	Stages []StageState `json:"stages" dynamodbav:"stages"`
 
 	// Network configuration
-	SecurityGroupID  string `json:"security_group_id,omitempty"`
-	PlacementGroupID string `json:"placement_group_id,omitempty"`
+	SecurityGroupID  string `json:"security_group_id,omitempty" dynamodbav:"security_group_id,omitempty"`
+	PlacementGroupID string `json:"placement_group_id,omitempty" dynamodbav:"placement_group_id,omitempty"`
 }
 
 // LoadPipelineFromFile loads a pipeline definition from a JSON file

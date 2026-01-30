@@ -336,24 +336,27 @@ func runLaunchPipeline(cmd *cobra.Command, args []string) error {
 	dynamoClient := dynamodb.NewFromConfig(cfg)
 	tableName := "spawn-pipeline-orchestration"
 
-	// Build initial pipeline state
+	// Build initial pipeline state (use map to control DynamoDB attribute names)
+	now := time.Now().UTC()
 	pipelineState := map[string]interface{}{
 		"pipeline_id":      p.PipelineID,
 		"pipeline_name":    p.PipelineName,
 		"user_id":          userAccountID,
-		"created_at":       time.Now().UTC().Format(time.RFC3339),
-		"updated_at":       time.Now().UTC().Format(time.RFC3339),
+		"created_at":       now,
+		"updated_at":       now,
 		"status":           "INITIALIZING",
+		"cancel_requested": false,
 		"s3_config_key":    fmt.Sprintf("s3://%s/%s", bucketName, s3Key),
 		"s3_bucket":        p.S3Bucket,
 		"s3_prefix":        p.S3Prefix,
 		"result_s3_bucket": p.ResultS3Bucket,
 		"result_s3_prefix": p.ResultS3Prefix,
 		"on_failure":       p.OnFailure,
+		"current_cost_usd": 0.0,
 		"total_stages":     len(p.Stages),
 		"completed_stages": 0,
 		"failed_stages":    0,
-		"current_cost_usd": 0.0,
+		"stages":           []interface{}{}, // Empty array for stages
 	}
 	if p.MaxCostUSD != nil {
 		pipelineState["max_cost_usd"] = *p.MaxCostUSD

@@ -17,7 +17,7 @@ Resources:
   PipelineOrchestrationTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub spawn-pipeline-orchestration-${Environment}
+      TableName: spawn-pipeline-orchestration
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: pipeline_id
@@ -39,7 +39,7 @@ Resources:
   PipelineOrchestratorFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !Sub spawn-pipeline-orchestrator-${Environment}
+      FunctionName: spawn-pipeline-orchestrator
       Handler: bootstrap
       Runtime: provided.al2023
       Architectures:
@@ -84,12 +84,12 @@ Resources:
               Action:
                 - iam:PassRole
               Resource: 'arn:aws:iam::*:role/spawnd-role'
-        # Lambda self-invocation
+        # Lambda self-invocation (wildcard to avoid circular dependency)
         - Statement:
             - Effect: Allow
               Action:
                 - lambda:InvokeFunction
-              Resource: !GetAtt PipelineOrchestratorFunction.Arn
+              Resource: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:spawn-pipeline-orchestrator*'
       Tags:
         Environment: !Ref Environment
         Application: spawn
@@ -99,29 +99,29 @@ Resources:
   PipelineOrchestratorLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Sub /aws/lambda/spawn-pipeline-orchestrator-${Environment}
+      LogGroupName: /aws/lambda/spawn-pipeline-orchestrator
       RetentionInDays: 30
 
-  # EventBridge rule for scheduled execution (optional)
-  PipelineOrchestratorScheduleRule:
-    Type: AWS::Events::Rule
-    Properties:
-      Name: !Sub spawn-pipeline-orchestrator-schedule-${Environment}
-      Description: Periodic invocation for long-running pipelines
-      State: DISABLED  # Enable manually if needed
-      ScheduleExpression: rate(5 minutes)
-      Targets:
-        - Arn: !GetAtt PipelineOrchestratorFunction.Arn
-          Id: PipelineOrchestratorTarget
-
-  # Permission for EventBridge to invoke Lambda
-  PipelineOrchestratorSchedulePermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      FunctionName: !Ref PipelineOrchestratorFunction
-      Action: lambda:InvokeFunction
-      Principal: events.amazonaws.com
-      SourceArn: !GetAtt PipelineOrchestratorScheduleRule.Arn
+  # EventBridge rule for scheduled execution (optional) - Commented out to avoid circular dependency
+  # Can be added manually if needed
+  # PipelineOrchestratorScheduleRule:
+  #   Type: AWS::Events::Rule
+  #   Properties:
+  #     Name: spawn-pipeline-orchestrator-schedule
+  #     Description: Periodic invocation for long-running pipelines
+  #     State: DISABLED
+  #     ScheduleExpression: rate(5 minutes)
+  #     Targets:
+  #       - Arn: !GetAtt PipelineOrchestratorFunction.Arn
+  #         Id: PipelineOrchestratorTarget
+  #
+  # PipelineOrchestratorSchedulePermission:
+  #   Type: AWS::Lambda::Permission
+  #   Properties:
+  #     FunctionName: !Ref PipelineOrchestratorFunction
+  #     Action: lambda:InvokeFunction
+  #     Principal: events.amazonaws.com
+  #     SourceArn: !GetAtt PipelineOrchestratorScheduleRule.Arn
 
 Outputs:
   PipelineOrchestratorFunctionArn:
