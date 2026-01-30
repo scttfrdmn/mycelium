@@ -9,11 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-#### Critical: Zombie Instance Prevention (Parameter Sweeps)
+#### Critical: Zombie Instance Prevention (ALL Launch Modes)
 
-**CRITICAL BUG FIX**: Parameter sweeps without `--detach` could create zombie instances if the CLI disconnected (laptop sleep/shutdown). Already-running instances would continue indefinitely without safeguards unless `--ttl` or `--idle-timeout` were explicitly set. This violated the core principle of preventing zombie instances.
+**CRITICAL BUG FIX**: Any instance launch without `--ttl` or `--idle-timeout` could create zombie instances if the CLI disconnected (laptop sleep/shutdown, network drop). Already-running instances would continue indefinitely without safeguards. This violated the core principle of preventing zombie instances and affected:
+- Single instance launches
+- Job arrays (`--count`)
+- MPI clusters (`--mpi`)
+- Parameter sweeps
+- Batch queues
 
 **Changes:**
+
+**1. Parameter Sweeps - Auto-Detach**
 - **Auto-enable `--detach` for all parameter sweeps by default**
   - Sweep state persists in DynamoDB
   - Lambda continues orchestration even if CLI disconnects
@@ -21,11 +28,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Auto-set `--max-concurrent` to reasonable default (up to 10) if not specified**
 - **Add `--no-detach` flag for opt-out (requires `--ttl` or `--idle-timeout`)**
 - **Validate mutual exclusivity of `--detach` and `--no-detach` flags**
-- **Clear user messaging about auto-detach behavior**
 
-**Cost Impact**: ~$0.005 per sweep (Lambda + DynamoDB + S3) - negligible compared to the risk of hours/days of untracked instance costs from zombie instances.
+**2. All Launches - Auto-Timeout**
+- **Auto-set `--idle-timeout=1h` if neither `--ttl` nor `--idle-timeout` specified**
+  - Applies to: single instances, job arrays, MPI, parameter sweeps, batch queues
+  - Instances terminate after 1 hour of inactivity (CPU < 5%)
+  - Safe for interactive SSH (won't timeout while working)
+  - Catches forgotten/abandoned instances
+- **Add `--no-timeout` flag to disable (NOT RECOMMENDED)**
+  - Requires explicit opt-in to run without safeguards
+  - Shows prominent warning about zombie risk
+  - For expert users with external monitoring
 
-**Behavior Change**: Parameter sweeps now use Lambda orchestration by default instead of local CLI orchestration. Users who need local orchestration can use `--no-detach` but must provide `--ttl` or `--idle-timeout` for safety.
+**Cost Impact**:
+- Parameter sweep detach: ~$0.005 per sweep (Lambda + DynamoDB + S3)
+- Auto idle-timeout: No cost impact (prevents waste)
+- Both negligible compared to hours/days of zombie instance costs
+
+**Behavior Change**:
+- **Parameter sweeps now use Lambda orchestration by default** (use `--no-detach` to opt-out)
+- **All launches now have 1h idle timeout by default** (use `--no-timeout` to disable)
+- Users must explicitly opt-in to unsafe behavior instead of accidentally creating zombies
 
 ## [0.14.0] - 2026-01-28
 
