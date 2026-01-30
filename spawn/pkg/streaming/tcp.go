@@ -68,7 +68,7 @@ type TCPClient struct {
 
 // NewTCPClient creates a new TCP client and connects to the server
 func NewTCPClient(address string, port int) (*TCPClient, error) {
-	fullAddr := fmt.Sprintf("%s:%d", address, port)
+	fullAddr := net.JoinHostPort(address, fmt.Sprintf("%d", port))
 
 	log.Printf("Connecting to TCP server at %s", fullAddr)
 
