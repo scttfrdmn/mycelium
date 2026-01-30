@@ -100,15 +100,37 @@ Downloads outputs from all stages to a local directory.`,
 	RunE: runCollectPipeline,
 }
 
+var listPipelineCmd = &cobra.Command{
+	Use:   "list",
+	Short: "List all pipelines",
+	Long: `List all pipelines for the current user.
+
+Shows pipeline ID, name, status, and cost.`,
+	Args: cobra.NoArgs,
+	RunE: runListPipeline,
+}
+
+var cancelPipelineCmd = &cobra.Command{
+	Use:   "cancel <pipeline-id>",
+	Short: "Cancel a running pipeline",
+	Long: `Cancel a running pipeline and terminate all instances.
+
+Sets the cancellation flag in DynamoDB. The orchestrator Lambda will
+terminate all running instances and mark the pipeline as CANCELLED.`,
+	Args: cobra.ExactArgs(1),
+	RunE: runCancelPipeline,
+}
+
 var (
-	flagSimpleGraph bool
-	flagGraphStats  bool
-	flagJSONOutput  bool
-	flagDetached    bool
-	flagWait        bool
-	flagRegion      string
-	flagOutputDir   string
-	flagStage       string
+	flagSimpleGraph  bool
+	flagGraphStats   bool
+	flagJSONOutput   bool
+	flagDetached     bool
+	flagWait         bool
+	flagRegion       string
+	flagOutputDir    string
+	flagStage        string
+	flagStatusFilter string
 )
 
 func init() {
@@ -118,6 +140,8 @@ func init() {
 	pipelineCmd.AddCommand(launchPipelineCmd)
 	pipelineCmd.AddCommand(statusPipelineCmd)
 	pipelineCmd.AddCommand(collectPipelineCmd)
+	pipelineCmd.AddCommand(listPipelineCmd)
+	pipelineCmd.AddCommand(cancelPipelineCmd)
 
 	// Graph command flags
 	graphPipelineCmd.Flags().BoolVar(&flagSimpleGraph, "simple", false, "Show simplified graph")
@@ -132,6 +156,10 @@ func init() {
 	// Collect command flags
 	collectPipelineCmd.Flags().StringVar(&flagOutputDir, "output", "./results", "Output directory for downloaded files")
 	collectPipelineCmd.Flags().StringVar(&flagStage, "stage", "", "Download results from specific stage only")
+
+	// List command flags
+	listPipelineCmd.Flags().StringVar(&flagStatusFilter, "status", "", "Filter by status (INITIALIZING, RUNNING, COMPLETED, FAILED, CANCELLED)")
+	listPipelineCmd.Flags().BoolVar(&flagJSONOutput, "json", false, "Output as JSON")
 }
 
 func runValidatePipeline(cmd *cobra.Command, args []string) error {
@@ -665,6 +693,146 @@ func runCollectPipeline(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Fprintf(os.Stderr, "\n✅ Downloaded %d files to %s\n", downloadCount, flagOutputDir)
+
+	return nil
+}
+
+func runListPipeline(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
+
+	// Load AWS config
+	cfg, err := config.LoadDefaultConfig(ctx,
+		config.WithSharedConfigProfile("mycelium-infra"),
+	)
+	if err != nil {
+		return fmt.Errorf("load AWS config: %w", err)
+	}
+
+	// Get user account ID for filtering
+	stsClient := sts.NewFromConfig(cfg)
+	identity, err := stsClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+	if err != nil {
+		return fmt.Errorf("get caller identity: %w", err)
+	}
+	userAccountID := *identity.Account
+
+	// Query DynamoDB for all pipelines
+	dynamoClient := dynamodb.NewFromConfig(cfg)
+	tableName := "spawn-pipeline-orchestration"
+
+	// Scan for all pipelines (or use GSI if exists)
+	scanOutput, err := dynamoClient.Scan(ctx, &dynamodb.ScanInput{
+		TableName: aws.String(tableName),
+	})
+	if err != nil {
+		return fmt.Errorf("scan DynamoDB: %w", err)
+	}
+
+	// Parse results
+	var pipelines []map[string]interface{}
+	for _, item := range scanOutput.Items {
+		var p map[string]interface{}
+		if err := attributevalue.UnmarshalMap(item, &p); err != nil {
+			continue
+		}
+
+		// Filter by user
+		if getStringField(p, "user_id") != userAccountID {
+			continue
+		}
+
+		// Filter by status if specified
+		if flagStatusFilter != "" && getStringField(p, "status") != flagStatusFilter {
+			continue
+		}
+
+		pipelines = append(pipelines, p)
+	}
+
+	if len(pipelines) == 0 {
+		fmt.Fprintf(os.Stdout, "No pipelines found\n")
+		return nil
+	}
+
+	// JSON output
+	if flagJSONOutput {
+		data, err := json.MarshalIndent(pipelines, "", "  ")
+		if err != nil {
+			return fmt.Errorf("marshal JSON: %w", err)
+		}
+		fmt.Fprintf(os.Stdout, "%s\n", data)
+		return nil
+	}
+
+	// Table output
+	fmt.Fprintf(os.Stdout, "PIPELINE ID                    NAME                          STATUS       COST      CREATED\n")
+	fmt.Fprintf(os.Stdout, "──────────────────────────────────────────────────────────────────────────────────────────────────\n")
+	for _, p := range pipelines {
+		pipelineID := getStringField(p, "pipeline_id")
+		pipelineName := getStringField(p, "pipeline_name")
+		status := getStringField(p, "status")
+		cost := getFloatField(p, "current_cost_usd")
+		createdAt := getStringField(p, "created_at")
+
+		// Format created time
+		createdTime := "-"
+		if createdAt != "" {
+			if t, err := time.Parse(time.RFC3339, createdAt); err == nil {
+				createdTime = t.Format("2006-01-02 15:04")
+			}
+		}
+
+		costStr := fmt.Sprintf("$%.2f", cost)
+
+		fmt.Fprintf(os.Stdout, "%-30s %-29s %-12s %-9s %s\n",
+			truncate(pipelineID, 30),
+			truncate(pipelineName, 29),
+			status,
+			costStr,
+			createdTime)
+	}
+
+	return nil
+}
+
+func runCancelPipeline(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
+	pipelineID := args[0]
+
+	fmt.Fprintf(os.Stderr, "⚠️  Cancelling pipeline: %s\n", pipelineID)
+
+	// Load AWS config
+	cfg, err := config.LoadDefaultConfig(ctx,
+		config.WithSharedConfigProfile("mycelium-infra"),
+	)
+	if err != nil {
+		return fmt.Errorf("load AWS config: %w", err)
+	}
+
+	// Set cancellation flag in DynamoDB
+	dynamoClient := dynamodb.NewFromConfig(cfg)
+	tableName := "spawn-pipeline-orchestration"
+
+	_, err = dynamoClient.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName: aws.String(tableName),
+		Key: map[string]types.AttributeValue{
+			"pipeline_id": &types.AttributeValueMemberS{Value: pipelineID},
+		},
+		UpdateExpression: aws.String("SET cancel_requested = :true, updated_at = :now"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":true": &types.AttributeValueMemberBOOL{Value: true},
+			":now":  &types.AttributeValueMemberS{Value: time.Now().UTC().Format(time.RFC3339)},
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("update DynamoDB: %w", err)
+	}
+
+	fmt.Fprintf(os.Stderr, "✓ Cancellation requested\n\n")
+	fmt.Fprintf(os.Stderr, "The orchestrator Lambda will terminate all running instances.\n")
+	fmt.Fprintf(os.Stderr, "This may take a few minutes.\n\n")
+	fmt.Fprintf(os.Stderr, "To check status:\n")
+	fmt.Fprintf(os.Stderr, "  spawn pipeline status %s\n", pipelineID)
 
 	return nil
 }
