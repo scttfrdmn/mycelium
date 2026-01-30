@@ -97,8 +97,6 @@ func main() {
 func handleRunQueue() {
 	if len(os.Args) < 3 {
 		fmt.Fprintf(os.Stderr, "Usage: spored run-queue <queue-file>\n")
-  spored run-pipeline-stage
-                        Execute pipeline stage (auto-detects from tags)
 		os.Exit(1)
 	}
 

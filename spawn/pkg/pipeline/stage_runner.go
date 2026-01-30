@@ -31,12 +31,13 @@ type StageRunner struct {
 
 // StageInfo contains information about the current stage from EC2 tags
 type StageInfo struct {
-	PipelineID   string
-	StageID      string
-	StageIndex   int
-	S3Bucket     string
-	S3Prefix     string
-	S3ConfigKey  string
+	PipelineID    string
+	StageID       string
+	StageIndex    int
+	InstanceIndex int
+	S3Bucket      string
+	S3Prefix      string
+	S3ConfigKey   string
 }
 
 // NewStageRunner creates a new stage runner
@@ -92,6 +93,14 @@ func NewStageRunner(ctx context.Context) (*StageRunner, error) {
 	stageDef := pipelineDef.GetStage(stageInfo.StageID)
 	if stageDef == nil {
 		return nil, fmt.Errorf("stage %s not found in pipeline definition", stageInfo.StageID)
+	}
+
+	// Generate peer discovery file for network streaming
+	log.Println("Generating peer discovery file...")
+	if err := GeneratePeerDiscoveryFile(ctx, stageInfo.PipelineID, stageInfo.StageID,
+		stageInfo.StageIndex, stageInfo.InstanceIndex, pipelineDef); err != nil {
+		log.Printf("Warning: Failed to generate peer discovery file: %v", err)
+		// Not a fatal error - stage can still run without peer file
 	}
 
 	return &StageRunner{
@@ -208,6 +217,8 @@ func loadStageInfoFromTags(ctx context.Context, client *ec2.Client, instanceID s
 			info.StageID = *tag.Value
 		case "spawn:stage-index":
 			fmt.Sscanf(*tag.Value, "%d", &info.StageIndex)
+		case "spawn:instance-index":
+			fmt.Sscanf(*tag.Value, "%d", &info.InstanceIndex)
 		case "spawn:s3-bucket":
 			info.S3Bucket = *tag.Value
 		case "spawn:s3-prefix":
