@@ -16,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/agent"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/pipeline"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/provider"
 )
 
 const Version = "0.1.0"
@@ -63,11 +64,20 @@ func main() {
 
 	log.Printf("spored v%s starting...", Version)
 
-	// Create agent
+	// Create agent with provider
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	agent, err := agent.NewAgent(ctx)
+	// Auto-detect provider (EC2 or local)
+	prov, err := provider.NewProvider(ctx)
+	if err != nil {
+		log.Fatalf("Failed to create provider: %v", err)
+	}
+
+	identity, _ := prov.GetIdentity(ctx)
+	log.Printf("Running on provider: %s", identity.Provider)
+
+	agent, err := agent.NewAgent(ctx, prov)
 	if err != nil {
 		log.Fatalf("Failed to create agent: %v", err)
 	}
@@ -119,7 +129,14 @@ func handleRunQueue() {
 func handleStatus() {
 	// Create agent to get configuration and metrics
 	ctx := context.Background()
-	ag, err := agent.NewAgent(ctx)
+
+	prov, err := provider.NewProvider(ctx)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: Failed to initialize provider: %v\n", err)
+		os.Exit(1)
+	}
+
+	ag, err := agent.NewAgent(ctx, prov)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: Failed to initialize agent: %v\n", err)
 		os.Exit(1)
@@ -128,8 +145,9 @@ func handleStatus() {
 	// Get configuration
 	config := ag.GetConfig()
 
-	// Get instance info
-	instanceID, region, accountID := ag.GetInstanceInfo()
+	// Get identity
+	identity := ag.GetIdentity()
+	instanceID, region, accountID := identity.InstanceID, identity.Region, identity.AccountID
 
 	// Get uptime
 	uptime := ag.GetUptime()
@@ -295,13 +313,20 @@ func handleStatus() {
 
 func handleReload() {
 	ctx := context.Background()
-	ag, err := agent.NewAgent(ctx)
+
+	prov, err := provider.NewProvider(ctx)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: Failed to initialize provider: %v\n", err)
+		os.Exit(1)
+	}
+
+	ag, err := agent.NewAgent(ctx, prov)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: Failed to initialize agent: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Println("Reloading configuration from EC2 tags...")
+	fmt.Println("Reloading configuration...")
 
 	if err := ag.Reload(ctx); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: Failed to reload configuration: %v\n", err)
@@ -360,7 +385,14 @@ func handleConfig(args []string) {
 
 func handleConfigGet(key string) {
 	ctx := context.Background()
-	ag, err := agent.NewAgent(ctx)
+
+	prov, err := provider.NewProvider(ctx)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: Failed to initialize provider: %v\n", err)
+		os.Exit(1)
+	}
+
+	ag, err := agent.NewAgent(ctx, prov)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: Failed to initialize agent: %v\n", err)
 		os.Exit(1)
@@ -410,13 +442,28 @@ func handleConfigGet(key string) {
 
 func handleConfigSet(key, value string) {
 	ctx := context.Background()
-	ag, err := agent.NewAgent(ctx)
+
+	prov, err := provider.NewProvider(ctx)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: Failed to initialize provider: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Config set only works for EC2 instances
+	if prov.GetProviderType() != "ec2" {
+		fmt.Fprintf(os.Stderr, "Error: config set is only supported on EC2 instances\n")
+		fmt.Fprintf(os.Stderr, "For local instances, edit the config file: /etc/spawn/local.yaml\n")
+		os.Exit(1)
+	}
+
+	ag, err := agent.NewAgent(ctx, prov)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: Failed to initialize agent: %v\n", err)
 		os.Exit(1)
 	}
 
-	instanceID, region, _ := ag.GetInstanceInfo()
+	identity := ag.GetIdentity()
+	instanceID, region := identity.InstanceID, identity.Region
 
 	// Map key to tag name
 	tagKey := ""
@@ -493,7 +540,14 @@ func handleConfigSet(key, value string) {
 
 func handleConfigList() {
 	ctx := context.Background()
-	ag, err := agent.NewAgent(ctx)
+
+	prov, err := provider.NewProvider(ctx)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: Failed to initialize provider: %v\n", err)
+		os.Exit(1)
+	}
+
+	ag, err := agent.NewAgent(ctx, prov)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: Failed to initialize agent: %v\n", err)
 		os.Exit(1)

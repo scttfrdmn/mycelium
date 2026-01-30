@@ -1,0 +1,97 @@
+package provider
+
+import (
+	"context"
+	"log"
+	"time"
+)
+
+// Identity represents the instance's identity information
+type Identity struct {
+	InstanceID string // EC2 instance ID or local hostname
+	Region     string // AWS region or "local"
+	AccountID  string // AWS account ID or organization name
+	PublicIP   string // Public IP address
+	PrivateIP  string // Private IP address
+	Provider   string // "ec2" or "local"
+}
+
+// Config represents the agent configuration
+type Config struct {
+	TTL             time.Duration
+	IdleTimeout     time.Duration
+	HibernateOnIdle bool
+	CostLimit       float64
+	IdleCPUPercent  float64
+
+	// Completion signal settings
+	OnComplete      string        // Action: terminate, stop, hibernate, exit
+	CompletionFile  string        // File path to watch
+	CompletionDelay time.Duration // Grace period before action
+
+	// DNS settings
+	DNSName string
+
+	// Job array settings
+	JobArrayID   string
+	JobArrayName string
+}
+
+// PeerInfo represents information about a peer instance
+type PeerInfo struct {
+	Index      int    `json:"index"`
+	InstanceID string `json:"instance_id"`
+	IP         string `json:"ip"`
+	DNS        string `json:"dns"`
+	Provider   string `json:"provider"` // "ec2" or "local"
+}
+
+// InterruptionInfo represents Spot instance interruption details
+type InterruptionInfo struct {
+	Action string    // "terminate" or "stop"
+	Time   time.Time // When interruption will occur
+}
+
+// Provider abstracts the compute environment (EC2 vs local)
+type Provider interface {
+	// GetIdentity returns instance identity information
+	GetIdentity(ctx context.Context) (*Identity, error)
+
+	// GetConfig returns agent configuration (from tags or config file)
+	GetConfig(ctx context.Context) (*Config, error)
+
+	// Terminate shuts down the instance (EC2) or exits process (local)
+	Terminate(ctx context.Context, reason string) error
+
+	// Stop stops the instance (EC2 only, no-op for local)
+	Stop(ctx context.Context, reason string) error
+
+	// Hibernate hibernates the instance (EC2 only, no-op for local)
+	Hibernate(ctx context.Context) error
+
+	// DiscoverPeers finds peer instances in the same job array
+	DiscoverPeers(ctx context.Context, jobArrayID string) ([]PeerInfo, error)
+
+	// IsSpotInstance returns true if running on a Spot instance
+	IsSpotInstance(ctx context.Context) bool
+
+	// CheckSpotInterruption checks for Spot interruption notice
+	CheckSpotInterruption(ctx context.Context) (*InterruptionInfo, error)
+
+	// GetProviderType returns the provider type ("ec2" or "local")
+	GetProviderType() string
+}
+
+// NewProvider creates a provider based on the environment
+// It auto-detects EC2 by trying IMDS, falls back to local
+func NewProvider(ctx context.Context) (Provider, error) {
+	// Try EC2 first with a fresh context (not the cancelled one from check)
+	ec2Provider, err := NewEC2Provider(context.Background())
+	if err == nil {
+		return ec2Provider, nil
+	}
+
+	// Fall back to local provider
+	log.Printf("EC2 provider failed (%v), using local provider", err)
+	return NewLocalProvider(context.Background())
+}

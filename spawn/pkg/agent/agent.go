@@ -2,117 +2,56 @@ package agent
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"os/exec"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/feature/ec2/imds"
-	"github.com/aws/aws-sdk-go-v2/service/ec2"
-	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/dns"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/provider"
 )
 
 type Agent struct {
-	instanceID       string
-	region           string
-	accountID        string
-	publicIP         string
-	dnsName          string
-	jobArrayID       string // Empty if not part of job array
-	jobArrayName     string // Empty if not part of job array
+	provider         provider.Provider
+	identity         *provider.Identity
+	config           *provider.Config
 	dnsClient        *dns.Client
-	ec2Client        *ec2.Client
-	imdsClient       *imds.Client
-	config           AgentConfig
 	startTime        time.Time
 	lastActivityTime time.Time
 }
 
-type AgentConfig struct {
-	TTL             time.Duration
-	IdleTimeout     time.Duration
-	HibernateOnIdle bool
-	CostLimit       float64
-	IdleCPUPercent  float64
-
-	// Completion signal settings
-	OnComplete      string        // Action: terminate, stop, hibernate
-	CompletionFile  string        // File path to watch
-	CompletionDelay time.Duration // Grace period before action
-}
-
-func NewAgent(ctx context.Context) (*Agent, error) {
-	// Get instance metadata
-	cfg, err := config.LoadDefaultConfig(ctx)
+func NewAgent(ctx context.Context, prov provider.Provider) (*Agent, error) {
+	// Get identity from provider
+	identity, err := prov.GetIdentity(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load AWS config: %w", err)
+		return nil, fmt.Errorf("failed to get identity: %w", err)
 	}
 
-	imdsClient := imds.NewFromConfig(cfg)
-
-	// Get instance identity document
-	idDoc, err := imdsClient.GetInstanceIdentityDocument(ctx, &imds.GetInstanceIdentityDocumentInput{})
+	// Get config from provider
+	config, err := prov.GetConfig(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get instance identity: %w", err)
-	}
-
-	instanceID := idDoc.InstanceID
-	region := idDoc.Region
-	accountID := idDoc.AccountID
-
-	// Get public IP from metadata
-	publicIPResult, err := imdsClient.GetMetadata(ctx, &imds.GetMetadataInput{
-		Path: "public-ipv4",
-	})
-	var publicIP string
-	if err == nil {
-		ipBytes, _ := io.ReadAll(publicIPResult.Content)
-		publicIP = strings.TrimSpace(string(ipBytes))
-	}
-
-	// Update config with region
-	cfg.Region = region
-	ec2Client := ec2.NewFromConfig(cfg)
-
-	// Get instance tags to read configuration
-	agentConfig, dnsName, jobArrayID, jobArrayName, err := loadConfigFromTags(ctx, ec2Client, instanceID)
-	if err != nil {
-		log.Printf("Warning: Could not load config from tags: %v", err)
-		agentConfig = AgentConfig{
-			IdleCPUPercent: 5.0,
-		}
+		return nil, fmt.Errorf("failed to get config: %w", err)
 	}
 
 	agent := &Agent{
-		instanceID:       instanceID,
-		region:           region,
-		accountID:        accountID,
-		publicIP:         publicIP,
-		dnsName:          dnsName,
-		jobArrayID:       jobArrayID,
-		jobArrayName:     jobArrayName,
-		ec2Client:        ec2Client,
-		imdsClient:       imdsClient,
-		config:           agentConfig,
+		provider:         prov,
+		identity:         identity,
+		config:           config,
 		startTime:        time.Now(),
 		lastActivityTime: time.Now(),
 	}
 
-	log.Printf("Agent initialized for instance %s in %s (account: %s)", instanceID, region, accountID)
+	log.Printf("Agent initialized for instance %s in %s (account: %s, provider: %s)",
+		identity.InstanceID, identity.Region, identity.AccountID, identity.Provider)
 	log.Printf("Config: TTL=%v, IdleTimeout=%v, Hibernate=%v",
-		agentConfig.TTL, agentConfig.IdleTimeout, agentConfig.HibernateOnIdle)
+		config.TTL, config.IdleTimeout, config.HibernateOnIdle)
 
 	// Initialize DNS client and register if DNS name is configured
-	if dnsName != "" && publicIP != "" {
+	// Skip DNS for local provider (Phase 1 decision)
+	if config.DNSName != "" && identity.PublicIP != "" && identity.Provider == "ec2" {
 		dnsClient, err := dns.NewClient(ctx, "", "") // Use defaults
 		if err != nil {
 			log.Printf("Warning: Failed to create DNS client: %v", err)
@@ -120,239 +59,50 @@ func NewAgent(ctx context.Context) (*Agent, error) {
 			agent.dnsClient = dnsClient
 
 			// Register DNS (use job array method if part of a job array)
-			if jobArrayID != "" && jobArrayName != "" {
-				log.Printf("Registering job array DNS: %s -> %s (array: %s)", dnsName, publicIP, jobArrayName)
-				resp, err := dnsClient.RegisterJobArrayDNS(ctx, dnsName, publicIP, jobArrayID, jobArrayName)
+			if config.JobArrayID != "" && config.JobArrayName != "" {
+				log.Printf("Registering job array DNS: %s -> %s (array: %s)",
+					config.DNSName, identity.PublicIP, config.JobArrayName)
+				resp, err := dnsClient.RegisterJobArrayDNS(ctx, config.DNSName, identity.PublicIP,
+					config.JobArrayID, config.JobArrayName)
 				if err != nil {
 					log.Printf("Warning: Failed to register job array DNS: %v", err)
 				} else {
-					fqdn := dns.GetFullDNSName(dnsName, accountID, "spore.host")
-					log.Printf("✓ Job array DNS registered: %s -> %s (change: %s)", fqdn, publicIP, resp.ChangeID)
+					fqdn := dns.GetFullDNSName(config.DNSName, identity.AccountID, "spore.host")
+					log.Printf("✓ Job array DNS registered: %s -> %s (change: %s)", fqdn, identity.PublicIP, resp.ChangeID)
 					if resp.Message != "" {
 						log.Printf("  %s", resp.Message)
 					}
 				}
 			} else {
-				log.Printf("Registering DNS: %s -> %s", dnsName, publicIP)
-				resp, err := dnsClient.RegisterDNS(ctx, dnsName, publicIP)
+				log.Printf("Registering DNS: %s -> %s", config.DNSName, identity.PublicIP)
+				resp, err := dnsClient.RegisterDNS(ctx, config.DNSName, identity.PublicIP)
 				if err != nil {
 					log.Printf("Warning: Failed to register DNS: %v", err)
 				} else {
-					fqdn := dns.GetFullDNSName(dnsName, accountID, "spore.host")
-					log.Printf("✓ DNS registered: %s -> %s (change: %s)", fqdn, publicIP, resp.ChangeID)
+					fqdn := dns.GetFullDNSName(config.DNSName, identity.AccountID, "spore.host")
+					log.Printf("✓ DNS registered: %s -> %s (change: %s)", fqdn, identity.PublicIP, resp.ChangeID)
 				}
 			}
 		}
-	} else if dnsName != "" {
-		log.Printf("Warning: DNS name configured (%s) but no public IP available", dnsName)
+	} else if config.DNSName != "" && identity.Provider == "local" {
+		log.Printf("DNS registration skipped for local provider")
+	} else if config.DNSName != "" {
+		log.Printf("Warning: DNS name configured (%s) but no public IP available", config.DNSName)
 	}
 
 	// Load job array peer information if part of a job array
-	err = agent.loadJobArrayPeers(ctx)
-	if err != nil {
-		log.Printf("Warning: Failed to load job array peers: %v", err)
-		// Non-fatal: continue without peer information
+	if config.JobArrayID != "" {
+		peers, err := prov.DiscoverPeers(ctx, config.JobArrayID)
+		if err != nil {
+			log.Printf("Warning: Failed to discover peers: %v", err)
+		} else if len(peers) > 0 {
+			log.Printf("✓ Discovered %d peers in job array %s", len(peers), config.JobArrayID)
+		}
 	}
 
 	return agent, nil
 }
 
-func loadConfigFromTags(ctx context.Context, client *ec2.Client, instanceID string) (AgentConfig, string, string, string, error) {
-	output, err := client.DescribeTags(ctx, &ec2.DescribeTagsInput{
-		Filters: []types.Filter{
-			{
-				Name:   aws.String("resource-id"),
-				Values: []string{instanceID},
-			},
-		},
-	})
-	if err != nil {
-		return AgentConfig{}, "", "", "", err
-	}
-
-	config := AgentConfig{
-		IdleCPUPercent: 5.0, // Default
-	}
-	var dnsName, jobArrayID, jobArrayName string
-
-	for _, tag := range output.Tags {
-		if tag.Key == nil || tag.Value == nil {
-			continue
-		}
-
-		switch *tag.Key {
-		case "spawn:ttl":
-			if duration, err := time.ParseDuration(*tag.Value); err == nil {
-				config.TTL = duration
-			}
-		case "spawn:idle-timeout":
-			if duration, err := time.ParseDuration(*tag.Value); err == nil {
-				config.IdleTimeout = duration
-			}
-		case "spawn:hibernate-on-idle":
-			config.HibernateOnIdle = *tag.Value == "true"
-		case "spawn:cost-limit":
-			if limit, err := strconv.ParseFloat(*tag.Value, 64); err == nil {
-				config.CostLimit = limit
-			}
-		case "spawn:idle-cpu":
-			if cpu, err := strconv.ParseFloat(*tag.Value, 64); err == nil {
-				config.IdleCPUPercent = cpu
-			}
-		case "spawn:dns-name":
-			dnsName = *tag.Value
-		case "spawn:on-complete":
-			config.OnComplete = *tag.Value
-		case "spawn:completion-file":
-			config.CompletionFile = *tag.Value
-		case "spawn:completion-delay":
-			if duration, err := time.ParseDuration(*tag.Value); err == nil {
-				config.CompletionDelay = duration
-			}
-		case "spawn:job-array-id":
-			jobArrayID = *tag.Value
-		case "spawn:job-array-name":
-			jobArrayName = *tag.Value
-		}
-	}
-
-	// Set default completion file if on-complete is set but file isn't specified
-	if config.OnComplete != "" && config.CompletionFile == "" {
-		config.CompletionFile = "/tmp/SPAWN_COMPLETE"
-	}
-
-	// Set default completion delay if on-complete is set but delay isn't specified
-	if config.OnComplete != "" && config.CompletionDelay == 0 {
-		config.CompletionDelay = 30 * time.Second
-	}
-
-	return config, dnsName, jobArrayID, jobArrayName, nil
-}
-
-// PeerInfo represents information about a peer instance in a job array
-type PeerInfo struct {
-	Index      int    `json:"index"`
-	InstanceID string `json:"instance_id"`
-	IP         string `json:"ip"`
-	DNS        string `json:"dns"`
-}
-
-// loadJobArrayPeers discovers peer instances and writes peer information to /etc/spawn/job-array-peers.json
-func (a *Agent) loadJobArrayPeers(ctx context.Context) error {
-	// Get this instance's job array ID tag
-	output, err := a.ec2Client.DescribeTags(ctx, &ec2.DescribeTagsInput{
-		Filters: []types.Filter{
-			{
-				Name:   aws.String("resource-id"),
-				Values: []string{a.instanceID},
-			},
-			{
-				Name:   aws.String("key"),
-				Values: []string{"spawn:job-array-id"},
-			},
-		},
-	})
-	if err != nil {
-		return fmt.Errorf("failed to describe tags: %w", err)
-	}
-
-	// If no job-array-id tag, not part of a job array
-	if len(output.Tags) == 0 {
-		return nil
-	}
-
-	jobArrayID := *output.Tags[0].Value
-	log.Printf("Instance is part of job array: %s", jobArrayID)
-
-	// Query for all instances with the same job-array-id
-	instances, err := a.ec2Client.DescribeInstances(ctx, &ec2.DescribeInstancesInput{
-		Filters: []types.Filter{
-			{
-				Name:   aws.String("tag:spawn:job-array-id"),
-				Values: []string{jobArrayID},
-			},
-			{
-				Name:   aws.String("instance-state-name"),
-				Values: []string{"pending", "running"},
-			},
-		},
-	})
-	if err != nil {
-		return fmt.Errorf("failed to query job array instances: %w", err)
-	}
-
-	// Build peer list
-	var peers []PeerInfo
-	accountBase36 := intToBase36(a.accountID)
-
-	for _, reservation := range instances.Reservations {
-		for _, instance := range reservation.Instances {
-			// Extract job array index from tags
-			var index int
-			var name string
-			for _, tag := range instance.Tags {
-				if *tag.Key == "spawn:job-array-index" {
-					index, _ = strconv.Atoi(*tag.Value)
-				}
-				if *tag.Key == "Name" {
-					name = *tag.Value
-				}
-			}
-
-			publicIP := ""
-			if instance.PublicIpAddress != nil {
-				publicIP = *instance.PublicIpAddress
-			}
-
-			// Generate DNS name: {name}.{account-base36}.spore.host
-			dnsName := fmt.Sprintf("%s.%s.spore.host", name, accountBase36)
-
-			peer := PeerInfo{
-				Index:      index,
-				InstanceID: *instance.InstanceId,
-				IP:         publicIP,
-				DNS:        dnsName,
-			}
-			peers = append(peers, peer)
-		}
-	}
-
-	// Sort by index
-	sort.Slice(peers, func(i, j int) bool {
-		return peers[i].Index < peers[j].Index
-	})
-
-	// Create /etc/spawn directory if it doesn't exist
-	err = os.MkdirAll("/etc/spawn", 0755)
-	if err != nil {
-		return fmt.Errorf("failed to create /etc/spawn directory: %w", err)
-	}
-
-	// Marshal to JSON and write to file
-	peersJSON, err := json.MarshalIndent(peers, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal peers: %w", err)
-	}
-
-	peersFile := "/etc/spawn/job-array-peers.json"
-	err = os.WriteFile(peersFile, peersJSON, 0644)
-	if err != nil {
-		return fmt.Errorf("failed to write peers file: %w", err)
-	}
-
-	log.Printf("✓ Job array peer information written to %s (%d peers)", peersFile, len(peers))
-
-	return nil
-}
-
-// intToBase36 converts an AWS account ID to base36
-func intToBase36(accountID string) string {
-	num, err := strconv.ParseUint(accountID, 10, 64)
-	if err != nil {
-		return accountID
-	}
-	return strconv.FormatUint(num, 36)
-}
 
 func (a *Agent) Monitor(ctx context.Context) {
 	ticker := time.NewTicker(1 * time.Minute)
@@ -373,10 +123,12 @@ func (a *Agent) Monitor(ctx context.Context) {
 }
 
 func (a *Agent) checkAndAct(ctx context.Context) {
-	// 0. Check for Spot interruption (HIGHEST PRIORITY)
-	if a.checkSpotInterruption(ctx) {
-		// Spot interruption detected - handled in checkSpotInterruption
-		return
+	// 0. Check for Spot interruption (HIGHEST PRIORITY - EC2 only)
+	if a.provider.IsSpotInstance(ctx) {
+		if a.checkSpotInterruption(ctx) {
+			// Spot interruption detected - handled in checkSpotInterruption
+			return
+		}
 	}
 
 	// 1. Check for completion signal (HIGH PRIORITY)
@@ -692,49 +444,20 @@ func (a *Agent) hasActiveTerminals() bool {
 }
 
 func (a *Agent) checkSpotInterruption(ctx context.Context) bool {
-	// Check if this is a Spot instance
-	if !a.isSpotInstance() {
-		return false
-	}
-
-	// Query the Spot instance action metadata
-	// http://169.254.169.254/latest/meta-data/spot/instance-action
-	// Returns 404 if no interruption, or JSON like:
-	// {"action": "terminate", "time": "2023-11-30T12:34:56Z"}
-
-	result, err := a.imdsClient.GetMetadata(ctx, &imds.GetMetadataInput{
-		Path: "spot/instance-action",
-	})
-
+	// Query provider for interruption info
+	info, err := a.provider.CheckSpotInterruption(ctx)
 	if err != nil {
-		// 404 means no interruption notice
-		if strings.Contains(err.Error(), "404") {
-			return false
-		}
-		// Other errors - log but don't treat as interruption
 		log.Printf("Error checking Spot interruption: %v", err)
 		return false
 	}
 
-	// Parse the response
-	body, err := io.ReadAll(result.Content)
-	if err != nil {
-		log.Printf("Error reading Spot interruption response: %v", err)
+	// No interruption
+	if info == nil {
 		return false
 	}
 
-	// Log the raw interruption notice
-	log.Printf("🚨 SPOT INTERRUPTION DETECTED: %s", string(body))
-
-	// Parse JSON to get details
-	var action struct {
-		Action string `json:"action"`
-		Time   string `json:"time"`
-	}
-
-	if err := json.Unmarshal(body, &action); err != nil {
-		log.Printf("Error parsing Spot interruption JSON: %v", err)
-	}
+	// Spot interruption detected
+	log.Printf("🚨 SPOT INTERRUPTION DETECTED: action=%s, time=%s", info.Action, info.Time.Format(time.RFC3339))
 
 	// Clean up DNS immediately to avoid stale records
 	log.Printf("Spot interruption: Running cleanup tasks")
@@ -745,37 +468,18 @@ func (a *Agent) checkSpotInterruption(ctx context.Context) bool {
 	message := fmt.Sprintf("🚨 SPOT INTERRUPTION WARNING! 🚨\n"+
 		"AWS will %s this instance at %s\n"+
 		"You have ~2 minutes to save your work!\n"+
-		"SAVE ALL FILES NOW!", action.Action, action.Time)
+		"SAVE ALL FILES NOW!", info.Action, info.Time.Format(time.RFC3339))
 
 	a.warnUsers(message)
 
 	// Send notifications (if configured)
-	a.sendSpotInterruptionNotification(action.Action, action.Time)
+	a.sendSpotInterruptionNotification(info.Action, info.Time.Format(time.RFC3339))
 
 	// Log for posterity
-	log.Printf("Spot interruption: action=%s, time=%s", action.Action, action.Time)
+	log.Printf("Spot interruption: action=%s, time=%s", info.Action, info.Time.Format(time.RFC3339))
 
 	// Continue monitoring for remaining time
-	// (don't return immediately, let other checks continue)
 	return false // Return false to allow normal monitoring to continue
-}
-
-func (a *Agent) isSpotInstance() bool {
-	// Check if we're running on a Spot instance via instance lifecycle metadata
-	result, err := a.imdsClient.GetMetadata(context.Background(), &imds.GetMetadataInput{
-		Path: "instance-life-cycle",
-	})
-	if err != nil {
-		return false
-	}
-
-	body, err := io.ReadAll(result.Content)
-	if err != nil {
-		return false
-	}
-
-	lifecycle := strings.TrimSpace(string(body))
-	return lifecycle == "spot"
 }
 
 func (a *Agent) sendSpotInterruptionNotification(action, interruptTime string) {
@@ -790,7 +494,7 @@ func (a *Agent) sendSpotInterruptionNotification(action, interruptTime string) {
   "action": "%s",
   "time": "%s",
   "detected_at": "%s"
-}`, a.instanceID, action, interruptTime, time.Now().UTC().Format(time.RFC3339))
+}`, a.identity.InstanceID, action, interruptTime, time.Now().UTC().Format(time.RFC3339))
 
 	if err := os.WriteFile(notificationFile, []byte(notification), 0644); err != nil {
 		log.Printf("Failed to write notification file: %v", err)
@@ -837,6 +541,11 @@ func (a *Agent) checkCompletion(ctx context.Context) bool {
 			a.stop(ctx, "Completion signal received")
 		case "hibernate":
 			a.hibernate(ctx)
+		case "exit":
+			// For local provider - just exit
+			log.Printf("Exiting on completion signal")
+			a.Cleanup(ctx)
+			os.Exit(0)
 		default:
 			log.Printf("Unknown on-complete action: %s (doing nothing)", a.config.OnComplete)
 			return false
@@ -849,7 +558,7 @@ func (a *Agent) checkCompletion(ctx context.Context) bool {
 }
 
 func (a *Agent) stop(ctx context.Context, reason string) {
-	log.Printf("Stopping instance %s (reason: %s)", a.instanceID, reason)
+	log.Printf("Stopping instance (reason: %s)", reason)
 
 	// Clean up DNS before stopping
 	a.Cleanup(ctx)
@@ -859,19 +568,14 @@ func (a *Agent) stop(ctx context.Context, reason string) {
 	// Wait a moment for users to see warning
 	time.Sleep(5 * time.Second)
 
-	_, err := a.ec2Client.StopInstances(ctx, &ec2.StopInstancesInput{
-		InstanceIds: []string{a.instanceID},
-	})
-
+	err := a.provider.Stop(ctx, reason)
 	if err != nil {
 		log.Printf("Failed to stop instance: %v", err)
-	} else {
-		log.Printf("Stop request sent")
 	}
 }
 
 func (a *Agent) hibernate(ctx context.Context) {
-	log.Printf("Hibernating instance %s", a.instanceID)
+	log.Printf("Hibernating instance")
 
 	// Clean up DNS before hibernating
 	a.Cleanup(ctx)
@@ -881,51 +585,42 @@ func (a *Agent) hibernate(ctx context.Context) {
 	// Wait a moment for users to see warning
 	time.Sleep(5 * time.Second)
 
-	_, err := a.ec2Client.StopInstances(ctx, &ec2.StopInstancesInput{
-		InstanceIds: []string{a.instanceID},
-		Hibernate:   aws.Bool(true),
-	})
-
+	err := a.provider.Hibernate(ctx)
 	if err != nil {
 		log.Printf("Failed to hibernate: %v", err)
-		// Fall back to regular stop
-		a.ec2Client.StopInstances(ctx, &ec2.StopInstancesInput{
-			InstanceIds: []string{a.instanceID},
-		})
 	}
-
-	log.Printf("Hibernate request sent")
 }
 
 // Cleanup performs cleanup tasks before shutdown (DNS deregistration, etc.)
 func (a *Agent) Cleanup(ctx context.Context) {
 	log.Printf("Running cleanup tasks...")
 
-	// Clean up DNS
-	if a.dnsClient != nil && a.dnsName != "" && a.publicIP != "" {
+	// Clean up DNS (EC2 only)
+	if a.dnsClient != nil && a.config.DNSName != "" && a.identity.PublicIP != "" {
 		cleanupCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 
 		// Use job array DNS deletion if part of a job array
-		if a.jobArrayID != "" && a.jobArrayName != "" {
-			log.Printf("Deleting job array DNS record: %s (array: %s)", a.dnsName, a.jobArrayName)
-			resp, err := a.dnsClient.DeleteJobArrayDNS(cleanupCtx, a.dnsName, a.publicIP, a.jobArrayID, a.jobArrayName)
+		if a.config.JobArrayID != "" && a.config.JobArrayName != "" {
+			log.Printf("Deleting job array DNS record: %s (array: %s)", a.config.DNSName, a.config.JobArrayName)
+			resp, err := a.dnsClient.DeleteJobArrayDNS(cleanupCtx, a.config.DNSName, a.identity.PublicIP,
+				a.config.JobArrayID, a.config.JobArrayName)
 			if err != nil {
 				log.Printf("Warning: Failed to delete job array DNS: %v", err)
 			} else {
-				fqdn := dns.GetFullDNSName(a.dnsName, a.accountID, "spore.host")
+				fqdn := dns.GetFullDNSName(a.config.DNSName, a.identity.AccountID, "spore.host")
 				log.Printf("✓ Job array DNS deleted: %s", fqdn)
 				if resp.Message != "" {
 					log.Printf("  %s", resp.Message)
 				}
 			}
 		} else {
-			log.Printf("Deleting DNS record: %s", a.dnsName)
-			_, err := a.dnsClient.DeleteDNS(cleanupCtx, a.dnsName, a.publicIP)
+			log.Printf("Deleting DNS record: %s", a.config.DNSName)
+			_, err := a.dnsClient.DeleteDNS(cleanupCtx, a.config.DNSName, a.identity.PublicIP)
 			if err != nil {
 				log.Printf("Warning: Failed to delete DNS: %v", err)
 			} else {
-				fqdn := dns.GetFullDNSName(a.dnsName, a.accountID, "spore.host")
+				fqdn := dns.GetFullDNSName(a.config.DNSName, a.identity.AccountID, "spore.host")
 				log.Printf("✓ DNS deleted: %s", fqdn)
 			}
 		}
@@ -935,7 +630,7 @@ func (a *Agent) Cleanup(ctx context.Context) {
 }
 
 func (a *Agent) terminate(ctx context.Context, reason string) {
-	log.Printf("Terminating instance %s (reason: %s)", a.instanceID, reason)
+	log.Printf("Terminating instance (reason: %s)", reason)
 
 	// Clean up DNS before terminating
 	a.Cleanup(ctx)
@@ -945,30 +640,21 @@ func (a *Agent) terminate(ctx context.Context, reason string) {
 	// Wait a moment for users to see warning
 	time.Sleep(5 * time.Second)
 
-	_, err := a.ec2Client.TerminateInstances(ctx, &ec2.TerminateInstancesInput{
-		InstanceIds: []string{a.instanceID},
-	})
-
+	err := a.provider.Terminate(ctx, reason)
 	if err != nil {
 		log.Printf("Failed to terminate: %v", err)
-	} else {
-		log.Printf("Terminate request sent")
 	}
 }
 
-// Reload re-reads configuration from EC2 tags without restarting the daemon
+// Reload re-reads configuration from provider without restarting the daemon
 func (a *Agent) Reload(ctx context.Context) error {
-	log.Printf("Reloading configuration from tags...")
+	log.Printf("Reloading configuration...")
 
-	// Re-read tags
-	newConfig, newDNSName, newJobArrayID, newJobArrayName, err := loadConfigFromTags(ctx, a.ec2Client, a.instanceID)
+	// Re-read config from provider
+	newConfig, err := a.provider.GetConfig(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to reload config from tags: %w", err)
+		return fmt.Errorf("failed to reload config: %w", err)
 	}
-
-	// Update job array fields (they shouldn't change after launch, but update anyway)
-	a.jobArrayID = newJobArrayID
-	a.jobArrayName = newJobArrayName
 
 	// Log changes
 	if newConfig.TTL != a.config.TTL {
@@ -986,7 +672,6 @@ func (a *Agent) Reload(ctx context.Context) error {
 
 	// Update config (but keep startTime - TTL is absolute)
 	a.config = newConfig
-	a.dnsName = newDNSName
 
 	log.Printf("Configuration reloaded successfully")
 	log.Printf("New config: TTL=%v, IdleTimeout=%v, OnComplete=%s, Hibernate=%v",
@@ -997,12 +682,16 @@ func (a *Agent) Reload(ctx context.Context) error {
 
 // Public getter methods for status reporting
 
-func (a *Agent) GetConfig() AgentConfig {
+func (a *Agent) GetConfig() *provider.Config {
 	return a.config
 }
 
+func (a *Agent) GetIdentity() *provider.Identity {
+	return a.identity
+}
+
 func (a *Agent) GetInstanceInfo() (string, string, string) {
-	return a.instanceID, a.region, a.accountID
+	return a.identity.InstanceID, a.identity.Region, a.identity.AccountID
 }
 
 func (a *Agent) GetUptime() time.Duration {

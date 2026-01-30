@@ -1,0 +1,36 @@
+# Example local configuration for spored
+# Copy to /etc/spawn/local.yaml on local systems
+
+# Instance identity
+instance_id: auto  # or specify: local-workstation-01
+region: local
+account_id: my-organization
+public_ip: auto    # query ifconfig.me, or explicit IP
+private_ip: auto   # auto-detect local IP
+
+# Lifecycle configuration
+ttl: 8h
+idle_timeout: 1h
+hibernate_on_idle: false
+idle_cpu_percent: 5.0
+on_complete: exit  # "exit" instead of "terminate" for local
+completion_file: /tmp/SPAWN_COMPLETE
+completion_delay: 30s
+
+# DNS configuration (optional - disabled for Phase 1)
+dns:
+  enabled: false
+  name: workstation-01
+  domain: local.mydomain.com
+
+# Job array configuration (optional)
+job_array:
+  id: ""
+  name: ""
+  peers_file: /etc/spawn/peers.json  # static peer list if needed
+
+# Orchestrator (for burst coordination - Phase 2)
+orchestrator:
+  enabled: false
+  url: http://orchestrator.local:8080
+  register_on_startup: false
