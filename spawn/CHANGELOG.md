@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+#### Critical: Zombie Instance Prevention (Parameter Sweeps)
+
+**CRITICAL BUG FIX**: Parameter sweeps without `--detach` could create zombie instances if the CLI disconnected (laptop sleep/shutdown). Already-running instances would continue indefinitely without safeguards unless `--ttl` or `--idle-timeout` were explicitly set. This violated the core principle of preventing zombie instances.
+
+**Changes:**
+- **Auto-enable `--detach` for all parameter sweeps by default**
+  - Sweep state persists in DynamoDB
+  - Lambda continues orchestration even if CLI disconnects
+  - Resume monitoring with: `spawn sweep status <sweep-id>`
+- **Auto-set `--max-concurrent` to reasonable default (up to 10) if not specified**
+- **Add `--no-detach` flag for opt-out (requires `--ttl` or `--idle-timeout`)**
+- **Validate mutual exclusivity of `--detach` and `--no-detach` flags**
+- **Clear user messaging about auto-detach behavior**
+
+**Cost Impact**: ~$0.005 per sweep (Lambda + DynamoDB + S3) - negligible compared to the risk of hours/days of untracked instance costs from zombie instances.
+
+**Behavior Change**: Parameter sweeps now use Lambda orchestration by default instead of local CLI orchestration. Users who need local orchestration can use `--no-detach` but must provide `--ttl` or `--idle-timeout` for safety.
+
 ## [0.14.0] - 2026-01-28
 
 **NIST Compliance Framework** - Complete implementation of NIST 800-171 Rev 3 and NIST 800-53 Rev 5 compliance controls, enabling spawn usage in government and regulated environments.
