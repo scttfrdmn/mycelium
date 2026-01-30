@@ -1,0 +1,366 @@
+package find
+
+import (
+	"fmt"
+	"regexp"
+	"strconv"
+	"strings"
+
+	"github.com/yourusername/truffle/pkg/metadata"
+)
+
+// TokenType represents the type of a parsed token
+type TokenType int
+
+const (
+	TokenUnknown TokenType = iota
+	TokenVendor
+	TokenProcessor
+	TokenGPU
+	TokenSize
+	TokenVCPU
+	TokenMemory
+	TokenGPUCount
+	TokenArchitecture
+)
+
+// Token represents a classified query token
+type Token struct {
+	Type  TokenType
+	Value string
+	Raw   string
+}
+
+// ParsedQuery represents the structured output of query parsing
+type ParsedQuery struct {
+	Vendors      []string
+	Processors   []string
+	GPUs         []string
+	Sizes        []string
+	MinVCPU      int
+	MinMemory    float64
+	GPUCount     int
+	Architecture string
+	RawTokens    []Token
+}
+
+var (
+	numberRegex = regexp.MustCompile(`^\d+$`)
+	memoryRegex = regexp.MustCompile(`^(\d+(?:\.\d+)?)\s*(gb|gib|g)$`)
+)
+
+// ParseQuery parses a natural language query into structured search criteria
+func ParseQuery(query string) (*ParsedQuery, error) {
+	// Normalize: lowercase, trim
+	query = strings.ToLower(strings.TrimSpace(query))
+	if query == "" {
+		return nil, fmt.Errorf("empty query")
+	}
+
+	// Tokenize: split on whitespace
+	words := strings.Fields(query)
+
+	// Classify tokens
+	tokens := classifyTokens(words)
+
+	// Build ParsedQuery
+	pq := &ParsedQuery{RawTokens: tokens}
+	for _, token := range tokens {
+		switch token.Type {
+		case TokenVendor:
+			pq.Vendors = append(pq.Vendors, token.Value)
+		case TokenProcessor:
+			pq.Processors = append(pq.Processors, token.Value)
+		case TokenGPU:
+			pq.GPUs = append(pq.GPUs, token.Value)
+		case TokenSize:
+			pq.Sizes = append(pq.Sizes, token.Value)
+		case TokenVCPU:
+			if v, err := strconv.Atoi(token.Value); err == nil {
+				pq.MinVCPU = v
+			}
+		case TokenMemory:
+			if v, err := parseMemory(token.Value); err == nil {
+				pq.MinMemory = v
+			}
+		case TokenGPUCount:
+			if v, err := strconv.Atoi(token.Value); err == nil {
+				pq.GPUCount = v
+			}
+		case TokenArchitecture:
+			pq.Architecture = token.Value
+		}
+	}
+
+	// Validate
+	if err := pq.Validate(); err != nil {
+		return nil, err
+	}
+
+	return pq, nil
+}
+
+func classifyTokens(words []string) []Token {
+	var tokens []Token
+
+	for i := 0; i < len(words); i++ {
+		word := words[i]
+
+		// Check multi-word patterns first (e.g., "ice lake", "sapphire rapids")
+		if i+1 < len(words) {
+			twoWord := word + " " + words[i+1]
+			if _, ok := metadata.ProcessorDatabase[twoWord]; ok {
+				tokens = append(tokens, Token{
+					Type:  TokenProcessor,
+					Value: twoWord,
+					Raw:   twoWord,
+				})
+				i++
+				continue
+			}
+			if _, ok := metadata.GPUDatabase[twoWord]; ok {
+				tokens = append(tokens, Token{
+					Type:  TokenGPU,
+					Value: twoWord,
+					Raw:   twoWord,
+				})
+				i++
+				continue
+			}
+		}
+
+		// Check three-word patterns (e.g., "radeon pro v520")
+		if i+2 < len(words) {
+			threeWord := word + " " + words[i+1] + " " + words[i+2]
+			if _, ok := metadata.GPUDatabase[threeWord]; ok {
+				tokens = append(tokens, Token{
+					Type:  TokenGPU,
+					Value: threeWord,
+					Raw:   threeWord,
+				})
+				i += 2
+				continue
+			}
+		}
+
+		// Single-word patterns
+		// Check vendor aliases first before processor database
+		if vendor, ok := metadata.VendorAliases[word]; ok {
+			tokens = append(tokens, Token{Type: TokenVendor, Value: vendor, Raw: word})
+		} else if _, ok := metadata.ProcessorDatabase[word]; ok {
+			tokens = append(tokens, Token{Type: TokenProcessor, Value: word, Raw: word})
+		} else if _, ok := metadata.GPUDatabase[word]; ok {
+			tokens = append(tokens, Token{Type: TokenGPU, Value: word, Raw: word})
+		} else if alias, ok := metadata.GPUAliases[word]; ok {
+			tokens = append(tokens, Token{Type: TokenGPU, Value: alias, Raw: word})
+		} else if _, ok := metadata.SizeCategories[word]; ok {
+			tokens = append(tokens, Token{Type: TokenSize, Value: word, Raw: word})
+		} else if word == "x86_64" || word == "x86-64" || word == "x86" || word == "amd64" {
+			tokens = append(tokens, Token{Type: TokenArchitecture, Value: "x86_64", Raw: word})
+		} else if word == "arm64" || word == "arm" || word == "aarch64" {
+			tokens = append(tokens, Token{Type: TokenArchitecture, Value: "arm64", Raw: word})
+		} else if numberRegex.MatchString(word) {
+			// Look ahead for units
+			if i+1 < len(words) {
+				next := words[i+1]
+				if next == "cores" || next == "core" || next == "vcpus" || next == "vcpu" || next == "cpus" || next == "cpu" {
+					tokens = append(tokens, Token{Type: TokenVCPU, Value: word, Raw: word + " " + next})
+					i++
+				} else if next == "gpus" || next == "gpu" {
+					tokens = append(tokens, Token{Type: TokenGPUCount, Value: word, Raw: word + " " + next})
+					i++
+				} else if memoryRegex.MatchString(next) || strings.HasSuffix(next, "gb") || strings.HasSuffix(next, "gib") || strings.HasSuffix(next, "g") {
+					tokens = append(tokens, Token{Type: TokenMemory, Value: word + next, Raw: word + next})
+					i++
+				}
+			}
+		} else if memoryRegex.MatchString(word) {
+			tokens = append(tokens, Token{Type: TokenMemory, Value: word, Raw: word})
+		} else {
+			tokens = append(tokens, Token{Type: TokenUnknown, Value: word, Raw: word})
+		}
+	}
+
+	return tokens
+}
+
+// parseMemory parses memory string (e.g., "32gb", "64gib") to GiB
+func parseMemory(s string) (float64, error) {
+	s = strings.ToLower(strings.TrimSpace(s))
+	matches := memoryRegex.FindStringSubmatch(s)
+	if len(matches) != 3 {
+		return 0, fmt.Errorf("invalid memory format: %s", s)
+	}
+
+	value, err := strconv.ParseFloat(matches[1], 64)
+	if err != nil {
+		return 0, err
+	}
+
+	// All units are treated as GiB
+	return value, nil
+}
+
+// Validate checks for conflicting or invalid query criteria
+func (pq *ParsedQuery) Validate() error {
+	// Check for conflicting architectures
+	archSet := make(map[string]bool)
+
+	// From processors
+	for _, proc := range pq.Processors {
+		if info, ok := metadata.ProcessorDatabase[proc]; ok {
+			archSet[info.Architecture] = true
+		}
+	}
+
+	// From vendors
+	for _, vendor := range pq.Vendors {
+		for _, info := range metadata.ProcessorDatabase {
+			if info.Vendor == vendor {
+				archSet[info.Architecture] = true
+			}
+		}
+	}
+
+	// From explicit architecture
+	if pq.Architecture != "" {
+		archSet[pq.Architecture] = true
+	}
+
+	if len(archSet) > 1 {
+		archs := make([]string, 0, len(archSet))
+		for arch := range archSet {
+			archs = append(archs, arch)
+		}
+		return fmt.Errorf("conflicting architectures: %v", archs)
+	}
+
+	// Check for unknown tokens (warn but don't error)
+	var unknown []string
+	for _, token := range pq.RawTokens {
+		if token.Type == TokenUnknown {
+			unknown = append(unknown, token.Raw)
+		}
+	}
+	if len(unknown) > 0 {
+		// This is informational; we don't fail on unknown tokens
+		// The caller can decide what to do with this
+	}
+
+	return nil
+}
+
+// ResolveInstanceFamilies returns all instance families matching the query
+func (pq *ParsedQuery) ResolveInstanceFamilies() []string {
+	familySet := make(map[string]bool)
+
+	// From processors
+	for _, proc := range pq.Processors {
+		if info, ok := metadata.ProcessorDatabase[proc]; ok {
+			for _, family := range info.Families {
+				familySet[family] = true
+			}
+		}
+	}
+
+	// From vendors
+	for _, vendor := range pq.Vendors {
+		families := metadata.GetFamiliesByVendor(vendor)
+		for _, family := range families {
+			familySet[family] = true
+		}
+	}
+
+	// From GPUs (use families for fuzzy matching)
+	for _, gpu := range pq.GPUs {
+		if info, ok := metadata.GPUDatabase[gpu]; ok {
+			for _, family := range info.Families {
+				familySet[family] = true
+			}
+		}
+	}
+
+	families := make([]string, 0, len(familySet))
+	for family := range familySet {
+		families = append(families, family)
+	}
+
+	return families
+}
+
+// ResolveGPUInstances returns exact instance types for GPU queries
+func (pq *ParsedQuery) ResolveGPUInstances() []string {
+	instanceSet := make(map[string]bool)
+
+	for _, gpu := range pq.GPUs {
+		if info, ok := metadata.GPUDatabase[gpu]; ok {
+			for _, inst := range info.InstanceTypes {
+				instanceSet[inst] = true
+			}
+		}
+	}
+
+	instances := make([]string, 0, len(instanceSet))
+	for inst := range instanceSet {
+		instances = append(instances, inst)
+	}
+
+	return instances
+}
+
+// DeriveArchitecture determines the architecture from query criteria
+func (pq *ParsedQuery) DeriveArchitecture() string {
+	if pq.Architecture != "" {
+		return pq.Architecture
+	}
+
+	archSet := make(map[string]bool)
+
+	// From processors
+	for _, proc := range pq.Processors {
+		if info, ok := metadata.ProcessorDatabase[proc]; ok {
+			archSet[info.Architecture] = true
+		}
+	}
+
+	// From vendors
+	for _, vendor := range pq.Vendors {
+		for _, info := range metadata.ProcessorDatabase {
+			if info.Vendor == vendor {
+				archSet[info.Architecture] = true
+			}
+		}
+	}
+
+	// Return architecture only if unambiguous
+	if len(archSet) == 1 {
+		for arch := range archSet {
+			return arch
+		}
+	}
+
+	return ""
+}
+
+// BuildSizePattern returns a regex pattern for size filtering
+func (pq *ParsedQuery) BuildSizePattern() string {
+	sizeSet := make(map[string]bool)
+
+	for _, sizeCategory := range pq.Sizes {
+		sizes := metadata.GetSizesForCategory(sizeCategory)
+		for _, size := range sizes {
+			sizeSet[size] = true
+		}
+	}
+
+	if len(sizeSet) == 0 {
+		return ".*"
+	}
+
+	sizes := make([]string, 0, len(sizeSet))
+	for size := range sizeSet {
+		sizes = append(sizes, regexp.QuoteMeta(size))
+	}
+
+	return "(" + strings.Join(sizes, "|") + ")"
+}
