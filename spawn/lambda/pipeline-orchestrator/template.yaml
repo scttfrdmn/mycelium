@@ -1,0 +1,143 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Spawn Pipeline Orchestrator Lambda Function
+
+Parameters:
+  Environment:
+    Type: String
+    Default: production
+    AllowedValues:
+      - production
+      - staging
+      - development
+    Description: Environment name
+
+Resources:
+  # DynamoDB table for pipeline state
+  PipelineOrchestrationTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub spawn-pipeline-orchestration-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pipeline_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pipeline_id
+          KeyType: HASH
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: spawn
+        - Key: Component
+          Value: pipeline-orchestrator
+
+  # Lambda function
+  PipelineOrchestratorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub spawn-pipeline-orchestrator-${Environment}
+      Handler: bootstrap
+      Runtime: provided.al2023
+      Architectures:
+        - arm64
+      MemorySize: 512
+      Timeout: 900  # 15 minutes (max)
+      Environment:
+        Variables:
+          SPAWN_PIPELINE_ORCHESTRATION_TABLE: !Ref PipelineOrchestrationTable
+          ENVIRONMENT: !Ref Environment
+      Policies:
+        # DynamoDB access
+        - DynamoDBCrudPolicy:
+            TableName: !Ref PipelineOrchestrationTable
+        # S3 access for pipeline definitions and data
+        - S3ReadPolicy:
+            BucketName: '*'
+        - S3CrudPolicy:
+            BucketName: '*'
+        # EC2 permissions for launching instances
+        - Statement:
+            - Effect: Allow
+              Action:
+                - ec2:RunInstances
+                - ec2:DescribeInstances
+                - ec2:DescribeInstanceStatus
+                - ec2:DescribeAvailabilityZones
+                - ec2:DescribeSecurityGroups
+                - ec2:CreateSecurityGroup
+                - ec2:DeleteSecurityGroup
+                - ec2:AuthorizeSecurityGroupIngress
+                - ec2:RevokeSecurityGroupIngress
+                - ec2:CreatePlacementGroup
+                - ec2:DeletePlacementGroup
+                - ec2:DescribePlacementGroups
+                - ec2:CreateTags
+                - ec2:TerminateInstances
+              Resource: '*'
+        # IAM pass role for EC2 instances
+        - Statement:
+            - Effect: Allow
+              Action:
+                - iam:PassRole
+              Resource: 'arn:aws:iam::*:role/spawnd-role'
+        # Lambda self-invocation
+        - Statement:
+            - Effect: Allow
+              Action:
+                - lambda:InvokeFunction
+              Resource: !GetAtt PipelineOrchestratorFunction.Arn
+      Tags:
+        Environment: !Ref Environment
+        Application: spawn
+        Component: pipeline-orchestrator
+
+  # CloudWatch Log Group with retention
+  PipelineOrchestratorLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/spawn-pipeline-orchestrator-${Environment}
+      RetentionInDays: 30
+
+  # EventBridge rule for scheduled execution (optional)
+  PipelineOrchestratorScheduleRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub spawn-pipeline-orchestrator-schedule-${Environment}
+      Description: Periodic invocation for long-running pipelines
+      State: DISABLED  # Enable manually if needed
+      ScheduleExpression: rate(5 minutes)
+      Targets:
+        - Arn: !GetAtt PipelineOrchestratorFunction.Arn
+          Id: PipelineOrchestratorTarget
+
+  # Permission for EventBridge to invoke Lambda
+  PipelineOrchestratorSchedulePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref PipelineOrchestratorFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt PipelineOrchestratorScheduleRule.Arn
+
+Outputs:
+  PipelineOrchestratorFunctionArn:
+    Description: ARN of the Pipeline Orchestrator Lambda function
+    Value: !GetAtt PipelineOrchestratorFunction.Arn
+    Export:
+      Name: !Sub ${AWS::StackName}-FunctionArn
+
+  PipelineOrchestrationTableName:
+    Description: Name of the DynamoDB table for pipeline orchestration
+    Value: !Ref PipelineOrchestrationTable
+    Export:
+      Name: !Sub ${AWS::StackName}-TableName
+
+  PipelineOrchestratorFunctionName:
+    Description: Name of the Pipeline Orchestrator Lambda function
+    Value: !Ref PipelineOrchestratorFunction
+    Export:
+      Name: !Sub ${AWS::StackName}-FunctionName

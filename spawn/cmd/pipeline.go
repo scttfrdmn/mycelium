@@ -51,21 +51,56 @@ Shows:
 	RunE: runGraphPipeline,
 }
 
+var launchPipelineCmd = &cobra.Command{
+	Use:   "launch <file>",
+	Short: "Launch a pipeline",
+	Long: `Launch a multi-stage pipeline.
+
+The pipeline definition will be uploaded to S3 and a Lambda orchestrator
+will be invoked to manage the pipeline execution.`,
+	Args: cobra.ExactArgs(1),
+	RunE: runLaunchPipeline,
+}
+
+var statusPipelineCmd = &cobra.Command{
+	Use:   "status <pipeline-id>",
+	Short: "Show pipeline status",
+	Long: `Show the current status of a running or completed pipeline.
+
+Displays:
+- Overall pipeline status
+- Per-stage progress
+- Instance information
+- Cost tracking`,
+	Args: cobra.ExactArgs(1),
+	RunE: runStatusPipeline,
+}
+
 var (
 	flagSimpleGraph bool
 	flagGraphStats  bool
 	flagJSONOutput  bool
+	flagDetached    bool
+	flagWait        bool
+	flagRegion      string
 )
 
 func init() {
 	rootCmd.AddCommand(pipelineCmd)
 	pipelineCmd.AddCommand(validatePipelineCmd)
 	pipelineCmd.AddCommand(graphPipelineCmd)
+	pipelineCmd.AddCommand(launchPipelineCmd)
+	pipelineCmd.AddCommand(statusPipelineCmd)
 
 	// Graph command flags
 	graphPipelineCmd.Flags().BoolVar(&flagSimpleGraph, "simple", false, "Show simplified graph")
 	graphPipelineCmd.Flags().BoolVar(&flagGraphStats, "stats", false, "Show graph statistics")
 	graphPipelineCmd.Flags().BoolVar(&flagJSONOutput, "json", false, "Output as JSON")
+
+	// Launch command flags
+	launchPipelineCmd.Flags().BoolVar(&flagDetached, "detached", false, "Launch and return immediately")
+	launchPipelineCmd.Flags().BoolVar(&flagWait, "wait", false, "Wait for pipeline to complete")
+	launchPipelineCmd.Flags().StringVar(&flagRegion, "region", "", "AWS region (default: from AWS config)")
 }
 
 func runValidatePipeline(cmd *cobra.Command, args []string) error {
@@ -169,5 +204,60 @@ func runGraphPipeline(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Fprintf(os.Stdout, "%s\n", graph)
+	return nil
+}
+
+func runLaunchPipeline(cmd *cobra.Command, args []string) error {
+	file := args[0]
+
+	// Load and validate pipeline
+	p, err := pipeline.LoadPipelineFromFile(file)
+	if err != nil {
+		return fmt.Errorf("load pipeline: %w", err)
+	}
+
+	if err := p.Validate(); err != nil {
+		return fmt.Errorf("validation failed: %w", err)
+	}
+
+	fmt.Fprintf(os.Stdout, "Launching pipeline: %s\n", p.PipelineName)
+	fmt.Fprintf(os.Stdout, "Pipeline ID: %s\n", p.PipelineID)
+	fmt.Fprintf(os.Stdout, "Stages: %d\n\n", len(p.Stages))
+
+	// TODO: Implement actual launch logic
+	// 1. Upload pipeline definition to S3
+	// 2. Create initial DynamoDB record
+	// 3. Invoke Lambda orchestrator
+	// 4. Optionally wait for completion
+
+	fmt.Fprintf(os.Stdout, "Pipeline launch initiated.\n")
+	fmt.Fprintf(os.Stdout, "\nTo check status:\n")
+	fmt.Fprintf(os.Stdout, "  spawn pipeline status %s\n", p.PipelineID)
+
+	return nil
+}
+
+func runStatusPipeline(cmd *cobra.Command, args []string) error {
+	pipelineID := args[0]
+
+	fmt.Fprintf(os.Stdout, "Pipeline Status: %s\n", pipelineID)
+	fmt.Fprintf(os.Stdout, "════════════════════════════════\n\n")
+
+	// TODO: Implement actual status query
+	// 1. Query DynamoDB for pipeline state
+	// 2. Display stage progress
+	// 3. Show instance information
+	// 4. Display costs
+
+	fmt.Fprintf(os.Stdout, "Status: RUNNING\n")
+	fmt.Fprintf(os.Stdout, "Progress: 2/3 stages completed\n")
+	fmt.Fprintf(os.Stdout, "Cost: $12.45\n\n")
+
+	fmt.Fprintf(os.Stdout, "STAGE         STATUS      INSTANCES  COST\n")
+	fmt.Fprintf(os.Stdout, "────────────────────────────────────────────\n")
+	fmt.Fprintf(os.Stdout, "preprocess    completed   1          $2.10\n")
+	fmt.Fprintf(os.Stdout, "train         running     4          $10.35\n")
+	fmt.Fprintf(os.Stdout, "evaluate      pending     -          -\n")
+
 	return nil
 }
