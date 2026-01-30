@@ -17,26 +17,26 @@ import (
 
 // PeerInfo contains information about a pipeline peer instance
 type PeerInfo struct {
-	StageID     string `json:"stage_id"`
-	StageIndex  int    `json:"stage_index"`
-	InstanceID  string `json:"instance_id"`
-	PrivateIP   string `json:"private_ip"`
-	PublicIP    string `json:"public_ip,omitempty"`
-	DNSName     string `json:"dns_name"`
-	State       string `json:"state"`
-	Index       int    `json:"index"` // Index within stage (0, 1, 2, ...)
+	StageID    string `json:"stage_id"`
+	StageIndex int    `json:"stage_index"`
+	InstanceID string `json:"instance_id"`
+	PrivateIP  string `json:"private_ip"`
+	PublicIP   string `json:"public_ip,omitempty"`
+	DNSName    string `json:"dns_name"`
+	State      string `json:"state"`
+	Index      int    `json:"index"` // Index within stage (0, 1, 2, ...)
 }
 
 // PipelinePeerFile is the peer discovery file format
 type PipelinePeerFile struct {
-	PipelineID      string                `json:"pipeline_id"`
-	StageID         string                `json:"stage_id"`
-	StageIndex      int                   `json:"stage_index"`
-	InstanceIndex   int                   `json:"instance_index"`
-	StagePeers      []PeerInfo            `json:"stage_peers"`       // Peers in same stage
-	UpstreamStages  map[string][]PeerInfo `json:"upstream_stages"`   // Stages this depends on
+	PipelineID       string                `json:"pipeline_id"`
+	StageID          string                `json:"stage_id"`
+	StageIndex       int                   `json:"stage_index"`
+	InstanceIndex    int                   `json:"instance_index"`
+	StagePeers       []PeerInfo            `json:"stage_peers"`       // Peers in same stage
+	UpstreamStages   map[string][]PeerInfo `json:"upstream_stages"`   // Stages this depends on
 	DownstreamStages map[string][]PeerInfo `json:"downstream_stages"` // Stages that depend on this
-	AllStages       map[string][]PeerInfo `json:"all_stages"`        // All stages in pipeline
+	AllStages        map[string][]PeerInfo `json:"all_stages"`        // All stages in pipeline
 }
 
 // GeneratePeerDiscoveryFile generates the peer discovery file for a pipeline instance

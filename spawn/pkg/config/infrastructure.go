@@ -11,7 +11,7 @@ import (
 type InfrastructureMode string
 
 const (
-	InfrastructureModeShared    InfrastructureMode = "shared"     // Use mycelium-infra account resources
+	InfrastructureModeShared     InfrastructureMode = "shared"      // Use mycelium-infra account resources
 	InfrastructureModeSelfHosted InfrastructureMode = "self-hosted" // Use customer's own AWS resources
 )
 
@@ -35,10 +35,10 @@ type InfrastructureConfig struct {
 
 // DynamoDBConfig holds DynamoDB table names
 type DynamoDBConfig struct {
-	SchedulesTable        string `yaml:"schedules_table"`
+	SchedulesTable          string `yaml:"schedules_table"`
 	SweepOrchestrationTable string `yaml:"sweep_orchestration_table"`
-	AlertsTable           string `yaml:"alerts_table"`
-	AlertHistoryTable     string `yaml:"alert_history_table"`
+	AlertsTable             string `yaml:"alerts_table"`
+	AlertHistoryTable       string `yaml:"alert_history_table"`
 	// Additional tables can be added here
 }
 
@@ -52,10 +52,10 @@ type S3Config struct {
 
 // LambdaConfig holds Lambda function ARNs
 type LambdaConfig struct {
-	SchedulerHandlerARN      string `yaml:"scheduler_handler_arn"`
-	SweepOrchestratorARN     string `yaml:"sweep_orchestrator_arn"`
-	AlertHandlerARN          string `yaml:"alert_handler_arn"`
-	DashboardAPIARN          string `yaml:"dashboard_api_arn"`
+	SchedulerHandlerARN  string `yaml:"scheduler_handler_arn"`
+	SweepOrchestratorARN string `yaml:"sweep_orchestrator_arn"`
+	AlertHandlerARN      string `yaml:"alert_handler_arn"`
+	DashboardAPIARN      string `yaml:"dashboard_api_arn"`
 	// Additional functions can be added here
 }
 

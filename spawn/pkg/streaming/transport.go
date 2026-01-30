@@ -29,9 +29,9 @@ type Transport interface {
 type TransportType string
 
 const (
-	TransportTCP  TransportType = "tcp"   // Standard TCP
-	TransportQUIC TransportType = "quic"  // QUIC for WAN
-	TransportRDMA TransportType = "rdma"  // RDMA/EFA for LAN
+	TransportTCP  TransportType = "tcp"  // Standard TCP
+	TransportQUIC TransportType = "quic" // QUIC for WAN
+	TransportRDMA TransportType = "rdma" // RDMA/EFA for LAN
 )
 
 // TransportConfig configures transport selection and behavior

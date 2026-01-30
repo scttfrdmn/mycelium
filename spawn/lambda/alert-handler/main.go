@@ -101,17 +101,17 @@ type SlackField struct {
 }
 
 var (
-	dynamoClient         *dynamodb.Client
-	snsClient            *sns.Client
-	kmsClient            *kms.Client
-	httpClient           *http.Client
-	region               string
-	accountID            string
-	kmsKeyID             string
-	encryptionEnabled    bool
-	alertsTable          string
-	alertHistoryTable    string
-	sweepAlertsTopicArn  string
+	dynamoClient        *dynamodb.Client
+	snsClient           *sns.Client
+	kmsClient           *kms.Client
+	httpClient          *http.Client
+	region              string
+	accountID           string
+	kmsKeyID            string
+	encryptionEnabled   bool
+	alertsTable         string
+	alertHistoryTable   string
+	sweepAlertsTopicArn string
 )
 
 func init() {

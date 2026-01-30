@@ -507,14 +507,14 @@ func TestPipelinePeerFile_GetEnvironmentVariables_Empty(t *testing.T) {
 
 func TestPeerInfoJSON(t *testing.T) {
 	peer := PeerInfo{
-		StageID:     "stage1",
-		StageIndex:  0,
-		InstanceID:  "i-123",
-		PrivateIP:   "10.0.1.1",
-		PublicIP:    "54.1.2.3",
-		DNSName:     "stage1-0.pipeline.spore.host",
-		State:       "running",
-		Index:       0,
+		StageID:    "stage1",
+		StageIndex: 0,
+		InstanceID: "i-123",
+		PrivateIP:  "10.0.1.1",
+		PublicIP:   "54.1.2.3",
+		DNSName:    "stage1-0.pipeline.spore.host",
+		State:      "running",
+		Index:      0,
 	}
 
 	// Test marshal

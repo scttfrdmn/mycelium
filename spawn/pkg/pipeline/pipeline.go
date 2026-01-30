@@ -86,60 +86,60 @@ const (
 type StageStatus string
 
 const (
-	StageStatusPending    StageStatus = "pending"
-	StageStatusReady      StageStatus = "ready"
-	StageStatusLaunching  StageStatus = "launching"
-	StageStatusRunning    StageStatus = "running"
-	StageStatusCompleted  StageStatus = "completed"
-	StageStatusFailed     StageStatus = "failed"
-	StageStatusSkipped    StageStatus = "skipped"
+	StageStatusPending   StageStatus = "pending"
+	StageStatusReady     StageStatus = "ready"
+	StageStatusLaunching StageStatus = "launching"
+	StageStatusRunning   StageStatus = "running"
+	StageStatusCompleted StageStatus = "completed"
+	StageStatusFailed    StageStatus = "failed"
+	StageStatusSkipped   StageStatus = "skipped"
 )
 
 // InstanceInfo tracks information about a launched instance
 type InstanceInfo struct {
-	InstanceID   string    `json:"instance_id"`
-	PrivateIP    string    `json:"private_ip"`
-	PublicIP     string    `json:"public_ip"`
-	DNSName      string    `json:"dns_name"`
-	State        string    `json:"state"`
-	LaunchedAt   time.Time `json:"launched_at"`
+	InstanceID   string     `json:"instance_id"`
+	PrivateIP    string     `json:"private_ip"`
+	PublicIP     string     `json:"public_ip"`
+	DNSName      string     `json:"dns_name"`
+	State        string     `json:"state"`
+	LaunchedAt   time.Time  `json:"launched_at"`
 	TerminatedAt *time.Time `json:"terminated_at,omitempty"`
 }
 
 // StageState tracks runtime state of a stage
 type StageState struct {
-	StageID      string         `json:"stage_id"`
-	StageIndex   int            `json:"stage_index"`
-	Status       StageStatus    `json:"status"`
-	LaunchedAt   *time.Time     `json:"launched_at,omitempty"`
-	CompletedAt  *time.Time     `json:"completed_at,omitempty"`
-	ErrorMessage string         `json:"error_message,omitempty"`
-	Instances    []InstanceInfo `json:"instances,omitempty"`
-	InstanceHours float64       `json:"instance_hours"`
-	StageCostUSD  float64       `json:"stage_cost_usd"`
+	StageID       string         `json:"stage_id"`
+	StageIndex    int            `json:"stage_index"`
+	Status        StageStatus    `json:"status"`
+	LaunchedAt    *time.Time     `json:"launched_at,omitempty"`
+	CompletedAt   *time.Time     `json:"completed_at,omitempty"`
+	ErrorMessage  string         `json:"error_message,omitempty"`
+	Instances     []InstanceInfo `json:"instances,omitempty"`
+	InstanceHours float64        `json:"instance_hours"`
+	StageCostUSD  float64        `json:"stage_cost_usd"`
 }
 
 // PipelineState tracks runtime state of entire pipeline
 type PipelineState struct {
-	PipelineID   string         `json:"pipeline_id"`
-	PipelineName string         `json:"pipeline_name"`
-	UserID       string         `json:"user_id"`
-	CreatedAt    time.Time      `json:"created_at"`
-	UpdatedAt    time.Time      `json:"updated_at"`
-	CompletedAt  *time.Time     `json:"completed_at,omitempty"`
-	Status       PipelineStatus `json:"status"`
-	CancelRequested bool        `json:"cancel_requested"`
+	PipelineID      string         `json:"pipeline_id"`
+	PipelineName    string         `json:"pipeline_name"`
+	UserID          string         `json:"user_id"`
+	CreatedAt       time.Time      `json:"created_at"`
+	UpdatedAt       time.Time      `json:"updated_at"`
+	CompletedAt     *time.Time     `json:"completed_at,omitempty"`
+	Status          PipelineStatus `json:"status"`
+	CancelRequested bool           `json:"cancel_requested"`
 
 	// Configuration
-	S3ConfigKey       string  `json:"s3_config_key"`
-	S3Bucket          string  `json:"s3_bucket"`
-	S3Prefix          string  `json:"s3_prefix"`
-	ResultS3Bucket    string  `json:"result_s3_bucket"`
-	ResultS3Prefix    string  `json:"result_s3_prefix"`
-	OnFailure         string  `json:"on_failure"`
+	S3ConfigKey       string   `json:"s3_config_key"`
+	S3Bucket          string   `json:"s3_bucket"`
+	S3Prefix          string   `json:"s3_prefix"`
+	ResultS3Bucket    string   `json:"result_s3_bucket"`
+	ResultS3Prefix    string   `json:"result_s3_prefix"`
+	OnFailure         string   `json:"on_failure"`
 	MaxCostUSD        *float64 `json:"max_cost_usd,omitempty"`
 	CurrentCostUSD    float64  `json:"current_cost_usd"`
-	NotificationEmail string  `json:"notification_email,omitempty"`
+	NotificationEmail string   `json:"notification_email,omitempty"`
 
 	// Progress tracking
 	TotalStages     int `json:"total_stages"`

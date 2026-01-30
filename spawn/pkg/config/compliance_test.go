@@ -10,16 +10,16 @@ func TestLoadComplianceConfig(t *testing.T) {
 	ctx := context.Background()
 
 	tests := []struct {
-		name             string
-		flagMode         string
-		flagStrict       bool
-		envMode          string
-		envEBS           string
-		envIMDS          string
-		wantMode         ComplianceMode
-		wantEBS          bool
-		wantIMDS         bool
-		wantStrict       bool
+		name       string
+		flagMode   string
+		flagStrict bool
+		envMode    string
+		envEBS     string
+		envIMDS    string
+		wantMode   ComplianceMode
+		wantEBS    bool
+		wantIMDS   bool
+		wantStrict bool
 	}{
 		{
 			name:       "default no compliance",
@@ -35,8 +35,8 @@ func TestLoadComplianceConfig(t *testing.T) {
 			flagMode:   "nist-800-171",
 			flagStrict: false,
 			wantMode:   ComplianceModeNIST80171,
-			wantEBS:    true,  // Auto-enabled for 800-171
-			wantIMDS:   true,  // Auto-enabled for 800-171
+			wantEBS:    true, // Auto-enabled for 800-171
+			wantIMDS:   true, // Auto-enabled for 800-171
 			wantStrict: false,
 		},
 		{
@@ -68,12 +68,12 @@ func TestLoadComplianceConfig(t *testing.T) {
 			wantIMDS: true,
 		},
 		{
-			name:       "flag overrides env",
-			flagMode:   "nist-800-53-low",
-			envMode:    "nist-800-171",
-			wantMode:   ComplianceModeBaseLow,
-			wantEBS:    true,
-			wantIMDS:   true,
+			name:     "flag overrides env",
+			flagMode: "nist-800-53-low",
+			envMode:  "nist-800-171",
+			wantMode: ComplianceModeBaseLow,
+			wantEBS:  true,
+			wantIMDS: true,
 		},
 	}
 
@@ -116,11 +116,11 @@ func TestLoadComplianceConfig(t *testing.T) {
 
 func TestComplianceConfigHelpers(t *testing.T) {
 	tests := []struct {
-		name                string
-		mode                ComplianceMode
-		wantEnabled         bool
-		wantSelfHosted      bool
-		wantDisplayName     string
+		name            string
+		mode            ComplianceMode
+		wantEnabled     bool
+		wantSelfHosted  bool
+		wantDisplayName string
 	}{
 		{
 			name:            "no compliance",
@@ -155,7 +155,7 @@ func TestComplianceConfigHelpers(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := &ComplianceConfig{
-				Mode: tt.mode,
+				Mode:                      tt.mode,
 				AllowSharedInfrastructure: true, // Default
 			}
 

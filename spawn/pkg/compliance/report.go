@@ -11,17 +11,17 @@ import (
 
 // ComplianceReport represents a compliance validation report
 type ComplianceReport struct {
-	Timestamp         time.Time          `json:"timestamp"`
-	Framework         string             `json:"framework"`
-	Baseline          string             `json:"baseline,omitempty"`
-	Summary           ComplianceSummary  `json:"summary"`
+	Timestamp         time.Time           `json:"timestamp"`
+	Framework         string              `json:"framework"`
+	Baseline          string              `json:"baseline,omitempty"`
+	Summary           ComplianceSummary   `json:"summary"`
 	Violations        []*ControlViolation `json:"violations"`
-	Warnings          []string           `json:"warnings"`
-	ControlsEvaluated int                `json:"controls_evaluated"`
-	ControlsPassed    int                `json:"controls_passed"`
-	ControlsFailed    int                `json:"controls_failed"`
-	Recommendations   []string           `json:"recommendations"`
-	Metadata          map[string]string  `json:"metadata,omitempty"`
+	Warnings          []string            `json:"warnings"`
+	ControlsEvaluated int                 `json:"controls_evaluated"`
+	ControlsPassed    int                 `json:"controls_passed"`
+	ControlsFailed    int                 `json:"controls_failed"`
+	Recommendations   []string            `json:"recommendations"`
+	Metadata          map[string]string   `json:"metadata,omitempty"`
 }
 
 // ComplianceSummary provides a high-level summary
@@ -263,9 +263,9 @@ func GenerateInstanceReport(instance *aws.InstanceInfo, framework, baseline stri
 		ControlsFailed:    0,
 		Recommendations:   make([]string, 0),
 		Metadata: map[string]string{
-			"instance_id": instance.InstanceID,
+			"instance_id":   instance.InstanceID,
 			"instance_type": instance.InstanceType,
-			"region": instance.Region,
+			"region":        instance.Region,
 		},
 	}
 

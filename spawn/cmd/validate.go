@@ -16,11 +16,11 @@ import (
 )
 
 var (
-	validateComplianceMode   string
-	validateOutputFormat     string // "text" or "json"
-	validateRegion           string
-	validateInstanceID       string
-	validateInfrastructure   bool   // Validate infrastructure resources
+	validateComplianceMode string
+	validateOutputFormat   string // "text" or "json"
+	validateRegion         string
+	validateInstanceID     string
+	validateInfrastructure bool // Validate infrastructure resources
 )
 
 var validateCmd = &cobra.Command{
@@ -202,12 +202,12 @@ func outputText(results map[string]*compliance.ValidationResult, instances []aws
 func outputValidationJSON(results map[string]*compliance.ValidationResult, instances []aws.InstanceInfo, cfg *spawnconfig.ComplianceConfig) error {
 	// Build JSON structure
 	output := map[string]interface{}{
-		"compliance_mode": cfg.GetModeDisplayName(),
-		"instances_scanned": len(instances),
-		"compliant_count": 0,
+		"compliance_mode":     cfg.GetModeDisplayName(),
+		"instances_scanned":   len(instances),
+		"compliant_count":     0,
 		"non_compliant_count": 0,
-		"total_violations": 0,
-		"instances": []map[string]interface{}{},
+		"total_violations":    0,
+		"instances":           []map[string]interface{}{},
 	}
 
 	compliantCount := 0
@@ -432,13 +432,13 @@ func outputInfrastructureText(result *infrastructure.ValidationResult, resolver 
 
 func outputInfrastructureJSON(result *infrastructure.ValidationResult, resolver *infrastructure.Resolver) error {
 	output := map[string]interface{}{
-		"valid":       result.Valid,
-		"mode":        resolver.IsSelfHosted(),
-		"errors":      result.Errors,
-		"warnings":    result.Warnings,
-		"resources":   result.Resources,
-		"region":      resolver.GetRegion(),
-		"account_id":  resolver.GetAccountID(),
+		"valid":      result.Valid,
+		"mode":       resolver.IsSelfHosted(),
+		"errors":     result.Errors,
+		"warnings":   result.Warnings,
+		"resources":  result.Resources,
+		"region":     resolver.GetRegion(),
+		"account_id": resolver.GetAccountID(),
 	}
 
 	jsonBytes, err := json.MarshalIndent(output, "", "  ")

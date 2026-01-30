@@ -34,8 +34,8 @@ func TestLoadPipelineFromJSON(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "invalid_json",
-			json: `{invalid json}`,
+			name:    "invalid_json",
+			json:    `{invalid json}`,
 			wantErr: true,
 		},
 	}
@@ -52,10 +52,10 @@ func TestLoadPipelineFromJSON(t *testing.T) {
 
 func TestPipelineValidate(t *testing.T) {
 	tests := []struct {
-		name    string
+		name     string
 		pipeline *Pipeline
-		wantErr bool
-		errMsg  string
+		wantErr  bool
+		errMsg   string
 	}{
 		{
 			name: "valid_pipeline",
@@ -399,10 +399,10 @@ func TestDataConfigValidate(t *testing.T) {
 
 func TestValidateDAG(t *testing.T) {
 	tests := []struct {
-		name    string
+		name     string
 		pipeline *Pipeline
-		wantErr bool
-		errMsg  string
+		wantErr  bool
+		errMsg   string
 	}{
 		{
 			name: "valid_linear",

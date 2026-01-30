@@ -19,14 +19,14 @@ import (
 
 // StageRunner executes a pipeline stage with data handoff
 type StageRunner struct {
-	pipelineID   string
-	stageID      string
-	stageIndex   int
-	instanceID   string
-	region       string
-	dataHandler  *StageDataHandler
-	pipelineDef  *Pipeline
-	stageDef     *Stage
+	pipelineID  string
+	stageID     string
+	stageIndex  int
+	instanceID  string
+	region      string
+	dataHandler *StageDataHandler
+	pipelineDef *Pipeline
+	stageDef    *Stage
 }
 
 // StageInfo contains information about the current stage from EC2 tags

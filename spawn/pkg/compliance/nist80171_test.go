@@ -230,9 +230,9 @@ func TestNIST80171_NonCompliantConfig(t *testing.T) {
 
 func TestValidateNIST80171Compliance(t *testing.T) {
 	tests := []struct {
-		name           string
-		cfg            *aws.LaunchConfig
-		expectCompliant bool
+		name             string
+		cfg              *aws.LaunchConfig
+		expectCompliant  bool
 		expectViolations int
 	}{
 		{
@@ -241,7 +241,7 @@ func TestValidateNIST80171Compliance(t *testing.T) {
 				EBSEncrypted:   true,
 				IMDSv2Enforced: true,
 			},
-			expectCompliant: true,
+			expectCompliant:  true,
 			expectViolations: 0,
 		},
 		{
@@ -250,7 +250,7 @@ func TestValidateNIST80171Compliance(t *testing.T) {
 				EBSEncrypted:   false,
 				IMDSv2Enforced: true,
 			},
-			expectCompliant: false,
+			expectCompliant:  false,
 			expectViolations: 1,
 		},
 		{
@@ -259,7 +259,7 @@ func TestValidateNIST80171Compliance(t *testing.T) {
 				EBSEncrypted:   true,
 				IMDSv2Enforced: false,
 			},
-			expectCompliant: false,
+			expectCompliant:  false,
 			expectViolations: 1,
 		},
 		{
@@ -268,7 +268,7 @@ func TestValidateNIST80171Compliance(t *testing.T) {
 				EBSEncrypted:   false,
 				IMDSv2Enforced: false,
 			},
-			expectCompliant: false,
+			expectCompliant:  false,
 			expectViolations: 2,
 		},
 	}

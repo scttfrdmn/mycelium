@@ -9,23 +9,23 @@ import (
 
 func TestFedRAMPControlSet(t *testing.T) {
 	tests := []struct {
-		name  string
-		level FedRAMPLevel
+		name             string
+		level            FedRAMPLevel
 		expectedBaseline Baseline
 	}{
 		{
-			name:  "FedRAMP Low",
-			level: FedRAMPLow,
+			name:             "FedRAMP Low",
+			level:            FedRAMPLow,
 			expectedBaseline: BaselineLow,
 		},
 		{
-			name:  "FedRAMP Moderate",
-			level: FedRAMPModerate,
+			name:             "FedRAMP Moderate",
+			level:            FedRAMPModerate,
 			expectedBaseline: BaselineModerate,
 		},
 		{
-			name:  "FedRAMP High",
-			level: FedRAMPHigh,
+			name:             "FedRAMP High",
+			level:            FedRAMPHigh,
 			expectedBaseline: BaselineHigh,
 		},
 	}
@@ -140,8 +140,8 @@ func TestValidateFedRAMPCompliance(t *testing.T) {
 			name:  "FedRAMP High - missing customer KMS",
 			level: FedRAMPHigh,
 			cfg: &aws.LaunchConfig{
-				EBSEncrypted:   true,
-				IMDSv2Enforced: true,
+				EBSEncrypted:     true,
+				IMDSv2Enforced:   true,
 				SecurityGroupIDs: []string{"sg-12345"},
 			},
 			wantErr: true,
@@ -150,9 +150,9 @@ func TestValidateFedRAMPCompliance(t *testing.T) {
 			name:  "FedRAMP High - fully compliant",
 			level: FedRAMPHigh,
 			cfg: &aws.LaunchConfig{
-				EBSEncrypted:   true,
-				IMDSv2Enforced: true,
-				EBSKMSKeyID:    "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012",
+				EBSEncrypted:     true,
+				IMDSv2Enforced:   true,
+				EBSKMSKeyID:      "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012",
 				SecurityGroupIDs: []string{"sg-12345"},
 			},
 			wantErr: false,

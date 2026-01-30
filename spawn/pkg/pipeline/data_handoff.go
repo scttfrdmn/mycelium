@@ -253,8 +253,8 @@ func (h *StageDataHandler) WriteCompletionMarker(ctx context.Context) error {
 
 	// Write empty marker file with metadata
 	metadata := map[string]string{
-		"pipeline-id": h.pipelineID,
-		"stage-id":    h.stageID,
+		"pipeline-id":  h.pipelineID,
+		"stage-id":     h.stageID,
 		"completed-at": fmt.Sprintf("%d", os.Getpid()),
 	}
 

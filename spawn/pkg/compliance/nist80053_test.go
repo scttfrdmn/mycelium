@@ -9,23 +9,23 @@ import (
 
 func TestNIST80053ControlSet(t *testing.T) {
 	tests := []struct {
-		name     string
-		baseline Baseline
+		name        string
+		baseline    Baseline
 		minControls int
 	}{
 		{
-			name:     "Low baseline",
-			baseline: BaselineLow,
+			name:        "Low baseline",
+			baseline:    BaselineLow,
 			minControls: 10, // At least NIST 800-171 controls
 		},
 		{
-			name:     "Moderate baseline",
-			baseline: BaselineModerate,
+			name:        "Moderate baseline",
+			baseline:    BaselineModerate,
 			minControls: 13, // Low + moderate-specific
 		},
 		{
-			name:     "High baseline",
-			baseline: BaselineHigh,
+			name:        "High baseline",
+			baseline:    BaselineHigh,
 			minControls: 18, // Moderate + high-specific
 		},
 	}
@@ -110,36 +110,36 @@ func TestNIST80053_HighBaseline_CustomerKMS(t *testing.T) {
 		{
 			name: "Customer KMS key ARN",
 			cfg: &aws.LaunchConfig{
-				EBSEncrypted: true,
+				EBSEncrypted:   true,
 				IMDSv2Enforced: true,
-				EBSKMSKeyID: "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012",
+				EBSKMSKeyID:    "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012",
 			},
 			wantError: false,
 		},
 		{
 			name: "Customer KMS key alias",
 			cfg: &aws.LaunchConfig{
-				EBSEncrypted: true,
+				EBSEncrypted:   true,
 				IMDSv2Enforced: true,
-				EBSKMSKeyID: "alias/my-key",
+				EBSKMSKeyID:    "alias/my-key",
 			},
 			wantError: false,
 		},
 		{
 			name: "Customer KMS key UUID",
 			cfg: &aws.LaunchConfig{
-				EBSEncrypted: true,
+				EBSEncrypted:   true,
 				IMDSv2Enforced: true,
-				EBSKMSKeyID: "12345678-1234-1234-1234-123456789012",
+				EBSKMSKeyID:    "12345678-1234-1234-1234-123456789012",
 			},
 			wantError: false,
 		},
 		{
 			name: "No KMS key (High requires customer key)",
 			cfg: &aws.LaunchConfig{
-				EBSEncrypted: true,
+				EBSEncrypted:   true,
 				IMDSv2Enforced: true,
-				EBSKMSKeyID: "",
+				EBSKMSKeyID:    "",
 			},
 			wantError: true,
 		},
@@ -178,9 +178,9 @@ func TestNIST80053_HighBaseline_SecurityGroups(t *testing.T) {
 		{
 			name: "Explicit security groups",
 			cfg: &aws.LaunchConfig{
-				EBSEncrypted: true,
-				IMDSv2Enforced: true,
-				EBSKMSKeyID: "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012",
+				EBSEncrypted:     true,
+				IMDSv2Enforced:   true,
+				EBSKMSKeyID:      "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012",
 				SecurityGroupIDs: []string{"sg-12345"},
 			},
 			wantError: false,
@@ -188,9 +188,9 @@ func TestNIST80053_HighBaseline_SecurityGroups(t *testing.T) {
 		{
 			name: "No security groups (High requires explicit)",
 			cfg: &aws.LaunchConfig{
-				EBSEncrypted: true,
-				IMDSv2Enforced: true,
-				EBSKMSKeyID: "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012",
+				EBSEncrypted:     true,
+				IMDSv2Enforced:   true,
+				EBSKMSKeyID:      "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012",
 				SecurityGroupIDs: []string{},
 			},
 			wantError: true,
@@ -221,16 +221,16 @@ func TestNIST80053_HighBaseline_SecurityGroups(t *testing.T) {
 
 func TestValidateNIST80053Compliance(t *testing.T) {
 	tests := []struct {
-		name     string
-		baseline Baseline
-		cfg      *aws.LaunchConfig
+		name            string
+		baseline        Baseline
+		cfg             *aws.LaunchConfig
 		expectCompliant bool
 	}{
 		{
 			name:     "Low - compliant",
 			baseline: BaselineLow,
 			cfg: &aws.LaunchConfig{
-				EBSEncrypted: true,
+				EBSEncrypted:   true,
 				IMDSv2Enforced: true,
 			},
 			expectCompliant: true,
@@ -239,7 +239,7 @@ func TestValidateNIST80053Compliance(t *testing.T) {
 			name:     "Moderate - missing controls",
 			baseline: BaselineModerate,
 			cfg: &aws.LaunchConfig{
-				EBSEncrypted: true,
+				EBSEncrypted:   true,
 				IMDSv2Enforced: true,
 			},
 			expectCompliant: true, // Moderate doesn't enforce public IP check yet
@@ -248,8 +248,8 @@ func TestValidateNIST80053Compliance(t *testing.T) {
 			name:     "High - missing customer KMS",
 			baseline: BaselineHigh,
 			cfg: &aws.LaunchConfig{
-				EBSEncrypted: true,
-				IMDSv2Enforced: true,
+				EBSEncrypted:     true,
+				IMDSv2Enforced:   true,
 				SecurityGroupIDs: []string{"sg-12345"},
 			},
 			expectCompliant: false,
@@ -258,9 +258,9 @@ func TestValidateNIST80053Compliance(t *testing.T) {
 			name:     "High - fully compliant",
 			baseline: BaselineHigh,
 			cfg: &aws.LaunchConfig{
-				EBSEncrypted: true,
-				IMDSv2Enforced: true,
-				EBSKMSKeyID: "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012",
+				EBSEncrypted:     true,
+				IMDSv2Enforced:   true,
+				EBSKMSKeyID:      "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012",
 				SecurityGroupIDs: []string{"sg-12345"},
 			},
 			expectCompliant: true,
