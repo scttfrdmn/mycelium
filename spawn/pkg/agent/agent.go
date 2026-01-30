@@ -12,6 +12,7 @@ import (
 
 	"github.com/scttfrdmn/mycelium/spawn/pkg/dns"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/provider"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/registry"
 )
 
 type Agent struct {
@@ -19,6 +20,7 @@ type Agent struct {
 	identity         *provider.Identity
 	config           *provider.Config
 	dnsClient        *dns.Client
+	registry         *registry.PeerRegistry
 	startTime        time.Time
 	lastActivityTime time.Time
 }
@@ -90,8 +92,27 @@ func NewAgent(ctx context.Context, prov provider.Provider) (*Agent, error) {
 		log.Printf("Warning: DNS name configured (%s) but no public IP available", config.DNSName)
 	}
 
-	// Load job array peer information if part of a job array
+	// Initialize hybrid registry if part of a job array
 	if config.JobArrayID != "" {
+		reg, err := registry.NewPeerRegistry(ctx, identity)
+		if err != nil {
+			log.Printf("Warning: Failed to initialize registry: %v (continuing without hybrid mode)", err)
+		} else {
+			agent.registry = reg
+
+			// Register with hybrid registry using index from config
+			index := config.JobArrayIndex
+			if err := reg.Register(ctx, config.JobArrayID, index); err != nil {
+				log.Printf("Warning: Failed to register with hybrid registry: %v", err)
+			} else {
+				// Start heartbeat
+				reg.StartHeartbeat(ctx, config.JobArrayID)
+				log.Printf("✓ Registered with hybrid registry: job_array=%s, provider=%s",
+					config.JobArrayID, identity.Provider)
+			}
+		}
+
+		// Discover peers
 		peers, err := prov.DiscoverPeers(ctx, config.JobArrayID)
 		if err != nil {
 			log.Printf("Warning: Failed to discover peers: %v", err)
@@ -594,6 +615,18 @@ func (a *Agent) hibernate(ctx context.Context) {
 // Cleanup performs cleanup tasks before shutdown (DNS deregistration, etc.)
 func (a *Agent) Cleanup(ctx context.Context) {
 	log.Printf("Running cleanup tasks...")
+
+	// Deregister from hybrid registry
+	if a.registry != nil && a.config.JobArrayID != "" {
+		cleanupCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+
+		if err := a.registry.Deregister(cleanupCtx, a.config.JobArrayID); err != nil {
+			log.Printf("Warning: Failed to deregister from hybrid registry: %v", err)
+		} else {
+			log.Printf("✓ Deregistered from hybrid registry")
+		}
+	}
 
 	// Clean up DNS (EC2 only)
 	if a.dnsClient != nil && a.config.DNSName != "" && a.identity.PublicIP != "" {

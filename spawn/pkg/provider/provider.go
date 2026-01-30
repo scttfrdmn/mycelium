@@ -33,8 +33,9 @@ type Config struct {
 	DNSName string
 
 	// Job array settings
-	JobArrayID   string
-	JobArrayName string
+	JobArrayID    string
+	JobArrayName  string
+	JobArrayIndex int
 }
 
 // PeerInfo represents information about a peer instance

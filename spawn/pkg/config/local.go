@@ -37,6 +37,7 @@ type LocalConfig struct {
 	JobArray struct {
 		ID        string `yaml:"id"`
 		Name      string `yaml:"name"`
+		Index     int    `yaml:"index"`
 		PeersFile string `yaml:"peers_file"`
 	} `yaml:"job_array"`
 

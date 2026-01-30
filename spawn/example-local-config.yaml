@@ -25,9 +25,10 @@ dns:
 
 # Job array configuration (optional)
 job_array:
-  id: ""
-  name: ""
-  peers_file: /etc/spawn/peers.json  # static peer list if needed
+  id: ""           # Job array ID (for hybrid coordination)
+  name: ""         # Job array name
+  index: 0         # Instance index in the array
+  peers_file: /etc/spawn/peers.json  # static peer list (fallback)
 
 # Orchestrator (for burst coordination - Phase 2)
 orchestrator:

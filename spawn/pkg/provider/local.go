@@ -12,14 +12,20 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/config"
 )
 
 // LocalProvider implements Provider for local (non-EC2) systems
 type LocalProvider struct {
-	identity   *Identity
-	config     *Config
-	configPath string
+	identity      *Identity
+	config        *Config
+	configPath    string
+	dynamoClient  *dynamodb.Client
+	registryTable string
 }
 
 // NewLocalProvider creates a local provider
@@ -63,13 +69,27 @@ func NewLocalProvider(ctx context.Context) (*LocalProvider, error) {
 		DNSName:         localConfig.DNS.Name,
 		JobArrayID:      localConfig.JobArray.ID,
 		JobArrayName:    localConfig.JobArray.Name,
+		JobArrayIndex:   localConfig.JobArray.Index,
 	}
 
-	return &LocalProvider{
-		identity:   identity,
-		config:     providerConfig,
-		configPath: configPath,
-	}, nil
+	provider := &LocalProvider{
+		identity:      identity,
+		config:        providerConfig,
+		configPath:    configPath,
+		registryTable: "spawn-hybrid-registry",
+	}
+
+	// Try to initialize DynamoDB client for hybrid coordination
+	// This is optional - local-only mode works without it
+	cfg, err := awsconfig.LoadDefaultConfig(ctx)
+	if err == nil {
+		provider.dynamoClient = dynamodb.NewFromConfig(cfg)
+		log.Printf("DynamoDB client initialized for hybrid registry")
+	} else {
+		log.Printf("Warning: DynamoDB client not available: %v (local-only mode)", err)
+	}
+
+	return provider, nil
 }
 
 func (p *LocalProvider) GetIdentity(ctx context.Context) (*Identity, error) {
@@ -108,21 +128,86 @@ func (p *LocalProvider) DiscoverPeers(ctx context.Context, jobArrayID string) ([
 
 	log.Printf("Discovering peers for job array: %s (local mode)", jobArrayID)
 
-	// Strategy: Use DynamoDB registry (to be implemented in Phase 2)
-	// For Phase 1, use static peers file if configured
+	// Try DynamoDB registry first (Phase 2)
+	peers, err := p.discoverPeersFromDynamoDB(ctx, jobArrayID)
+	if err == nil && len(peers) > 0 {
+		return peers, nil
+	}
+
+	// Fall back to static peers file (Phase 1 compatibility)
 	localConfig, err := config.LoadLocalConfig(p.configPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
 
 	if localConfig.JobArray.PeersFile != "" {
-		// Load peers from static file
+		log.Printf("Falling back to static peers file: %s", localConfig.JobArray.PeersFile)
 		return loadPeersFromFile(localConfig.JobArray.PeersFile)
 	}
 
 	// No peers configured
 	log.Printf("No peer discovery configured for local mode")
 	return nil, nil
+}
+
+func (p *LocalProvider) discoverPeersFromDynamoDB(ctx context.Context, jobArrayID string) ([]PeerInfo, error) {
+	if p.dynamoClient == nil {
+		return nil, fmt.Errorf("DynamoDB client not available")
+	}
+
+	result, err := p.dynamoClient.Query(ctx, &dynamodb.QueryInput{
+		TableName:              aws.String(p.registryTable),
+		KeyConditionExpression: aws.String("job_array_id = :job_array_id"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":job_array_id": &types.AttributeValueMemberS{Value: jobArrayID},
+		},
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to query DynamoDB registry: %w", err)
+	}
+
+	var peers []PeerInfo
+	now := time.Now().Unix()
+
+	for _, item := range result.Items {
+		// Check if instance is still alive (heartbeat within TTL)
+		expiresAt := getNumberValue(item["expires_at"])
+		if expiresAt < now {
+			// Instance expired, skip it
+			continue
+		}
+
+		peer := PeerInfo{
+			Index:      int(getNumberValue(item["index"])),
+			InstanceID: getStringValue(item["instance_id"]),
+			IP:         getStringValue(item["ip_address"]),
+			DNS:        "", // Can construct if needed
+			Provider:   getStringValue(item["provider"]),
+		}
+
+		peers = append(peers, peer)
+	}
+
+	log.Printf("Discovered %d peers from DynamoDB registry", len(peers))
+	return peers, nil
+}
+
+// Helper functions for DynamoDB attribute parsing
+func getStringValue(attr types.AttributeValue) string {
+	if s, ok := attr.(*types.AttributeValueMemberS); ok {
+		return s.Value
+	}
+	return ""
+}
+
+func getNumberValue(attr types.AttributeValue) int64 {
+	if n, ok := attr.(*types.AttributeValueMemberN); ok {
+		var val int64
+		fmt.Sscanf(n.Value, "%d", &val)
+		return val
+	}
+	return 0
 }
 
 func (p *LocalProvider) IsSpotInstance(ctx context.Context) bool {
