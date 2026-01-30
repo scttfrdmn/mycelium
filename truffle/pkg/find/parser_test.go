@@ -7,16 +7,18 @@ import (
 
 func TestParseQuery(t *testing.T) {
 	tests := []struct {
-		name        string
-		query       string
-		wantVendors []string
-		wantProcs   []string
-		wantGPUs    []string
-		wantSizes   []string
-		wantVCPU    int
-		wantMemory  float64
-		wantArch    string
-		wantErr     bool
+		name            string
+		query           string
+		wantVendors     []string
+		wantProcs       []string
+		wantGPUs        []string
+		wantSizes       []string
+		wantVCPU        int
+		wantMemory      float64
+		wantArch        string
+		wantNetworkGbps int
+		wantEFA         bool
+		wantErr         bool
 	}{
 		{
 			name:        "single vendor",
@@ -119,6 +121,33 @@ func TestParseQuery(t *testing.T) {
 			query:      "32gib",
 			wantMemory: 32,
 		},
+		{
+			name:       "efa network",
+			query:      "efa",
+			wantEFA:    true,
+		},
+		{
+			name:          "100gbps network",
+			query:         "100gbps",
+			wantNetworkGbps: 100,
+		},
+		{
+			name:          "efa with graviton",
+			query:         "efa graviton",
+			wantVendors:   []string{"aws"},
+			wantEFA:       true,
+		},
+		{
+			name:          "h100 with efa",
+			query:         "h100 efa",
+			wantGPUs:      []string{"h100"},
+			wantEFA:       true,
+		},
+		{
+			name:          "100g alias",
+			query:         "100g",
+			wantNetworkGbps: 100,
+		},
 	}
 
 	for _, tt := range tests {
@@ -159,6 +188,14 @@ func TestParseQuery(t *testing.T) {
 
 			if got.Architecture != tt.wantArch {
 				t.Errorf("Architecture = %v, want %v", got.Architecture, tt.wantArch)
+			}
+
+			if got.MinNetworkGbps != tt.wantNetworkGbps {
+				t.Errorf("MinNetworkGbps = %v, want %v", got.MinNetworkGbps, tt.wantNetworkGbps)
+			}
+
+			if got.RequireEFA != tt.wantEFA {
+				t.Errorf("RequireEFA = %v, want %v", got.RequireEFA, tt.wantEFA)
 			}
 		})
 	}

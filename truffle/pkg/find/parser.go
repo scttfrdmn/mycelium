@@ -22,6 +22,8 @@ const (
 	TokenMemory
 	TokenGPUCount
 	TokenArchitecture
+	TokenNetworkSpeed
+	TokenEFA
 )
 
 // Token represents a classified query token
@@ -33,20 +35,23 @@ type Token struct {
 
 // ParsedQuery represents the structured output of query parsing
 type ParsedQuery struct {
-	Vendors      []string
-	Processors   []string
-	GPUs         []string
-	Sizes        []string
-	MinVCPU      int
-	MinMemory    float64
-	GPUCount     int
-	Architecture string
-	RawTokens    []Token
+	Vendors         []string
+	Processors      []string
+	GPUs            []string
+	Sizes           []string
+	MinVCPU         int
+	MinMemory       float64
+	GPUCount        int
+	Architecture    string
+	MinNetworkGbps  int
+	RequireEFA      bool
+	RawTokens       []Token
 }
 
 var (
-	numberRegex = regexp.MustCompile(`^\d+$`)
-	memoryRegex = regexp.MustCompile(`^(\d+(?:\.\d+)?)\s*(gb|gib|g)$`)
+	numberRegex        = regexp.MustCompile(`^\d+$`)
+	memoryRegex        = regexp.MustCompile(`^(\d+(?:\.\d+)?)\s*(gb|gib|g)$`)
+	networkSpeedRegex  = regexp.MustCompile(`^(\d+)\s*(gbps|g)$`)
 )
 
 // ParseQuery parses a natural language query into structured search criteria
@@ -89,6 +94,12 @@ func ParseQuery(query string) (*ParsedQuery, error) {
 			}
 		case TokenArchitecture:
 			pq.Architecture = token.Value
+		case TokenNetworkSpeed:
+			if v, err := parseNetworkSpeed(token.Value); err == nil {
+				pq.MinNetworkGbps = v
+			}
+		case TokenEFA:
+			pq.RequireEFA = true
 		}
 	}
 
@@ -155,6 +166,17 @@ func classifyTokens(words []string) []Token {
 			tokens = append(tokens, Token{Type: TokenGPU, Value: alias, Raw: word})
 		} else if _, ok := metadata.SizeCategories[word]; ok {
 			tokens = append(tokens, Token{Type: TokenSize, Value: word, Raw: word})
+		} else if word == "efa" {
+			tokens = append(tokens, Token{Type: TokenEFA, Value: "efa", Raw: word})
+		} else if alias, ok := metadata.NetworkAliases[word]; ok {
+			if alias == "efa" {
+				tokens = append(tokens, Token{Type: TokenEFA, Value: "efa", Raw: word})
+			} else {
+				// It's a bandwidth alias
+				tokens = append(tokens, Token{Type: TokenNetworkSpeed, Value: alias, Raw: word})
+			}
+		} else if networkSpeedRegex.MatchString(word) {
+			tokens = append(tokens, Token{Type: TokenNetworkSpeed, Value: word, Raw: word})
 		} else if word == "x86_64" || word == "x86-64" || word == "x86" || word == "amd64" {
 			tokens = append(tokens, Token{Type: TokenArchitecture, Value: "x86_64", Raw: word})
 		} else if word == "arm64" || word == "arm" || word == "aarch64" {
@@ -199,6 +221,34 @@ func parseMemory(s string) (float64, error) {
 
 	// All units are treated as GiB
 	return value, nil
+}
+
+// parseNetworkSpeed parses network speed string (e.g., "10gbps", "100g") to Gbps
+func parseNetworkSpeed(s string) (int, error) {
+	s = strings.ToLower(strings.TrimSpace(s))
+
+	// Check if it's a known alias (e.g., "10gbps", "25gbps")
+	if _, ok := metadata.NetworkBandwidthTiers[s]; ok {
+		// Extract the number from the key (e.g., "10gbps" -> 10)
+		matches := regexp.MustCompile(`^(\d+)`).FindStringSubmatch(s)
+		if len(matches) == 2 {
+			if v, err := strconv.Atoi(matches[1]); err == nil {
+				return v, nil
+			}
+		}
+	}
+
+	// Try parsing as "100gbps" or "100g"
+	matches := networkSpeedRegex.FindStringSubmatch(s)
+	if len(matches) == 3 {
+		value, err := strconv.Atoi(matches[1])
+		if err != nil {
+			return 0, err
+		}
+		return value, nil
+	}
+
+	return 0, fmt.Errorf("invalid network speed format: %s", s)
 }
 
 // Validate checks for conflicting or invalid query criteria
@@ -277,6 +327,21 @@ func (pq *ParsedQuery) ResolveInstanceFamilies() []string {
 			for _, family := range info.Families {
 				familySet[family] = true
 			}
+		}
+	}
+
+	// From network requirements
+	if pq.RequireEFA {
+		efaFamilies := metadata.GetFamiliesByEFA()
+		for _, family := range efaFamilies {
+			familySet[family] = true
+		}
+	}
+
+	if pq.MinNetworkGbps > 0 {
+		networkFamilies := metadata.GetFamiliesByNetworkSpeed(pq.MinNetworkGbps)
+		for _, family := range networkFamilies {
+			familySet[family] = true
 		}
 	}
 

@@ -34,6 +34,7 @@ Understands:
   - Sizes: tiny, small, medium, large, huge
   - Specs: 8 cores, 32gb, 4 gpus
   - Architecture: x86_64, arm64
+  - Network: efa, 10gbps, 25gbps, 50gbps, 100gbps, 200gbps, 400gbps
 
 Examples:
   truffle find graviton
@@ -44,7 +45,10 @@ Examples:
   truffle find "intel gpu"
   truffle find "milan 64gb"
   truffle find "sapphire rapids 32 cores"
-  truffle find "inferentia"`,
+  truffle find "inferentia"
+  truffle find "efa graviton"
+  truffle find "100gbps intel"
+  truffle find "h100 efa"`,
 	Args: cobra.MinimumNArgs(1),
 	RunE: runFind,
 }
@@ -170,6 +174,12 @@ func printParsedQuery(query *find.ParsedQuery) {
 	}
 	if query.Architecture != "" {
 		fmt.Fprintf(os.Stderr, "   Architecture: %s\n", query.Architecture)
+	}
+	if query.RequireEFA {
+		fmt.Fprintf(os.Stderr, "   Network: EFA required\n")
+	}
+	if query.MinNetworkGbps > 0 {
+		fmt.Fprintf(os.Stderr, "   Min Network: %d Gbps\n", query.MinNetworkGbps)
 	}
 
 	// Show resolved families

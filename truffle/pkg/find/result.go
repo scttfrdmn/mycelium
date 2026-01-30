@@ -108,6 +108,28 @@ sizeDone:
 		reasons = append(reasons, fmt.Sprintf("Architecture: %s", result.Architecture))
 	}
 
+	// Check EFA match
+	if query.RequireEFA && metadata.IsEFASupported(family) {
+		reasons = append(reasons, "Network: EFA supported")
+	}
+
+	// Check network speed match
+	if query.MinNetworkGbps > 0 {
+		// Check if family supports the required bandwidth
+		for speed, capability := range metadata.NetworkBandwidthTiers {
+			if capability.MaxBandwidthGbps >= query.MinNetworkGbps {
+				for _, f := range capability.Families {
+					if f == family {
+						reasons = append(reasons,
+							fmt.Sprintf("Network: %d+ Gbps (supports %s)", query.MinNetworkGbps, speed))
+						goto networkDone
+					}
+				}
+			}
+		}
+	}
+networkDone:
+
 	return reasons
 }
 
