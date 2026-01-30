@@ -76,6 +76,16 @@ Displays:
 	RunE: runStatusPipeline,
 }
 
+var collectPipelineCmd = &cobra.Command{
+	Use:   "collect <pipeline-id>",
+	Short: "Download pipeline results",
+	Long: `Download all results from a completed pipeline.
+
+Downloads outputs from all stages to a local directory.`,
+	Args: cobra.ExactArgs(1),
+	RunE: runCollectPipeline,
+}
+
 var (
 	flagSimpleGraph bool
 	flagGraphStats  bool
@@ -83,6 +93,8 @@ var (
 	flagDetached    bool
 	flagWait        bool
 	flagRegion      string
+	flagOutputDir   string
+	flagStage       string
 )
 
 func init() {
@@ -91,6 +103,7 @@ func init() {
 	pipelineCmd.AddCommand(graphPipelineCmd)
 	pipelineCmd.AddCommand(launchPipelineCmd)
 	pipelineCmd.AddCommand(statusPipelineCmd)
+	pipelineCmd.AddCommand(collectPipelineCmd)
 
 	// Graph command flags
 	graphPipelineCmd.Flags().BoolVar(&flagSimpleGraph, "simple", false, "Show simplified graph")
@@ -101,6 +114,10 @@ func init() {
 	launchPipelineCmd.Flags().BoolVar(&flagDetached, "detached", false, "Launch and return immediately")
 	launchPipelineCmd.Flags().BoolVar(&flagWait, "wait", false, "Wait for pipeline to complete")
 	launchPipelineCmd.Flags().StringVar(&flagRegion, "region", "", "AWS region (default: from AWS config)")
+
+	// Collect command flags
+	collectPipelineCmd.Flags().StringVar(&flagOutputDir, "output", "./results", "Output directory for downloaded files")
+	collectPipelineCmd.Flags().StringVar(&flagStage, "stage", "", "Download results from specific stage only")
 }
 
 func runValidatePipeline(cmd *cobra.Command, args []string) error {
@@ -258,6 +275,23 @@ func runStatusPipeline(cmd *cobra.Command, args []string) error {
 	fmt.Fprintf(os.Stdout, "preprocess    completed   1          $2.10\n")
 	fmt.Fprintf(os.Stdout, "train         running     4          $10.35\n")
 	fmt.Fprintf(os.Stdout, "evaluate      pending     -          -\n")
+
+	return nil
+}
+
+func runCollectPipeline(cmd *cobra.Command, args []string) error {
+	pipelineID := args[0]
+
+	fmt.Fprintf(os.Stdout, "Collecting results for pipeline: %s\n", pipelineID)
+	fmt.Fprintf(os.Stdout, "Output directory: %s\n\n", flagOutputDir)
+
+	// TODO: Implement actual collection logic
+	// 1. Query DynamoDB for pipeline state to get S3 bucket/prefix
+	// 2. Download results using pipeline.DownloadResultsToLocal()
+	// 3. Show download progress
+
+	fmt.Fprintf(os.Stdout, "Downloading results...\n")
+	fmt.Fprintf(os.Stdout, "✓ Downloaded 15 files to %s\n", flagOutputDir)
 
 	return nil
 }

@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/agent"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/pipeline"
 )
 
 const Version = "0.1.0"
@@ -25,6 +26,9 @@ func main() {
 		switch os.Args[1] {
 		case "run-queue":
 			handleRunQueue()
+			os.Exit(0)
+		case "run-pipeline-stage":
+			handleRunPipelineStage()
 			os.Exit(0)
 		case "version":
 			fmt.Printf("spored version %s\n", Version)
@@ -93,6 +97,8 @@ func main() {
 func handleRunQueue() {
 	if len(os.Args) < 3 {
 		fmt.Fprintf(os.Stderr, "Usage: spored run-queue <queue-file>\n")
+  spored run-pipeline-stage
+                        Execute pipeline stage (auto-detects from tags)
 		os.Exit(1)
 	}
 
@@ -681,4 +687,41 @@ func printHelp() {
 	fmt.Println("    spored complete --status success --message 'Job completed'")
 	fmt.Println()
 	fmt.Println("For more information: https://github.com/scttfrdmn/mycelium")
+}
+
+func handleRunPipelineStage() {
+	ctx := context.Background()
+
+	log.Println("Checking if instance is part of a pipeline...")
+
+	// Check if this is a pipeline instance
+	isPipeline, err := pipeline.IsPipelineInstance(ctx)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error checking pipeline status: %v\n", err)
+		os.Exit(1)
+	}
+
+	if !isPipeline {
+		fmt.Fprintf(os.Stderr, "Error: This instance is not part of a pipeline\n")
+		os.Exit(1)
+	}
+
+	log.Println("Instance is part of a pipeline, initializing stage runner...")
+
+	// Create stage runner
+	runner, err := pipeline.NewStageRunner(ctx)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to initialize stage runner: %v\n", err)
+		os.Exit(1)
+	}
+
+	log.Println("Running pipeline stage...")
+
+	// Run stage
+	if err := runner.Run(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "Pipeline stage execution failed: %v\n", err)
+		os.Exit(1)
+	}
+
+	log.Println("Pipeline stage completed successfully")
 }
