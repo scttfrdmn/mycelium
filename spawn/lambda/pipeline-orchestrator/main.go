@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -21,6 +22,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	snstypes "github.com/aws/aws-sdk-go-v2/service/sns/types"
+	spawnaws "github.com/scttfrdmn/mycelium/spawn/pkg/aws"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/pipeline"
 )
 
@@ -201,6 +203,35 @@ func downloadPipelineDefinition(ctx context.Context, s3Key string) (*pipeline.Pi
 }
 
 func setupPipelineResources(ctx context.Context, state *pipeline.PipelineState, pipelineDef *pipeline.Pipeline) error {
+	// Initialize stages from pipeline definition
+	log.Printf("Initializing %d stages from pipeline definition", len(pipelineDef.Stages))
+	state.Stages = make([]pipeline.StageState, len(pipelineDef.Stages))
+
+	// Get topological order for stage indices
+	topoOrder, err := pipelineDef.GetTopologicalOrder()
+	if err != nil {
+		return fmt.Errorf("get topological order: %w", err)
+	}
+
+	// Create index map
+	indexMap := make(map[string]int)
+	for i, stageID := range topoOrder {
+		indexMap[stageID] = i
+	}
+
+	// Initialize each stage with pending status
+	for i, stageSpec := range pipelineDef.Stages {
+		state.Stages[i] = pipeline.StageState{
+			StageID:       stageSpec.StageID,
+			StageIndex:    indexMap[stageSpec.StageID],
+			Status:        pipeline.StageStatusPending,
+			Instances:     []pipeline.InstanceInfo{},
+			InstanceHours: 0,
+			StageCostUSD:  0,
+		}
+		log.Printf("Initialized stage %s (index=%d, status=pending)", stageSpec.StageID, indexMap[stageSpec.StageID])
+	}
+
 	// Create security group if streaming stages exist
 	if pipelineDef.HasStreamingStages() {
 		log.Println("Pipeline has streaming stages, creating security group...")
@@ -502,6 +533,12 @@ func dependenciesMet(state *pipeline.PipelineState, stageDef *pipeline.Stage) bo
 }
 
 func launchStage(ctx context.Context, state *pipeline.PipelineState, stageDef *pipeline.Stage, stageState *pipeline.StageState) error {
+	// Create spawn AWS client (for AMI lookup)
+	awsClient, err := spawnaws.NewClient(ctx)
+	if err != nil {
+		return fmt.Errorf("create AWS client: %w", err)
+	}
+
 	// Get EC2 client for stage's region
 	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(stageDef.Region))
 	if err != nil {
@@ -511,7 +548,7 @@ func launchStage(ctx context.Context, state *pipeline.PipelineState, stageDef *p
 
 	// Launch instances for this stage
 	for i := 0; i < stageDef.InstanceCount; i++ {
-		instanceInfo, err := launchStageInstance(ctx, ec2Client, state, stageDef, stageState, i)
+		instanceInfo, err := launchStageInstance(ctx, awsClient, ec2Client, state, stageDef, stageState, i)
 		if err != nil {
 			return fmt.Errorf("launch instance %d: %w", i, err)
 		}
@@ -522,12 +559,45 @@ func launchStage(ctx context.Context, state *pipeline.PipelineState, stageDef *p
 	return nil
 }
 
-func launchStageInstance(ctx context.Context, ec2Client *ec2.Client, state *pipeline.PipelineState, stageDef *pipeline.Stage, stageState *pipeline.StageState, index int) (*pipeline.InstanceInfo, error) {
+func launchStageInstance(ctx context.Context, awsClient *spawnaws.Client, ec2Client *ec2.Client, state *pipeline.PipelineState, stageDef *pipeline.Stage, stageState *pipeline.StageState, index int) (*pipeline.InstanceInfo, error) {
+	// Determine region
+	region := stageDef.Region
+	if region == "" {
+		region = "us-east-1" // Default region
+	}
+
+	// Determine AMI to use
+	amiID := stageDef.AMI
+	if amiID == "" {
+		// No AMI specified, get recommended AMI for region/instance type
+		log.Printf("No AMI specified for stage %s, looking up recommended AMI...", stageDef.StageID)
+		var err error
+		amiID, err = awsClient.GetRecommendedAMI(ctx, region, stageDef.InstanceType)
+		if err != nil {
+			return nil, fmt.Errorf("lookup recommended AMI: %w", err)
+		}
+		log.Printf("Using recommended AMI %s for stage %s", amiID, stageDef.StageID)
+	}
+
+	// Use existing spored instance profile
+	instanceProfile := "spored-instance-profile"
+
+	// Generate user data with pipeline context
+	userData, err := generatePipelineUserData(state, stageDef, stageState, index, region)
+	if err != nil {
+		return nil, fmt.Errorf("generate user data: %w", err)
+	}
+
 	// Build RunInstances input
 	input := &ec2.RunInstancesInput{
 		MinCount:     aws.Int32(1),
 		MaxCount:     aws.Int32(1),
 		InstanceType: ec2types.InstanceType(stageDef.InstanceType),
+		ImageId:      aws.String(amiID),
+		UserData:     aws.String(userData),
+		IamInstanceProfile: &ec2types.IamInstanceProfileSpecification{
+			Name: aws.String(instanceProfile),
+		},
 		TagSpecifications: []ec2types.TagSpecification{
 			{
 				ResourceType: ec2types.ResourceTypeInstance,
@@ -535,15 +605,11 @@ func launchStageInstance(ctx context.Context, ec2Client *ec2.Client, state *pipe
 					{Key: aws.String("spawn:pipeline-id"), Value: aws.String(state.PipelineID)},
 					{Key: aws.String("spawn:stage-id"), Value: aws.String(stageDef.StageID)},
 					{Key: aws.String("spawn:stage-index"), Value: aws.String(fmt.Sprintf("%d", stageState.StageIndex))},
+					{Key: aws.String("spawn:instance-index"), Value: aws.String(fmt.Sprintf("%d", index))},
 					{Key: aws.String("Name"), Value: aws.String(fmt.Sprintf("%s-%s-%d", state.PipelineName, stageDef.StageID, index))},
 				},
 			},
 		},
-	}
-
-	// Add AMI if specified
-	if stageDef.AMI != "" {
-		input.ImageId = aws.String(stageDef.AMI)
 	}
 
 	// Add spot if specified
@@ -589,6 +655,191 @@ func launchStageInstance(ctx context.Context, ec2Client *ec2.Client, state *pipe
 	instanceInfo.DNSName = fmt.Sprintf("%s-%d.%s.spore.host", stageDef.StageID, index, state.PipelineID)
 
 	return instanceInfo, nil
+}
+
+func generatePipelineUserData(state *pipeline.PipelineState, stageDef *pipeline.Stage, stageState *pipeline.StageState, instanceIndex int, region string) (string, error) {
+	// Escape shell variables
+	shellEscape := func(s string) string {
+		return strings.ReplaceAll(s, "'", "'\\''")
+	}
+
+	// Determine timeout (convert to seconds)
+	timeout := "3600" // Default 1 hour
+	if stageDef.Timeout != "" {
+		duration, err := time.ParseDuration(stageDef.Timeout)
+		if err == nil {
+			timeout = fmt.Sprintf("%d", int(duration.Seconds()))
+		}
+	}
+
+	// Build environment variables
+	envVars := ""
+	for k, v := range stageDef.Env {
+		envVars += fmt.Sprintf("export %s='%s'\n", k, shellEscape(v))
+	}
+
+	// Generate user data script
+	script := fmt.Sprintf(`#!/bin/bash
+set -e
+
+# Detect architecture
+ARCH=$(uname -m)
+echo "Installing spored for architecture: $ARCH"
+
+# Detect region
+TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" 2>/dev/null || true)
+if [ -n "$TOKEN" ]; then
+    REGION=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/placement/region 2>/dev/null)
+else
+    REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region 2>/dev/null || echo "us-east-1")
+fi
+
+echo "Region: $REGION"
+
+# Determine binary name
+case "$ARCH" in
+    x86_64)
+        BINARY="spored-linux-amd64"
+        ;;
+    aarch64)
+        BINARY="spored-linux-arm64"
+        ;;
+    *)
+        echo "Unsupported architecture: $ARCH"
+        exit 1
+        ;;
+esac
+
+# Download from S3
+S3_BASE_URL="https://spawn-binaries-${REGION}.s3.amazonaws.com"
+FALLBACK_URL="https://spawn-binaries-us-east-1.s3.amazonaws.com"
+
+echo "Downloading spored binary..."
+
+if curl -f -o /usr/local/bin/spored "${S3_BASE_URL}/${BINARY}" 2>/dev/null; then
+    CHECKSUM_URL="${S3_BASE_URL}/${BINARY}.sha256"
+    echo "Downloaded from ${REGION}"
+else
+    echo "Regional bucket unavailable, using us-east-1"
+    curl -f -o /usr/local/bin/spored "${FALLBACK_URL}/${BINARY}" || {
+        echo "Failed to download spored binary"
+        exit 1
+    }
+    CHECKSUM_URL="${FALLBACK_URL}/${BINARY}.sha256"
+fi
+
+# Download and verify SHA256 checksum
+echo "Verifying checksum..."
+curl -f -o /tmp/spored.sha256 "${CHECKSUM_URL}" || {
+    echo "Failed to download checksum"
+    exit 1
+}
+
+cd /usr/local/bin
+EXPECTED_CHECKSUM=$(cat /tmp/spored.sha256)
+ACTUAL_CHECKSUM=$(sha256sum spored | awk '{print $1}')
+
+if [ "$EXPECTED_CHECKSUM" != "$ACTUAL_CHECKSUM" ]; then
+    echo "❌ Checksum verification failed!"
+    exit 1
+fi
+
+echo "✅ Checksum verified"
+chmod +x /usr/local/bin/spored
+
+# Install AWS CLI if not present (needed for S3 operations)
+if ! command -v aws &> /dev/null; then
+    echo "Installing AWS CLI..."
+    case "$ARCH" in
+        x86_64)
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip"
+            ;;
+        aarch64)
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "/tmp/awscliv2.zip"
+            ;;
+    esac
+    cd /tmp && unzip -q awscliv2.zip && ./aws/install
+    rm -rf /tmp/aws /tmp/awscliv2.zip
+fi
+
+# Pipeline configuration
+export SPAWN_PIPELINE_ID='%s'
+export SPAWN_PIPELINE_NAME='%s'
+export SPAWN_STAGE_ID='%s'
+export SPAWN_STAGE_INDEX='%d'
+export SPAWN_INSTANCE_INDEX='%d'
+export SPAWN_S3_BUCKET='%s'
+export SPAWN_S3_PREFIX='%s'
+export SPAWN_RESULT_S3_BUCKET='%s'
+export SPAWN_RESULT_S3_PREFIX='%s'
+export SPAWN_REGION='%s'
+
+# User environment variables
+%s
+
+# Create working directory
+WORK_DIR="/opt/spawn/pipeline/${SPAWN_PIPELINE_ID}/${SPAWN_STAGE_ID}"
+mkdir -p "$WORK_DIR"
+cd "$WORK_DIR"
+
+# Download stage inputs from S3 if configured
+# TODO: Implement S3 input download based on data_input config
+
+# Run stage command with timeout
+echo "========================================"
+echo "Running stage command: %s"
+echo "========================================"
+echo ""
+
+STAGE_CMD='%s'
+
+# Run command with timeout
+timeout %s bash -c "$STAGE_CMD" || {
+    EXIT_CODE=$?
+    echo "Stage command failed with exit code: $EXIT_CODE"
+
+    # Write failure marker to S3
+    echo "failed" | aws s3 cp - "s3://${SPAWN_S3_BUCKET}/${SPAWN_S3_PREFIX}/stages/${SPAWN_STAGE_ID}/FAILED" --region "$SPAWN_REGION"
+
+    exit $EXIT_CODE
+}
+
+echo ""
+echo "========================================"
+echo "Stage command completed successfully"
+echo "========================================"
+
+# Upload stage outputs to S3 if configured
+# TODO: Implement S3 output upload based on data_output config
+
+# Write completion marker to S3
+echo "success" | aws s3 cp - "s3://${SPAWN_S3_BUCKET}/${SPAWN_S3_PREFIX}/stages/${SPAWN_STAGE_ID}/COMPLETE" --region "$SPAWN_REGION"
+
+echo "✅ Stage complete, terminating instance in 60s..."
+sleep 60
+
+# Terminate self
+INSTANCE_ID=$(ec2-metadata --instance-id | cut -d " " -f 2)
+aws ec2 terminate-instances --instance-ids "$INSTANCE_ID" --region "$SPAWN_REGION"
+`,
+		shellEscape(state.PipelineID),
+		shellEscape(state.PipelineName),
+		shellEscape(stageDef.StageID),
+		stageState.StageIndex,
+		instanceIndex,
+		shellEscape(state.S3Bucket),
+		shellEscape(state.S3Prefix),
+		shellEscape(state.ResultS3Bucket),
+		shellEscape(state.ResultS3Prefix),
+		region,
+		envVars,
+		stageDef.Command,
+		shellEscape(stageDef.Command),
+		timeout,
+	)
+
+	// Base64 encode for EC2 user data
+	return base64.StdEncoding.EncodeToString([]byte(script)), nil
 }
 
 func allInstancesRunning(ctx context.Context, stageState *pipeline.StageState) bool {
@@ -665,6 +916,50 @@ func allStagesComplete(state *pipeline.PipelineState) bool {
 }
 
 func cleanupPipelineResources(ctx context.Context, state *pipeline.PipelineState) {
+	// Terminate all instances
+	for _, stage := range state.Stages {
+		if len(stage.Instances) == 0 {
+			continue
+		}
+
+		// Collect instance IDs
+		instanceIDs := []string{}
+		for _, inst := range stage.Instances {
+			if inst.State != "terminated" && inst.State != "stopped" {
+				instanceIDs = append(instanceIDs, inst.InstanceID)
+			}
+		}
+
+		if len(instanceIDs) > 0 {
+			// Determine region for this stage (stages can be in different regions)
+			region := "us-east-1" // Default
+			for _, stageSpec := range state.Stages {
+				if stageSpec.StageID == stage.StageID && stageSpec.StageIndex == stage.StageIndex {
+					// This doesn't have region, need to get from original pipeline def
+					// For now, use default region
+					break
+				}
+			}
+
+			cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(region))
+			if err != nil {
+				log.Printf("Warning: Failed to load config for region %s: %v", region, err)
+				continue
+			}
+			ec2Client := ec2.NewFromConfig(cfg)
+
+			log.Printf("Terminating %d instances for stage %s", len(instanceIDs), stage.StageID)
+			_, err = ec2Client.TerminateInstances(ctx, &ec2.TerminateInstancesInput{
+				InstanceIds: instanceIDs,
+			})
+			if err != nil {
+				log.Printf("Warning: Failed to terminate instances for stage %s: %v", stage.StageID, err)
+			} else {
+				log.Printf("Terminated instances for stage %s: %v", stage.StageID, instanceIDs)
+			}
+		}
+	}
+
 	// Cleanup security group
 	if state.SecurityGroupID != "" {
 		go func() {

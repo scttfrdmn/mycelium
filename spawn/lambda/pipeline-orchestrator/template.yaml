@@ -83,13 +83,22 @@ Resources:
             - Effect: Allow
               Action:
                 - iam:PassRole
-              Resource: 'arn:aws:iam::*:role/spawnd-role'
+              Resource:
+                - 'arn:aws:iam::*:role/spawnd-role'
+                - 'arn:aws:iam::*:role/spored-instance-role'
         # Lambda self-invocation (wildcard to avoid circular dependency)
         - Statement:
             - Effect: Allow
               Action:
                 - lambda:InvokeFunction
               Resource: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:spawn-pipeline-orchestrator*'
+        # SSM parameter access for AMI lookup
+        - Statement:
+            - Effect: Allow
+              Action:
+                - ssm:GetParameter
+                - ssm:GetParameters
+              Resource: 'arn:aws:ssm:*:*:parameter/aws/service/ami-*'
       Tags:
         Environment: !Ref Environment
         Application: spawn

@@ -443,72 +443,61 @@ func runStatusPipeline(cmd *cobra.Command, args []string) error {
 	}
 
 	// Parse pipeline state
-	var state map[string]interface{}
+	var state pipeline.PipelineState
 	err = attributevalue.UnmarshalMap(result.Item, &state)
 	if err != nil {
 		return fmt.Errorf("unmarshal pipeline state: %w", err)
 	}
 
 	// Display status
-	fmt.Fprintf(os.Stdout, "Pipeline: %s\n", getStringField(state, "pipeline_name"))
+	fmt.Fprintf(os.Stdout, "Pipeline: %s\n", state.PipelineName)
 	fmt.Fprintf(os.Stdout, "ID: %s\n", pipelineID)
-	fmt.Fprintf(os.Stdout, "Status: %s\n", getStringField(state, "status"))
-	fmt.Fprintf(os.Stdout, "Created: %s\n", getStringField(state, "created_at"))
-	fmt.Fprintf(os.Stdout, "Updated: %s\n", getStringField(state, "updated_at"))
+	fmt.Fprintf(os.Stdout, "Status: %s\n", state.Status)
+	fmt.Fprintf(os.Stdout, "Created: %s\n", state.CreatedAt.Format(time.RFC3339))
+	fmt.Fprintf(os.Stdout, "Updated: %s\n", state.UpdatedAt.Format(time.RFC3339))
 	fmt.Fprintf(os.Stdout, "\n")
 
 	// Progress
-	totalStages := getIntField(state, "total_stages")
-	completedStages := getIntField(state, "completed_stages")
-	failedStages := getIntField(state, "failed_stages")
-	fmt.Fprintf(os.Stdout, "Progress: %d/%d stages completed", completedStages, totalStages)
-	if failedStages > 0 {
-		fmt.Fprintf(os.Stdout, " (%d failed)", failedStages)
+	fmt.Fprintf(os.Stdout, "Progress: %d/%d stages completed", state.CompletedStages, state.TotalStages)
+	if state.FailedStages > 0 {
+		fmt.Fprintf(os.Stdout, " (%d failed)", state.FailedStages)
 	}
 	fmt.Fprintf(os.Stdout, "\n")
 
 	// Cost
-	currentCost := getFloatField(state, "current_cost_usd")
-	fmt.Fprintf(os.Stdout, "Cost: $%.2f", currentCost)
-	if maxCost, ok := state["max_cost_usd"].(float64); ok && maxCost > 0 {
-		fmt.Fprintf(os.Stdout, " / $%.2f", maxCost)
+	fmt.Fprintf(os.Stdout, "Cost: $%.2f", state.CurrentCostUSD)
+	if state.MaxCostUSD != nil && *state.MaxCostUSD > 0 {
+		fmt.Fprintf(os.Stdout, " / $%.2f", *state.MaxCostUSD)
 	}
 	fmt.Fprintf(os.Stdout, "\n\n")
 
 	// Stages table
-	if stages, ok := state["stages"].([]interface{}); ok && len(stages) > 0 {
+	if len(state.Stages) > 0 {
 		fmt.Fprintf(os.Stdout, "STAGE                STATUS       INSTANCES  COST      DURATION\n")
 		fmt.Fprintf(os.Stdout, "─────────────────────────────────────────────────────────────────\n")
-		for _, stageVal := range stages {
-			if stageMap, ok := stageVal.(map[string]interface{}); ok {
-				stageID := getStringField(stageMap, "stage_id")
-				status := getStringField(stageMap, "status")
-				instanceCount := len(getSliceField(stageMap, "instances"))
-				stageCost := getFloatField(stageMap, "stage_cost_usd")
-
-				// Calculate duration
-				duration := ""
-				if launchedAt := getStringField(stageMap, "launched_at"); launchedAt != "" {
-					if completedAt := getStringField(stageMap, "completed_at"); completedAt != "" {
-						duration = formatDurationBetween(launchedAt, completedAt)
-					} else {
-						duration = formatDurationBetween(launchedAt, time.Now().UTC().Format(time.RFC3339))
-					}
+		for _, stage := range state.Stages {
+			// Calculate duration
+			duration := ""
+			if stage.LaunchedAt != nil {
+				if stage.CompletedAt != nil {
+					duration = formatDurationFromTime(stage.CompletedAt.Sub(*stage.LaunchedAt))
+				} else {
+					duration = formatDurationFromTime(time.Since(*stage.LaunchedAt))
 				}
-
-				instanceStr := "-"
-				if instanceCount > 0 {
-					instanceStr = fmt.Sprintf("%d", instanceCount)
-				}
-
-				costStr := "-"
-				if stageCost > 0 {
-					costStr = fmt.Sprintf("$%.2f", stageCost)
-				}
-
-				fmt.Fprintf(os.Stdout, "%-20s %-12s %-10s %-9s %s\n",
-					truncate(stageID, 20), status, instanceStr, costStr, duration)
 			}
+
+			instanceStr := "-"
+			if len(stage.Instances) > 0 {
+				instanceStr = fmt.Sprintf("%d", len(stage.Instances))
+			}
+
+			costStr := "-"
+			if stage.StageCostUSD > 0 {
+				costStr = fmt.Sprintf("$%.2f", stage.StageCostUSD)
+			}
+
+			fmt.Fprintf(os.Stdout, "%-20s %-12s %-10s %-9s %s\n",
+				truncate(stage.StageID, 20), stage.Status, instanceStr, costStr, duration)
 		}
 	}
 
@@ -544,13 +533,7 @@ func getSliceField(m map[string]interface{}, key string) []interface{} {
 	return nil
 }
 
-func formatDurationBetween(start, end string) string {
-	startTime, err1 := time.Parse(time.RFC3339, start)
-	endTime, err2 := time.Parse(time.RFC3339, end)
-	if err1 != nil || err2 != nil {
-		return "-"
-	}
-	duration := endTime.Sub(startTime)
+func formatDurationFromTime(duration time.Duration) string {
 	if duration < time.Minute {
 		return fmt.Sprintf("%ds", int(duration.Seconds()))
 	} else if duration < time.Hour {
