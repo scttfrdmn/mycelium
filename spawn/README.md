@@ -1452,6 +1452,76 @@ Considered **idle** when:
 - Network < 10KB/min
 - For duration > idle timeout
 
+## 📈 Observability Stack (v0.19.0+)
+
+Production-ready observability with Prometheus, OpenTelemetry, and Grafana.
+
+### Prometheus Metrics
+
+Enable HTTP metrics server:
+
+```bash
+spawn launch --instance-type m7i.large \
+  --tag spawn:metrics-enabled=true \
+  --tag spawn:metrics-port=9090
+```
+
+Access metrics:
+- `http://localhost:9090/metrics` - Prometheus format
+- `http://localhost:9090/health` - Health check
+- `http://localhost:9090/state` - JSON state
+
+**25+ metrics exposed:** CPU, memory, network, disk, GPU, idle state, cost tracking, job arrays, TTL countdown.
+
+### OpenTelemetry Tracing
+
+Enable distributed tracing:
+
+```bash
+spawn launch --instance-type m7i.large \
+  --tag spawn:tracing-enabled=true \
+  --tag spawn:tracing-exporter=xray
+```
+
+Traces AWS SDK calls, queue operations, and job execution. View in AWS X-Ray console.
+
+### Grafana Dashboards
+
+4 pre-built dashboards in `deployment/grafana/dashboards/`:
+- **instance-overview.json** - Single instance metrics
+- **fleet-monitoring.json** - Fleet-wide view
+- **cost-tracking.json** - Cost analysis and forecasting
+- **hybrid-compute.json** - EC2 + local instances
+
+Import: `grafana-cli dashboard import deployment/grafana/dashboards/instance-overview.json`
+
+### Prometheus Alertmanager
+
+26 pre-built alert rules across 4 categories:
+- **Instance Lifecycle** (6): Idle, TTL expiration, spot interruption
+- **Cost Management** (6): Budget exceeded, high-cost instances, forecasting
+- **Capacity** (6): Fleet size, growth anomalies, regional imbalance
+- **Performance** (8): CPU, memory, GPU, network, disk I/O
+
+Setup:
+```bash
+# Install
+brew install prometheus alertmanager
+
+# Configure
+cp deployment/prometheus/prometheus.yaml /etc/prometheus/prometheus.yml
+cp deployment/prometheus/alerts/*.yaml /etc/prometheus/alerts/
+
+# Start
+prometheus --config.file=/etc/prometheus/prometheus.yml
+alertmanager --config.file=/etc/alertmanager/alertmanager.yml
+```
+
+**Documentation:**
+- Setup guide: `docs/how-to/prometheus-alerting.md`
+- Metrics reference: `docs/reference/metrics.md`
+- Quick start: `deployment/prometheus/README.md`
+
 ## 🔄 Integration with truffle
 
 spawn is designed to work seamlessly with truffle:

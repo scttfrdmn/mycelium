@@ -1,6 +1,6 @@
 # Spawn Development Roadmap
 
-**Last Updated:** 2026-01-27 (v0.13.0)
+**Last Updated:** 2026-01-30 (v0.19.0)
 
 ## Current Status
 
@@ -134,6 +134,16 @@ Spawn has evolved from a single-instance tool into a **production-ready cloud or
 - Docker image with multi-arch support
 - Comprehensive 1,088-line integration guide
 - **Delivered:** v0.12.0
+
+#### 14. Observability Stack ✅ **COMPLETED** (#76-79)
+- **Prometheus Metrics**: HTTP server exposing 25+ metrics in Prometheus format
+- **OpenTelemetry Tracing**: Distributed tracing with AWS X-Ray integration
+- **Grafana Dashboards**: 4 pre-built dashboards (instance, fleet, cost, hybrid)
+- **Alertmanager Integration**: 26 alert rules across 4 categories (lifecycle, cost, capacity, performance)
+- **Webhook Bridge**: Convert Prometheus alerts to spawn format
+- **Service Discovery**: EC2, file-based, and static configuration
+- **Production Ready**: Zero breaking changes, opt-in via tags/config
+- **Delivered:** v0.19.0
 
 ---
 

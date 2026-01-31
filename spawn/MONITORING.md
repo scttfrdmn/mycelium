@@ -290,6 +290,235 @@ If the agent cannot read a metric (e.g., /proc files unavailable):
 
 This ensures robustness in various environments.
 
+## Prometheus Metrics (v0.19.0+)
+
+Spawn now supports exposing metrics in Prometheus format via HTTP. This enables integration with modern observability stacks.
+
+### Enabling Metrics
+
+Enable metrics server via instance tags:
+
+```bash
+spawn launch --instance-type m7i.large \
+  --tag spawn:metrics-enabled=true \
+  --tag spawn:metrics-port=9090 \
+  --tag spawn:metrics-bind=localhost
+```
+
+Or in local config (`~/.config/spawn/local-config.yaml`):
+
+```yaml
+observability:
+  metrics:
+    enabled: true
+    port: 9090
+    bind: "localhost"
+```
+
+### Metrics Endpoints
+
+Once enabled, spored exposes:
+- `http://localhost:9090/metrics` - Prometheus text format
+- `http://localhost:9090/health` - Health check
+- `http://localhost:9090/state` - JSON state dump
+
+### Available Metrics
+
+**Instance Lifecycle:**
+- `spawn_instance_uptime_seconds` - Instance uptime
+- `spawn_instance_start_time_seconds` - Instance start timestamp
+- `spawn_instance_spot` - Spot instance indicator (0 or 1)
+- `spawn_ttl_remaining_seconds` - TTL countdown
+- `spawn_idle_timeout_remaining_seconds` - Idle timeout countdown
+
+**Resource Usage:**
+- `spawn_cpu_usage_percent` - Current CPU usage
+- `spawn_memory_used_bytes` / `spawn_memory_total_bytes` - Memory metrics
+- `spawn_network_bytes_total` - Network traffic (by interface)
+- `spawn_disk_io_bytes_total` - Disk I/O (by device)
+- `spawn_gpu_utilization_percent` - GPU utilization (by GPU index)
+- `spawn_gpu_temperature_celsius` - GPU temperature
+
+**Idle Detection:**
+- `spawn_idle_state` - Current idle state (0=active, 1=idle)
+- `spawn_idle_duration_seconds` - How long instance has been idle
+- `spawn_active_terminals` - Number of active PTYs
+- `spawn_logged_in_users` - Number of logged-in users
+
+**Cost Tracking:**
+- `spawn_cost_per_hour_dollars` - Hourly cost
+- `spawn_estimated_cost_dollars` - Estimated cost since launch
+
+**Job Arrays:**
+- `spawn_job_array_size` - Total job array size
+- `spawn_job_array_index` - This instance's index
+- `spawn_job_array_peers_discovered` - Number of peers found
+
+### Prometheus Integration
+
+Configure Prometheus to scrape spawn instances:
+
+```yaml
+# prometheus.yml
+scrape_configs:
+  - job_name: 'spawn-fleet'
+    ec2_sd_configs:
+      - region: us-east-1
+        port: 9090
+        filters:
+          - name: tag:spawn:metrics-enabled
+            values: ['true']
+    relabel_configs:
+      - source_labels: [__meta_ec2_instance_id]
+        target_label: instance_id
+```
+
+See `deployment/prometheus/prometheus.yaml` for complete configuration.
+
+### Grafana Dashboards
+
+Pre-built Grafana dashboards are available in `deployment/grafana/dashboards/`:
+- **instance-overview.json** - Single instance drill-down
+- **fleet-monitoring.json** - Fleet-wide overview
+- **cost-tracking.json** - Cost analysis and forecasting
+- **hybrid-compute.json** - EC2 + local instance metrics
+
+Import dashboards:
+```bash
+grafana-cli dashboard import deployment/grafana/dashboards/instance-overview.json
+```
+
+See `deployment/grafana/README.md` for setup instructions.
+
+## OpenTelemetry Tracing (v0.19.0+)
+
+Spawn supports distributed tracing with OpenTelemetry for debugging complex workloads.
+
+### Enabling Tracing
+
+Enable tracing via instance tags:
+
+```bash
+spawn launch --instance-type m7i.large \
+  --tag spawn:tracing-enabled=true \
+  --tag spawn:tracing-exporter=xray \
+  --tag spawn:tracing-sampling=0.1
+```
+
+Or in local config:
+
+```yaml
+observability:
+  tracing:
+    enabled: true
+    exporter: "xray"  # or "stdout"
+    sampling_rate: 0.1
+```
+
+### Supported Exporters
+
+- **xray** - AWS X-Ray (default, recommended for AWS)
+- **stdout** - Console output (debugging)
+
+### What Gets Traced
+
+When tracing is enabled, spans are created for:
+- AWS SDK calls (EC2, DynamoDB, S3, SQS, etc.)
+- Queue operations
+- Job execution
+- Peer discovery
+
+### Viewing Traces
+
+**AWS X-Ray:**
+```bash
+# View traces in X-Ray console
+open https://console.aws.amazon.com/xray/home
+
+# Query traces via CLI
+aws xray get-trace-summaries \
+  --start-time $(date -u -d '10 minutes ago' +%s) \
+  --end-time $(date -u +%s)
+```
+
+### Trace Context Propagation
+
+Traces propagate across:
+- Agent → Queue → Lambda flows
+- Multi-instance job arrays
+- Cross-service AWS SDK calls
+
+## Alertmanager Integration (v0.19.0+)
+
+Spawn supports Prometheus Alertmanager for advanced alerting beyond the existing SNS/Slack integration.
+
+### Alert Rules
+
+26 pre-built alert rules in `deployment/prometheus/alerts/`:
+
+**Instance Lifecycle (6 rules):**
+- InstanceHighIdleTime - Idle > 30 minutes
+- InstanceTTLExpiringSoon - TTL < 5 minutes
+- SpotInstanceInterruptionWarning
+- InstanceNoActivity - No activity for 2+ hours
+
+**Cost Management (6 rules):**
+- DailyCostBudgetExceeded - Total cost > $200
+- HighCostInstance - Instance > $5/hour
+- CostForecastExceeded - Predictive cost alert
+- IdleHighCostInstance - Idle instance > $2/hour
+
+**Capacity (6 rules):**
+- HighFleetSize - Fleet > 100 instances
+- FleetGrowthAnomaly - Fleet doubled in 1 hour
+- ProviderImbalance - EC2 vs local imbalance
+
+**Performance (8 rules):**
+- HighCPUUsage - CPU > 95% for 5 minutes
+- HighMemoryUsage - Memory > 90% for 5 minutes
+- GPUHighTemperature - GPU > 80°C
+- FleetAverageCPUHigh - Fleet avg CPU > 80%
+
+### Setup
+
+1. **Install Prometheus and Alertmanager:**
+```bash
+brew install prometheus alertmanager
+```
+
+2. **Configure Prometheus:**
+```bash
+cp deployment/prometheus/prometheus.yaml /etc/prometheus/prometheus.yml
+cp deployment/prometheus/alerts/*.yaml /etc/prometheus/alerts/
+```
+
+3. **Configure Alertmanager:**
+```bash
+cp deployment/prometheus/alertmanager.yaml /etc/alertmanager/alertmanager.yml
+```
+
+4. **Start services:**
+```bash
+prometheus --config.file=/etc/prometheus/prometheus.yml
+alertmanager --config.file=/etc/alertmanager/alertmanager.yml
+```
+
+### Webhook Bridge
+
+Alertmanager routes alerts through a webhook bridge to integrate with spawn's existing alert system:
+
+```
+Prometheus → Alertmanager → Webhook Bridge → SNS/Slack/Email
+```
+
+The bridge converts Prometheus alerts to spawn format and sends via configured channels.
+
+### Documentation
+
+- Complete setup: `docs/how-to/prometheus-alerting.md`
+- Metrics reference: `docs/reference/metrics.md`
+- Quick start: `deployment/prometheus/README.md`
+
 ## Testing
 
 The monitoring logic is tested in `spawn/pkg/agent/monitoring_test.go` with tests for:

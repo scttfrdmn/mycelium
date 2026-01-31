@@ -631,13 +631,141 @@ Check:
 - Alert configurations expire after 90 days (TTL)
 - Alert history expires after 90 days (TTL)
 
+## Prometheus Alertmanager Integration (v0.19.0+)
+
+Spawn now supports Prometheus Alertmanager for advanced, metric-based alerting beyond sweep-level alerts.
+
+### Overview
+
+The Alertmanager integration provides:
+- **26 pre-built alert rules** across 4 categories
+- **Real-time monitoring** via Prometheus metrics
+- **Predictive alerts** (e.g., cost forecasting)
+- **Flexible routing** to multiple destinations
+- **Alert grouping and inhibition** rules
+
+### Alert Categories
+
+**Instance Lifecycle (6 rules):**
+- InstanceHighIdleTime - Instance idle > 30 minutes
+- InstanceTTLExpiringSoon - TTL < 5 minutes remaining
+- SpotInstanceInterruptionWarning - Spot interruption detected
+- InstanceNoActivity - No activity for 2+ hours
+- InstanceIdleTimeoutExpiringSoon - Idle timeout < 5 minutes
+- InstanceRecentlyStarted - Instance started < 5 minutes ago
+
+**Cost Management (6 rules):**
+- HighCostInstance - Instance > $5/hour
+- DailyCostBudgetExceeded - Total cost > $200
+- CostTrendingUp - Cost 50%+ higher than 24h ago
+- HighRegionalCost - Regional cost > $50
+- IdleHighCostInstance - Idle instance > $2/hour
+- CostForecastExceeded - Forecasted daily cost > budget (predictive)
+
+**Capacity (6 rules):**
+- HighFleetSize - Fleet > 100 instances
+- LowSpotAvailability - < 20% spot instances
+- RegionalCapacityImbalance - One region has 3x average capacity
+- JobArraySizeAnomaly - Job array > 50 instances
+- FleetGrowthAnomaly - Fleet doubled in 1 hour
+- ProviderImbalance - EC2 10x local instances
+
+**Performance (8 rules):**
+- HighCPUUsage - CPU > 95% for 5 minutes
+- HighMemoryUsage - Memory > 90% for 5 minutes
+- GPUHighUtilization - GPU > 95% for 10 minutes
+- GPUHighTemperature - GPU > 80°C for 5 minutes
+- HighNetworkThroughput - Network > 100MB/s for 10 minutes
+- HighDiskIO - Disk I/O > 50MB/s for 10 minutes
+- FleetAverageCPUHigh - Fleet avg CPU > 80% for 10 minutes
+- RegionalPerformanceDegradation - Regional avg CPU > 90% for 15 minutes
+
+### Setup
+
+1. **Enable metrics on instances:**
+   ```bash
+   spawn launch --instance-type m7i.large \
+     --tag spawn:metrics-enabled=true \
+     --tag spawn:metrics-port=9090
+   ```
+
+2. **Install Prometheus and Alertmanager:**
+   ```bash
+   brew install prometheus alertmanager
+   ```
+
+3. **Configure Prometheus:**
+   ```bash
+   cp deployment/prometheus/prometheus.yaml /etc/prometheus/prometheus.yml
+   cp deployment/prometheus/alerts/*.yaml /etc/prometheus/alerts/
+   prometheus --config.file=/etc/prometheus/prometheus.yml
+   ```
+
+4. **Configure Alertmanager:**
+   ```bash
+   cp deployment/prometheus/alertmanager.yaml /etc/alertmanager/alertmanager.yml
+   alertmanager --config.file=/etc/alertmanager/alertmanager.yml
+   ```
+
+### Integration with Existing Alerts
+
+Alertmanager integrates with spawn's existing alert system via webhook bridge:
+
+```
+Prometheus → Alertmanager → Webhook Bridge → SNS/Slack/Email
+```
+
+The bridge converts Prometheus alerts to spawn format and routes them through your existing notification channels.
+
+### Customization
+
+Edit alert rules in `deployment/prometheus/alerts/*.yaml`:
+
+```yaml
+# Adjust CPU threshold
+- alert: HighCPUUsage
+  expr: spawn_cpu_usage_percent > 90  # Changed from 95
+  for: 5m
+  labels:
+    severity: warning
+```
+
+Reload Prometheus:
+```bash
+curl -X POST http://localhost:9090/-/reload
+```
+
+### Documentation
+
+- Complete setup guide: `docs/how-to/prometheus-alerting.md`
+- Metrics reference: `docs/reference/metrics.md`
+- Quick start: `deployment/prometheus/README.md`
+- Grafana dashboards: `deployment/grafana/README.md`
+
+### Comparison: Sweep Alerts vs Alertmanager
+
+**Use Sweep Alerts for:**
+- Parameter sweep completion/failure
+- Sweep-level cost tracking
+- Schedule-based alerts
+- Simple email/Slack notifications
+
+**Use Alertmanager for:**
+- Real-time resource monitoring (CPU, memory, GPU)
+- Fleet-wide visibility
+- Predictive cost alerts
+- Complex routing and grouping
+- Integration with existing Prometheus/Grafana stack
+
+Both systems can run concurrently and complement each other.
+
 ## Future Enhancements
 
 - CloudWatch dashboard integration
-- Periodic sweep monitoring for cost/duration thresholds
+- Periodic sweep monitoring for cost/duration thresholds (partially addressed by Alertmanager)
 - Custom alert messages and templates
 - Alert aggregation (don't spam on every instance failure)
-- PagerDuty integration
+- PagerDuty integration (possible via Alertmanager)
 - Microsoft Teams integration
 - SMS notifications via SNS
-- Alert grouping and muting
+- Alert grouping and muting (supported in Alertmanager)
