@@ -16,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/agent"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/observability/metrics"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/observability/tracing"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/pipeline"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/provider"
 )
@@ -83,8 +84,24 @@ func main() {
 		log.Fatalf("Failed to create agent: %v", err)
 	}
 
-	// Get config to check if metrics are enabled
+	// Get config and identity for observability
 	agentConfig := agent.GetConfig()
+	agentIdentity := agent.GetIdentity()
+
+	// Initialize tracer if enabled
+	var tracer *tracing.Tracer
+	if agentConfig.Observability.Tracing.Enabled {
+		log.Printf("Initializing tracer: exporter=%s, sampling=%.2f",
+			agentConfig.Observability.Tracing.Exporter,
+			agentConfig.Observability.Tracing.SamplingRate)
+
+		var err error
+		tracer, err = tracing.NewTracer(ctx, agentConfig.Observability.Tracing,
+			"spored", agentIdentity.InstanceID, agentIdentity.Region)
+		if err != nil {
+			log.Printf("Warning: Failed to initialize tracer: %v", err)
+		}
+	}
 
 	// Start metrics server if enabled
 	var metricsServer *metrics.Server
@@ -123,6 +140,14 @@ func main() {
 	// Run cleanup with a timeout context
 	cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cleanupCancel()
+
+	// Shutdown tracer if running
+	if tracer != nil {
+		log.Printf("Flushing traces...")
+		if err := tracer.Shutdown(cleanupCtx); err != nil {
+			log.Printf("Warning: Tracer shutdown error: %v", err)
+		}
+	}
 
 	// Shutdown metrics server if running
 	if metricsServer != nil {

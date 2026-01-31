@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/observability/tracing"
 )
 
 type Client struct {
@@ -27,6 +28,16 @@ func NewClient(ctx context.Context) (*Client, error) {
 	}
 
 	return &Client{cfg: cfg}, nil
+}
+
+// EnableTracing instruments AWS SDK calls with OpenTelemetry tracing
+func (c *Client) EnableTracing() {
+	tracing.InstrumentAWSConfig(&c.cfg)
+}
+
+// Config returns the AWS config (for use with service clients)
+func (c *Client) Config() aws.Config {
+	return c.cfg
 }
 
 // GetEnabledRegions returns a list of AWS regions enabled for this account

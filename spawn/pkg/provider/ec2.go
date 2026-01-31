@@ -18,6 +18,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/observability"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/observability/tracing"
 )
 
 // EC2Provider implements Provider for EC2 instances
@@ -84,15 +85,24 @@ func NewEC2Provider(ctx context.Context) (*EC2Provider, error) {
 
 	// Update config with region
 	cfg.Region = region
-	ec2Client := ec2.NewFromConfig(cfg)
 
-	// Load config from tags
+	// Load config from tags first to check if tracing is enabled
+	ec2Client := ec2.NewFromConfig(cfg)
 	providerConfig, err := loadConfigFromEC2Tags(ctx, ec2Client, instanceID)
 	if err != nil {
 		log.Printf("Warning: Could not load config from tags: %v", err)
 		providerConfig = &Config{
-			IdleCPUPercent: 5.0,
+			IdleCPUPercent:5.0,
+			Observability: observability.DefaultConfig(),
 		}
+	}
+
+	// Instrument AWS SDK with tracing if enabled
+	if providerConfig.Observability.Tracing.Enabled {
+		tracing.InstrumentAWSConfig(&cfg)
+		// Recreate EC2 client with instrumented config
+		ec2Client = ec2.NewFromConfig(cfg)
+		log.Printf("AWS SDK instrumented with tracing")
 	}
 
 	return &EC2Provider{
