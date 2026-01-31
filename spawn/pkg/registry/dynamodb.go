@@ -199,6 +199,55 @@ func getNumberValue(attr types.AttributeValue) int64 {
 	return 0
 }
 
+// DiscoverPeersForJobArray discovers peers without requiring an identity (for orchestrator)
+func DiscoverPeersForJobArray(ctx context.Context, cfg aws.Config, jobArrayID string) ([]PeerInfo, error) {
+	client := dynamodb.NewFromConfig(cfg)
+
+	result, err := client.Query(ctx, &dynamodb.QueryInput{
+		TableName:              aws.String(TableName),
+		KeyConditionExpression: aws.String("job_array_id = :job_array_id"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":job_array_id": &types.AttributeValueMemberS{Value: jobArrayID},
+		},
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to query peers: %w", err)
+	}
+
+	var peers []PeerInfo
+	now := time.Now().Unix()
+
+	for _, item := range result.Items {
+		// Check if instance is still alive
+		expiresAt := getNumberValue(item["expires_at"])
+		if expiresAt < now {
+			continue
+		}
+
+		peer := PeerInfo{
+			Index:      int(getNumberValue(item["index"])),
+			InstanceID: getStringValue(item["instance_id"]),
+			IP:         getStringValue(item["ip_address"]),
+			DNS:        "",
+			Provider:   getStringValue(item["provider"]),
+		}
+
+		peers = append(peers, peer)
+	}
+
+	return peers, nil
+}
+
+// PeerInfo represents a peer instance (duplicate from provider package to avoid circular import)
+type PeerInfo struct {
+	Index      int
+	InstanceID string
+	IP         string
+	DNS        string
+	Provider   string
+}
+
 // EnsureTable creates the DynamoDB table if it doesn't exist
 func EnsureTable(ctx context.Context) error {
 	cfg, err := config.LoadDefaultConfig(ctx)
