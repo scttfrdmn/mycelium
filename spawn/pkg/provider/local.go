@@ -17,6 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/config"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/observability"
 )
 
 // LocalProvider implements Provider for local (non-EC2) systems
@@ -70,6 +71,47 @@ func NewLocalProvider(ctx context.Context) (*LocalProvider, error) {
 		JobArrayID:      localConfig.JobArray.ID,
 		JobArrayName:    localConfig.JobArray.Name,
 		JobArrayIndex:   localConfig.JobArray.Index,
+		Observability: observability.Config{
+			Metrics: observability.MetricsConfig{
+				Enabled: localConfig.Observability.Metrics.Enabled,
+				Port:    localConfig.Observability.Metrics.Port,
+				Path:    localConfig.Observability.Metrics.Path,
+				Bind:    localConfig.Observability.Metrics.Bind,
+			},
+			Tracing: observability.TracingConfig{
+				Enabled:      localConfig.Observability.Tracing.Enabled,
+				Exporter:     localConfig.Observability.Tracing.Exporter,
+				SamplingRate: localConfig.Observability.Tracing.SamplingRate,
+				Endpoint:     localConfig.Observability.Tracing.Endpoint,
+			},
+			Alerting: observability.AlertingConfig{
+				PrometheusURL:   localConfig.Observability.Alerting.PrometheusURL,
+				AlertmanagerURL: localConfig.Observability.Alerting.AlertmanagerURL,
+			},
+		},
+	}
+
+	// Apply defaults if not set
+	if !providerConfig.Observability.Metrics.Enabled && providerConfig.Observability.Metrics.Port == 0 {
+		providerConfig.Observability = observability.DefaultConfig()
+	} else {
+		// Apply defaults for unset fields
+		defaults := observability.DefaultConfig()
+		if providerConfig.Observability.Metrics.Port == 0 {
+			providerConfig.Observability.Metrics.Port = defaults.Metrics.Port
+		}
+		if providerConfig.Observability.Metrics.Path == "" {
+			providerConfig.Observability.Metrics.Path = defaults.Metrics.Path
+		}
+		if providerConfig.Observability.Metrics.Bind == "" {
+			providerConfig.Observability.Metrics.Bind = defaults.Metrics.Bind
+		}
+		if providerConfig.Observability.Tracing.Exporter == "" {
+			providerConfig.Observability.Tracing.Exporter = defaults.Tracing.Exporter
+		}
+		if providerConfig.Observability.Tracing.SamplingRate == 0 {
+			providerConfig.Observability.Tracing.SamplingRate = defaults.Tracing.SamplingRate
+		}
 	}
 
 	provider := &LocalProvider{

@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/agent"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/observability/metrics"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/pipeline"
 	"github.com/scttfrdmn/mycelium/spawn/pkg/provider"
 )
@@ -82,6 +83,29 @@ func main() {
 		log.Fatalf("Failed to create agent: %v", err)
 	}
 
+	// Get config to check if metrics are enabled
+	agentConfig := agent.GetConfig()
+
+	// Start metrics server if enabled
+	var metricsServer *metrics.Server
+	if agentConfig.Observability.Metrics.Enabled {
+		log.Printf("Starting metrics server on %s:%d%s",
+			agentConfig.Observability.Metrics.Bind,
+			agentConfig.Observability.Metrics.Port,
+			agentConfig.Observability.Metrics.Path)
+
+		registry := metrics.NewRegistry()
+		collector := metrics.NewCollector(agent)
+		if err := registry.Register(collector); err != nil {
+			log.Printf("Warning: Failed to register metrics collector: %v", err)
+		} else {
+			metricsServer = metrics.NewServer(agentConfig.Observability.Metrics, registry)
+			if err := metricsServer.Start(ctx); err != nil {
+				log.Printf("Warning: Failed to start metrics server: %v", err)
+			}
+		}
+	}
+
 	// Handle signals
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
@@ -99,6 +123,15 @@ func main() {
 	// Run cleanup with a timeout context
 	cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cleanupCancel()
+
+	// Shutdown metrics server if running
+	if metricsServer != nil {
+		log.Printf("Shutting down metrics server...")
+		if err := metricsServer.Shutdown(cleanupCtx); err != nil {
+			log.Printf("Warning: Metrics server shutdown error: %v", err)
+		}
+	}
+
 	agent.Cleanup(cleanupCtx)
 
 	log.Printf("spored stopped")

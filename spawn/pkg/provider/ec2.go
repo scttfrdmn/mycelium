@@ -17,6 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/ec2/imds"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/scttfrdmn/mycelium/spawn/pkg/observability"
 )
 
 // EC2Provider implements Provider for EC2 instances
@@ -309,6 +310,7 @@ func loadConfigFromEC2Tags(ctx context.Context, client *ec2.Client, instanceID s
 
 	config := &Config{
 		IdleCPUPercent: 5.0, // Default
+		Observability:  observability.DefaultConfig(),
 	}
 
 	for _, tag := range output.Tags {
@@ -349,6 +351,38 @@ func loadConfigFromEC2Tags(ctx context.Context, client *ec2.Client, instanceID s
 			config.JobArrayID = *tag.Value
 		case "spawn:job-array-name":
 			config.JobArrayName = *tag.Value
+		case "spawn:job-array-size":
+			if size, err := strconv.Atoi(*tag.Value); err == nil {
+				config.JobArraySize = size
+			}
+		case "spawn:job-array-index":
+			if index, err := strconv.Atoi(*tag.Value); err == nil {
+				config.JobArrayIndex = index
+			}
+
+		// Observability - Metrics
+		case "spawn:metrics-enabled":
+			config.Observability.Metrics.Enabled = *tag.Value == "true"
+		case "spawn:metrics-port":
+			if port, err := strconv.Atoi(*tag.Value); err == nil {
+				config.Observability.Metrics.Port = port
+			}
+		case "spawn:metrics-bind":
+			config.Observability.Metrics.Bind = *tag.Value
+		case "spawn:metrics-path":
+			config.Observability.Metrics.Path = *tag.Value
+
+		// Observability - Tracing
+		case "spawn:tracing-enabled":
+			config.Observability.Tracing.Enabled = *tag.Value == "true"
+		case "spawn:tracing-exporter":
+			config.Observability.Tracing.Exporter = *tag.Value
+		case "spawn:tracing-sampling":
+			if rate, err := strconv.ParseFloat(*tag.Value, 64); err == nil {
+				config.Observability.Tracing.SamplingRate = rate
+			}
+		case "spawn:tracing-endpoint":
+			config.Observability.Tracing.Endpoint = *tag.Value
 		}
 	}
 

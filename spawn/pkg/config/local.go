@@ -47,6 +47,26 @@ type LocalConfig struct {
 		URL               string `yaml:"url"`
 		RegisterOnStartup bool   `yaml:"register_on_startup"`
 	} `yaml:"orchestrator"`
+
+	// Observability configuration
+	Observability struct {
+		Metrics struct {
+			Enabled bool   `yaml:"enabled"`
+			Port    int    `yaml:"port"`
+			Path    string `yaml:"path"`
+			Bind    string `yaml:"bind"`
+		} `yaml:"metrics"`
+		Tracing struct {
+			Enabled      bool    `yaml:"enabled"`
+			Exporter     string  `yaml:"exporter"`
+			SamplingRate float64 `yaml:"sampling_rate"`
+			Endpoint     string  `yaml:"endpoint"`
+		} `yaml:"tracing"`
+		Alerting struct {
+			PrometheusURL   string `yaml:"prometheus_url"`
+			AlertmanagerURL string `yaml:"alertmanager_url"`
+		} `yaml:"alerting"`
+	} `yaml:"observability"`
 }
 
 // LoadLocalConfig loads configuration from file and environment variables

@@ -4,6 +4,8 @@ import (
 	"context"
 	"log"
 	"time"
+
+	"github.com/scttfrdmn/mycelium/spawn/pkg/observability"
 )
 
 // Identity represents the instance's identity information
@@ -36,6 +38,10 @@ type Config struct {
 	JobArrayID    string
 	JobArrayName  string
 	JobArrayIndex int
+	JobArraySize  int
+
+	// Observability settings
+	Observability observability.Config
 }
 
 // PeerInfo represents information about a peer instance

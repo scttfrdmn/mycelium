@@ -35,3 +35,19 @@ orchestrator:
   enabled: false
   url: http://orchestrator.local:8080
   register_on_startup: false
+
+# Observability configuration (v0.19.0)
+observability:
+  metrics:
+    enabled: false    # Set to true to enable Prometheus metrics
+    port: 9090
+    path: /metrics
+    bind: localhost   # Bind to localhost for security
+  tracing:
+    enabled: false    # Set to true to enable OpenTelemetry tracing
+    exporter: xray    # xray, jaeger, stdout
+    sampling_rate: 0.1
+    endpoint: ""      # Optional custom endpoint
+  alerting:
+    prometheus_url: ""
+    alertmanager_url: ""
