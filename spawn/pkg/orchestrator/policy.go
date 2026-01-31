@@ -10,21 +10,21 @@ import (
 
 // BurstPolicy defines auto-burst behavior
 type BurstPolicy struct {
-	Mode                string  `yaml:"mode"`                   // "manual", "auto", "scheduled"
-	QueueDepthThreshold int     `yaml:"queue_depth_threshold"`  // Burst if queue > N
-	LocalCapacity       int     `yaml:"local_capacity"`         // Max local instances
-	MaxCloudInstances   int     `yaml:"max_cloud_instances"`    // Cloud instance limit
-	CostBudget          float64 `yaml:"cost_budget"`            // Max $/hour
-	ScaleDownDelay      string  `yaml:"scale_down_delay"`       // Wait before terminating idle
-	MinCloudInstances   int     `yaml:"min_cloud_instances"`    // Keep warm pool
+	Mode                string  `yaml:"mode"`                  // "manual", "auto", "scheduled"
+	QueueDepthThreshold int     `yaml:"queue_depth_threshold"` // Burst if queue > N
+	LocalCapacity       int     `yaml:"local_capacity"`        // Max local instances
+	MaxCloudInstances   int     `yaml:"max_cloud_instances"`   // Cloud instance limit
+	CostBudget          float64 `yaml:"cost_budget"`           // Max $/hour
+	ScaleDownDelay      string  `yaml:"scale_down_delay"`      // Wait before terminating idle
+	MinCloudInstances   int     `yaml:"min_cloud_instances"`   // Keep warm pool
 
 	// Instance configuration
-	InstanceType    string   `yaml:"instance_type"`
-	AMI             string   `yaml:"ami"`
-	Spot            bool     `yaml:"spot"`
-	KeyName         string   `yaml:"key_name"`
-	SubnetID        string   `yaml:"subnet_id"`
-	SecurityGroups  []string `yaml:"security_groups"`
+	InstanceType   string   `yaml:"instance_type"`
+	AMI            string   `yaml:"ami"`
+	Spot           bool     `yaml:"spot"`
+	KeyName        string   `yaml:"key_name"`
+	SubnetID       string   `yaml:"subnet_id"`
+	SecurityGroups []string `yaml:"security_groups"`
 
 	// Monitoring
 	CheckInterval string `yaml:"check_interval"` // How often to check queue
@@ -36,10 +36,10 @@ type BurstPolicy struct {
 
 // Config is the orchestrator configuration
 type Config struct {
-	JobArrayID   string       `yaml:"job_array_id"`
-	QueueURL     string       `yaml:"queue_url"`
-	BurstPolicy  BurstPolicy  `yaml:"burst_policy"`
-	Region       string       `yaml:"region"`
+	JobArrayID  string      `yaml:"job_array_id"`
+	QueueURL    string      `yaml:"queue_url"`
+	BurstPolicy BurstPolicy `yaml:"burst_policy"`
+	Region      string      `yaml:"region"`
 }
 
 // LoadConfig loads orchestrator config from file

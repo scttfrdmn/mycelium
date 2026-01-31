@@ -14,9 +14,9 @@ import (
 )
 
 const (
-	TableName           = "spawn-hybrid-registry"
-	DefaultTTLSeconds   = 3600 // 1 hour
-	HeartbeatInterval   = 30 * time.Second
+	TableName         = "spawn-hybrid-registry"
+	DefaultTTLSeconds = 3600 // 1 hour
+	HeartbeatInterval = 30 * time.Second
 )
 
 // PeerRegistry manages registration and discovery of instances
@@ -50,17 +50,17 @@ func (r *PeerRegistry) Register(ctx context.Context, jobArrayID string, index in
 	expiresAt := now + r.ttl
 
 	item := map[string]types.AttributeValue{
-		"job_array_id": &types.AttributeValueMemberS{Value: jobArrayID},
-		"instance_id":  &types.AttributeValueMemberS{Value: r.identity.InstanceID},
-		"index":        &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", index)},
-		"provider":     &types.AttributeValueMemberS{Value: r.identity.Provider},
-		"ip_address":   &types.AttributeValueMemberS{Value: r.identity.PublicIP},
-		"private_ip":   &types.AttributeValueMemberS{Value: r.identity.PrivateIP},
-		"region":       &types.AttributeValueMemberS{Value: r.identity.Region},
-		"registered_at": &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", now)},
+		"job_array_id":   &types.AttributeValueMemberS{Value: jobArrayID},
+		"instance_id":    &types.AttributeValueMemberS{Value: r.identity.InstanceID},
+		"index":          &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", index)},
+		"provider":       &types.AttributeValueMemberS{Value: r.identity.Provider},
+		"ip_address":     &types.AttributeValueMemberS{Value: r.identity.PublicIP},
+		"private_ip":     &types.AttributeValueMemberS{Value: r.identity.PrivateIP},
+		"region":         &types.AttributeValueMemberS{Value: r.identity.Region},
+		"registered_at":  &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", now)},
 		"last_heartbeat": &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", now)},
-		"expires_at":   &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", expiresAt)},
-		"status":       &types.AttributeValueMemberS{Value: "running"},
+		"expires_at":     &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", expiresAt)},
+		"status":         &types.AttributeValueMemberS{Value: "running"},
 	}
 
 	_, err := r.client.PutItem(ctx, &dynamodb.PutItemInput{

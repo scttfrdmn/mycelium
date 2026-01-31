@@ -92,8 +92,8 @@ func NewEC2Provider(ctx context.Context) (*EC2Provider, error) {
 	if err != nil {
 		log.Printf("Warning: Could not load config from tags: %v", err)
 		providerConfig = &Config{
-			IdleCPUPercent:5.0,
-			Observability: observability.DefaultConfig(),
+			IdleCPUPercent: 5.0,
+			Observability:  observability.DefaultConfig(),
 		}
 	}
 

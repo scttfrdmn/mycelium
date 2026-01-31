@@ -47,7 +47,7 @@ region: local
 			wantErr:    false,
 		},
 		{
-			name:       "environment variable override",
+			name: "environment variable override",
 			configYAML: `
 instance_id: from-file
 region: us-east-1

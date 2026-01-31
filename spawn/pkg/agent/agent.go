@@ -124,7 +124,6 @@ func NewAgent(ctx context.Context, prov provider.Provider) (*Agent, error) {
 	return agent, nil
 }
 
-
 func (a *Agent) Monitor(ctx context.Context) {
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()

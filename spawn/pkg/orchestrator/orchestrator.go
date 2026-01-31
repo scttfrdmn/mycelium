@@ -17,10 +17,10 @@ import (
 
 // Orchestrator manages automatic cloud bursting
 type Orchestrator struct {
-	config      *Config
-	sqsClient   *sqs.Client
-	ec2Client   *ec2.Client
-	registry    *registry.PeerRegistry
+	config    *Config
+	sqsClient *sqs.Client
+	ec2Client *ec2.Client
+	registry  *registry.PeerRegistry
 
 	// State tracking
 	managedInstances map[string]*ManagedInstance
@@ -394,20 +394,20 @@ func (o *Orchestrator) updateCostTracking() {
 func getInstanceCostPerHour(instanceType string, spot bool) float64 {
 	// Simplified cost mapping (US East 1 on-demand prices)
 	costs := map[string]float64{
-		"t3.micro":    0.0104,
-		"t3.small":    0.0208,
-		"t3.medium":   0.0416,
-		"t3.large":    0.0832,
-		"t3.xlarge":   0.1664,
-		"c5.large":    0.085,
-		"c5.xlarge":   0.17,
-		"c5.2xlarge":  0.34,
-		"c5.4xlarge":  0.68,
-		"c5.9xlarge":  1.53,
-		"m5.large":    0.096,
-		"m5.xlarge":   0.192,
-		"m5.2xlarge":  0.384,
-		"m5.4xlarge":  0.768,
+		"t3.micro":   0.0104,
+		"t3.small":   0.0208,
+		"t3.medium":  0.0416,
+		"t3.large":   0.0832,
+		"t3.xlarge":  0.1664,
+		"c5.large":   0.085,
+		"c5.xlarge":  0.17,
+		"c5.2xlarge": 0.34,
+		"c5.4xlarge": 0.68,
+		"c5.9xlarge": 1.53,
+		"m5.large":   0.096,
+		"m5.xlarge":  0.192,
+		"m5.2xlarge": 0.384,
+		"m5.4xlarge": 0.768,
 	}
 
 	cost, ok := costs[instanceType]

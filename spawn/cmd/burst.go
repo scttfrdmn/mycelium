@@ -33,14 +33,14 @@ extended with on-demand cloud resources.`,
 }
 
 var (
-	burstCount        int
-	burstJobArrayID   string
-	burstJobArrayName string
-	burstInstanceType string
-	burstAMI          string
-	burstSpot         bool
-	burstKeyName      string
-	burstSubnetID     string
+	burstCount          int
+	burstJobArrayID     string
+	burstJobArrayName   string
+	burstInstanceType   string
+	burstAMI            string
+	burstSpot           bool
+	burstKeyName        string
+	burstSubnetID       string
 	burstSecurityGroups []string
 )
 

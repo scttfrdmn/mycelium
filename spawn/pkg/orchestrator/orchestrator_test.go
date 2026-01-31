@@ -461,7 +461,7 @@ func TestBurstPolicy_GetCheckInterval(t *testing.T) {
 			}
 
 			p := &BurstPolicy{
-				CheckInterval:  tt.interval,
+				CheckInterval: tt.interval,
 				checkInterval: parsed,
 			}
 
@@ -476,19 +476,19 @@ func TestBurstPolicy_GetCheckInterval(t *testing.T) {
 
 func TestBurstPolicy_GetScaleDownDelay(t *testing.T) {
 	tests := []struct {
-		name     string
-		delay    string
-		wantSec  int
+		name    string
+		delay   string
+		wantSec int
 	}{
 		{
-			name:     "5 minutes",
-			delay:    "5m",
-			wantSec:  300,
+			name:    "5 minutes",
+			delay:   "5m",
+			wantSec: 300,
 		},
 		{
-			name:     "1 hour",
-			delay:    "1h",
-			wantSec:  3600,
+			name:    "1 hour",
+			delay:   "1h",
+			wantSec: 3600,
 		},
 	}
 
@@ -500,7 +500,7 @@ func TestBurstPolicy_GetScaleDownDelay(t *testing.T) {
 			}
 
 			p := &BurstPolicy{
-				ScaleDownDelay:  tt.delay,
+				ScaleDownDelay: tt.delay,
 				scaleDownDelay: parsed,
 			}
 

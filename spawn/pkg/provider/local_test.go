@@ -10,12 +10,12 @@ import (
 
 func TestLocalProvider_GetIdentity(t *testing.T) {
 	tests := []struct {
-		name      string
-		configYAML string
-		wantID    string
-		wantRegion string
+		name         string
+		configYAML   string
+		wantID       string
+		wantRegion   string
 		wantProvider string
-		wantErr   bool
+		wantErr      bool
 	}{
 		{
 			name: "valid config",
