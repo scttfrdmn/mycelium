@@ -1,6 +1,8 @@
 <h1 align="center">🍄 spore.host</h1>
 
 <p align="center">
+  <a href="https://github.com/spore-host/spore-host/actions/workflows/ci.yml"><img src="https://github.com/spore-host/spore-host/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://codecov.io/gh/spore-host/spore-host"><img src="https://codecov.io/gh/spore-host/spore-host/branch/main/graph/badge.svg" alt="codecov"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License: Apache 2.0"></a>
   <a href="https://spore.host"><img src="https://img.shields.io/badge/docs-spore.host-blue" alt="Documentation"></a>
 </p>

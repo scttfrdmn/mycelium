@@ -49,6 +49,13 @@ jobs:
           awk -v t="$total" -v m="$MIN_COVERAGE" 'BEGIN { exit !(t+0 >= m+0) }' \
             || { echo "::error::coverage ${total}% is below floor ${MIN_COVERAGE}%"; exit 1; }
 
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: ${{ matrix.module }}/coverage.out
+          flags: ${{ matrix.module }}
+          fail_ci_if_error: false
+
       - name: Vet
         working-directory: ${{ matrix.module }}
         run: go vet ./...
