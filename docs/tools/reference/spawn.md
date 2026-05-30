@@ -55,6 +55,7 @@ spawn launch analysis --instance-type r7i.4xlarge --ttl 8h \
 | `--region` | string | (config default) | AWS region |
 | `--az` | string | | Specific availability zone |
 | `--ami` | string | (auto-detects AL2023) | AMI ID |
+| `--volume-size` | int | (AMI default) | Root EBS volume size in GiB. Use for AMI-baking or large datasets that exceed the default root volume |
 | `--vpc` | string | | VPC ID (auto-creates if unset) |
 | `--subnet` | string | | Subnet ID |
 | `--security-group` | string | | Security group ID |
