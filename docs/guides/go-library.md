@@ -8,13 +8,13 @@ Each tool lives in its own Go module. Add only the packages you need:
 
 ```sh
 # Instance type discovery
-go get github.com/spore-host/spore-host/truffle
+go get github.com/spore-host/truffle
 
 # Instance lifecycle management
-go get github.com/spore-host/spore-host/spawn
+go get github.com/spore-host/spawn
 
 # Capacity watching
-go get github.com/spore-host/spore-host/lagotto
+go get github.com/spore-host/lagotto
 ```
 
 All modules require Go 1.26+ and load AWS credentials from the standard chain (`AWS_*` environment variables, `~/.aws/credentials`, or EC2/ECS metadata).
@@ -25,8 +25,8 @@ No extra configuration is needed beyond standard AWS credentials:
 
 ```go
 import (
-    truffleaws "github.com/spore-host/spore-host/truffle/pkg/aws"
-    spawnclient "github.com/spore-host/spore-host/spawn/pkg/aws"
+    truffleaws "github.com/spore-host/truffle/pkg/aws"
+    spawnclient "github.com/spore-host/spawn/pkg/aws"
 )
 
 // Both use the same credential chain as the AWS CLI
@@ -42,8 +42,8 @@ To use a specific profile, set `AWS_PROFILE` in the environment before calling `
 
 ```go
 import (
-    truffleaws "github.com/spore-host/spore-host/truffle/pkg/aws"
-    "github.com/spore-host/spore-host/truffle/pkg/find"
+    truffleaws "github.com/spore-host/truffle/pkg/aws"
+    "github.com/spore-host/truffle/pkg/find"
 )
 
 // Parse a free-text query into structured criteria
@@ -76,7 +76,7 @@ Supported query terms: vendor names (`intel`, `amd`, `graviton`), processor code
 
 ```go
 prices, err := client.GetSpotPricing(ctx, results, truffleaws.SpotOptions{
-    ShowSavings: true, // populate SavingsPercent field
+    ShowSavings: true, // populate OnDemandPrice + SavingsPercent
 })
 
 cheapest := prices[0]
@@ -90,10 +90,45 @@ fmt.Printf("Cheapest: %s %s $%.4f/hr (%.0f%% savings)\n",
     cheapest.SpotPrice, cheapest.SavingsPercent)
 ```
 
+With `ShowSavings: true`, each `SpotPriceResult` gets its `OnDemandPrice` and
+`SavingsPercent` filled in. On-demand rates come from the AWS Price List API
+(cached, refreshed at most once a day per type/region) and fall back to an
+embedded estimate table when the API is unavailable. Without `ShowSavings`,
+those fields stay `0` and no pricing call is made.
+
+### On-demand prices
+
+For the on-demand rate alone — no spot lookup — use `HourlyRate`, a single-number
+convenience that takes a purchase model:
+
+```go
+// "on-demand" (or "") → the on-demand rate; "spot" → cheapest spot across AZs.
+rate, err := client.HourlyRate(ctx, "c6i.4xlarge", "us-east-1", "on-demand")
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Printf("c6i.4xlarge on-demand: $%.4f/hr\n", rate) // → $0.6800/hr
+```
+
+`OnDemandPrice(ctx, instanceType, region)` returns the same on-demand figure
+directly. To control the price source — for tests, an offline fixture, or a
+shared cache across clients — inject your own with `SetOnDemandPricer`:
+
+```go
+// Implements truffleaws.OnDemandPricer
+client.SetOnDemandPricer(myPricer)
+```
+
+::: tip
+`"reserved"` is rejected by `HourlyRate` — reserved pricing depends on term,
+payment option, and offering class, so it isn't a point-in-time rate. Use the
+on-demand figure as a baseline and apply your own reserved discount.
+:::
+
 ### Quota check
 
 ```go
-import "github.com/spore-host/spore-host/truffle/pkg/quotas"
+import "github.com/spore-host/truffle/pkg/quotas"
 
 qc, err := quotas.NewClient(ctx)
 info, err := qc.GetQuotas(ctx, "us-east-1")
@@ -204,8 +239,8 @@ Embed capacity watches into your own tools without shelling out to the CLI.
 
 ```go
 import (
-    "github.com/spore-host/spore-host/lagotto/pkg/watcher"
-    truffleaws "github.com/spore-host/spore-host/truffle/pkg/aws"
+    "github.com/spore-host/lagotto/pkg/watcher"
+    truffleaws "github.com/spore-host/truffle/pkg/aws"
     "github.com/aws/aws-sdk-go-v2/config"
 )
 
@@ -285,11 +320,11 @@ matches, err := store.ListMatchHistory(ctx, "w-mywatch01")
 
 Full API documentation is on pkg.go.dev:
 
-- [truffle/pkg/aws](https://pkg.go.dev/github.com/spore-host/spore-host/truffle/pkg/aws) — `Client`, `InstanceTypeResult`, `SpotPriceResult`, `FilterOptions`, `SpotOptions`
-- [truffle/pkg/find](https://pkg.go.dev/github.com/spore-host/spore-host/truffle/pkg/find) — `ParseQuery`, `ParsedQuery`, `SearchCriteria`, `FindResult`, `ExplainMatch`
-- [truffle/pkg/quotas](https://pkg.go.dev/github.com/spore-host/spore-host/truffle/pkg/quotas) — `Client`, `QuotaInfo`, `CanLaunch`, `GetQuotaFamily`
-- [spawn/pkg/aws](https://pkg.go.dev/github.com/spore-host/spore-host/spawn/pkg/aws) — `Client`, `LaunchConfig`, `LaunchResult`, `InstanceInfo`
-- [lagotto/pkg/watcher](https://pkg.go.dev/github.com/spore-host/spore-host/lagotto/pkg/watcher) — `Store`, `Watch`, `MatchResult`, `NotifyChannel`, `Poller`, `ActionMode`, `WatchStatus`
+- [truffle/pkg/aws](https://pkg.go.dev/github.com/spore-host/truffle/pkg/aws) — `Client`, `InstanceTypeResult`, `SpotPriceResult`, `FilterOptions`, `SpotOptions`, `HourlyRate`, `OnDemandPrice`, `OnDemandPricer`, `SetOnDemandPricer`
+- [truffle/pkg/find](https://pkg.go.dev/github.com/spore-host/truffle/pkg/find) — `ParseQuery`, `ParsedQuery`, `SearchCriteria`, `FindResult`, `ExplainMatch`
+- [truffle/pkg/quotas](https://pkg.go.dev/github.com/spore-host/truffle/pkg/quotas) — `Client`, `QuotaInfo`, `CanLaunch`, `GetQuotaFamily`
+- [spawn/pkg/aws](https://pkg.go.dev/github.com/spore-host/spawn/pkg/aws) — `Client`, `LaunchConfig`, `LaunchResult`, `InstanceInfo`
+- [lagotto/pkg/watcher](https://pkg.go.dev/github.com/spore-host/lagotto/pkg/watcher) — `Store`, `Watch`, `MatchResult`, `NotifyChannel`, `Poller`, `ActionMode`, `WatchStatus`
 
 ## Real-world usage
 

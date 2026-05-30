@@ -22,8 +22,10 @@ spore.host will request a Spot instance. If no capacity is available, it fails i
 ## Check Spot prices first
 
 ```sh
-truffle spot g5.xlarge --regions us-east-1,us-west-2,eu-west-1
+truffle spot g5.xlarge --regions us-east-1,us-west-2,eu-west-1 --show-savings
 ```
+
+`--show-savings` adds On-Demand and Savings columns so you can see the real discount per AZ (on-demand rates are pulled live from the AWS Price List API).
 
 ::: tip Finding the right instance type
 Not sure which instance to use? See [Finding the Right Instance](/guides/finding-instances) for a step-by-step walkthrough: `truffle find` → `truffle search` → `truffle spot` → `truffle quotas`.

@@ -89,10 +89,10 @@ Common `truffle search` flags:
 Before committing, check current Spot prices. Spot can be 60–90% cheaper than on-demand:
 
 ```sh
-truffle spot m8a.4xlarge --sort-by-price --active-only
+truffle spot m8a.4xlarge --sort-by-price --active-only --show-savings
 ```
 
-Output:
+Output (`--show-savings` adds the On-Demand and Savings columns, using live AWS Price List rates):
 ```
 ┌───────────────┬───────────┬───────────────────┬───────────────┬───────────┬─────────┐
 │ Instance Type │ Region    │ Availability Zone │ Spot Price/hr │ On-Demand │ Savings │

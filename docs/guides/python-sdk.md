@@ -3,7 +3,7 @@
 ::: tip Two SDKs are available
 **REST API client** (`sdk/python/`) — manages instances and queries truffle via the spore.host HTTP API. Covered on this page.
 
-**Native CGO bindings** (`truffle/bindings/python/`) — calls the truffle Go library directly from Python, 10–50× faster. Covered in [Python Bindings (native)](/guides/python-bindings).
+**Native CGO bindings** (`truffle/bindings/python/`) — calls the truffle Go library directly from Python, 10–50× faster. See [`bindings/python/`](https://github.com/spore-host/truffle/tree/main/bindings/python) in the truffle repo.
 :::
 
 The `spore-host` Python package lets you discover EC2 instances, check Spot prices, and manage running instances from Python scripts, Jupyter notebooks, and reactive notebooks like marimo.

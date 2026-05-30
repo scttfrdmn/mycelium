@@ -102,7 +102,11 @@ Find Spot instance availability and current pricing.
 truffle spot <pattern>
 ```
 
-Queries AWS Spot price history for all instance types matching the pattern across all enabled regions (or those specified with `--regions`). Prints price range summary plus a per-AZ table.
+Queries AWS Spot price history for all instance types matching the pattern across all enabled regions (or those specified with `--regions`). Prints a price-range summary plus a per-AZ table.
+
+With `--show-savings`, the table adds On-Demand and Savings columns. On-demand rates are fetched live from the AWS Price List API (cached for a day) and fall back to a built-in estimate when the API is unavailable.
+
+The summary block is printed only for the default `table` output; `--output json`, `csv`, and `yaml` emit just the structured data, so they pipe cleanly into `jq` and other tools.
 
 **Examples:**
 ```sh
