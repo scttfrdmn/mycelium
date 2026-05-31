@@ -32,6 +32,8 @@ spawn launch --spot --ttl 12h --on-complete terminate
 spawn launch --count 8 --mpi --ttl 6h                  # MPI cluster
 spawn launch --active-processes rsession --ttl 8h       # RStudio
 spawn launch --slack-workspace T03NE3GTY --ttl 4h       # with notifications
+spawn launch --name big-disk --instance-type m7i.large --volume-size 200  # 200 GiB root
+spawn launch my-job --instance-type c6a.large -o json | jq -r '.[0].instance_id'  # scriptable
 ```
 
 ## spawn — manage
@@ -44,6 +46,8 @@ spawn extend my-instance 4h         # extend TTL
 spawn stop my-instance              # stop (preserves instance)
 spawn hibernate my-instance         # hibernate (saves RAM to disk)
 spawn start my-instance             # start stopped instance
+spawn terminate my-instance         # permanently terminate (destroys EBS)
+spawn terminate my-instance -y      # skip confirmation
 spawn connect my-instance           # SSH in
 ```
 

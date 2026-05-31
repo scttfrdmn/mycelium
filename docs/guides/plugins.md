@@ -1,132 +1,158 @@
 # Plugins
 
-Plugins extend instances at launch time — installing software, configuring services, or setting up data movement before your job starts. They run once during startup and are defined either in your launch command or in a config file.
-
-## Using a plugin at launch
-
-```sh
-spawn launch \
-  --name analysis \
-  --instance-type r6i.4xlarge \
-  --plugin rclone \
-  --plugin-config rclone.remote=my-gdrive,rclone.path=/data \
-  --ttl 8h
-```
-
-The `rclone` plugin installs rclone and configures the remote, so your data is mounted and ready before your job starts.
+Plugins install and manage software on a running instance — connecting to a
+private network, mounting data transfer tooling, running a dev server. A plugin
+is a declarative `plugin.yaml` spec describing lifecycle steps (install,
+configure, start, health-check, stop) that spawn runs on the instance.
 
 ## Available plugins
 
+The official registry lives at
+[`spore-host/spore-plugins`](https://github.com/spore-host/spore-plugins):
+
 | Plugin | What it does |
 |--------|-------------|
-| `rclone` | Mount cloud storage (Google Drive, Dropbox, S3, etc.) |
-| `conda` | Install a Conda environment from an `environment.yml` |
-| `pip` | Install Python packages from a `requirements.txt` |
-| `r-packages` | Install R packages from a `packages.txt` |
-| `docker` | Install Docker and pull specified images |
-| `aws-cli` | Install/configure the AWS CLI |
-| `s3-sync` | Sync an S3 prefix to a local path at startup |
-| `efs-mount` | Mount an EFS filesystem (alternative to `--efs-id`) |
+| `tailscale` | Connect the instance to your Tailscale private network |
+| `rstudio-server` | Browser-based R development environment |
+| `globus-personal-endpoint` | High-speed data transfer via Globus Connect Personal |
+| `spore-sync` | Live bidirectional directory sync |
 
-## Plugin configuration
+## Installing a plugin
 
-Each plugin accepts key-value configuration:
+Install onto a running instance with `spawn plugin install <ref>`:
 
 ```sh
-# Sync S3 data before starting
-spawn launch \
-  --name training \
-  --plugin s3-sync \
-  --plugin-config "s3-sync.source=s3://my-bucket/datasets/imagenet,s3-sync.dest=/data/imagenet" \
-  --command "python train.py --data /data/imagenet"
+# From the official registry, by name
+spawn plugin install tailscale --instance my-job --config auth_key=tskey-auth-...
+
+# Pin to a specific version
+spawn plugin install rstudio-server@v1.0.0 --instance my-job
+
+# From any GitHub repo
+spawn plugin install github:myorg/my-plugins/my-tool --instance my-job
+
+# From a local file (development)
+spawn plugin install ./my-plugin.yaml --instance my-job
 ```
 
-For complex configuration, use a YAML file:
+Per-plugin configuration is passed with repeatable `--config key=value` pairs.
+
+Manage installed plugins:
+
+```sh
+spawn plugin list --instance my-job        # what's installed
+spawn plugin status tailscale --instance my-job
+spawn plugin remove tailscale --instance my-job
+```
+
+## Installing at launch
+
+Declare plugins to install during startup with `--plugin` (repeatable; takes a
+`ref[@version]`):
+
+```sh
+spawn launch analysis --instance-type r6i.4xlarge --plugin rstudio-server --ttl 8h
+```
+
+For per-plugin config, use a launch config file's `plugins:` block:
 
 ```yaml
 # launch.yaml
-instance_type: p4d.24xlarge
-ttl: 24h
+instance_type: r6i.4xlarge
+ttl: 8h
 plugins:
-  - ref: s3-sync
+  - ref: tailscale
     config:
-      source: s3://my-bucket/datasets/imagenet
-      dest: /data/imagenet
-  - ref: conda
-    config:
-      environment_file: s3://my-bucket/envs/torch-2.yml
+      auth_key: tskey-auth-...
 ```
 
 ```sh
-spawn launch --config launch.yaml --name training
+spawn launch analysis --config launch.yaml
 ```
 
-## Writing a custom plugin
+## Writing a plugin
 
-A plugin is a shell script with a standard interface. Create a file at `~/.spawn/plugins/my-plugin.sh`:
+A plugin is a `plugin.yaml` file declaring lifecycle steps. Minimal example:
+
+```yaml
+name: my-tool                # kebab-case, must match the directory name
+version: v1.0.0              # semver
+description: "Install and run my-tool"
+author: you
+
+config:
+  api_key:
+    type: string             # string | int | bool
+    required: true
+    description: "API key for my-tool"
+
+conditions:
+  remote:
+    - type: platform         # command | platform
+      os: linux
+
+remote:                      # steps run on the instance
+  install:                   # phases: install, configure, start, stop, health
+    - type: run              # remote step types: run | fetch | extract
+      run: curl -fsSL https://example.com/install.sh | sh
+  start:
+    - type: run
+      run: my-tool serve --key={{ config.api_key }}
+  health:
+    interval: 30s
+    steps:
+      - type: run
+        run: my-tool status
+
+outputs:
+  endpoint:
+    description: "Service endpoint"
+```
+
+Template references in the `config`, `instance`, `outputs`, and `pushed`
+namespaces (for example `config.api_key` or `instance.name`, written in double
+braces) are substituted at run time. See
+[AUTHORING.md](https://github.com/spore-host/spore-plugins/blob/main/AUTHORING.md)
+for the full spec, including controller-side `local` steps and the `push` API for
+moving captured values to the instance.
+
+### Validate before you ship
+
+Lint a spec offline (no instance, no AWS) with `spawn plugin validate`:
 
 ```sh
-#!/bin/bash
-# Plugin: my-setup
-# Installs my custom analysis environment
-
-set -euo pipefail
-
-# Configuration is passed as environment variables
-# PLUGIN_MY_SETUP_VERSION=${PLUGIN_MY_SETUP_VERSION:-latest}
-
-apt-get install -y my-dependency
-pip install my-package==${PLUGIN_MY_SETUP_VERSION:-latest}
+spawn plugin validate ./my-tool/plugin.yaml
+spawn plugin validate plugins/*/plugin.yaml      # whole registry
 ```
 
-Use it:
+It checks schema, semver, that the directory matches the plugin name, that step
+and condition types are valid for their context, and that every config template
+reference points at a declared parameter. The official registry runs this in CI
+on every change.
 
-```sh
-spawn launch \
-  --plugin my-setup \
-  --plugin-config "my-setup.version=2.1.0" \
-  --ttl 8h
-```
+## Contributing to the registry
 
-## Plugin registry
-
-Custom plugins can be shared via a URL or Git repository:
-
-```sh
-spawn plugin install https://github.com/myorg/spawn-plugins/raw/main/bioinformatics.sh
-spawn plugin install github.com/myorg/spawn-plugins/bioinformatics
-
-# List installed plugins
-spawn plugin list
-
-# Remove a plugin
-spawn plugin remove bioinformatics
-```
+Open a PR against [`spore-host/spore-plugins`](https://github.com/spore-host/spore-plugins)
+adding `plugins/<name>/plugin.yaml`. CI validates it automatically; gated
+integration tests then install it on a real instance.
 
 ## Data movement patterns
 
-The most common use for plugins is getting data onto the instance before work starts and getting results off before it terminates.
-
-**Pre-job data setup:**
+A common companion to plugins is moving data on and off the instance around your
+job. The `--pre-stop` hook syncs results out before any shutdown — TTL expiry,
+idle stop, or Spot interruption:
 
 ```sh
-spawn launch \
-  --plugin s3-sync \
-  --plugin-config "s3-sync.source=s3://my-bucket/input,s3-sync.dest=/data/input" \
+spawn launch process --instance-type r7i.4xlarge --ttl 8h \
   --pre-stop "aws s3 sync /data/output s3://my-bucket/output/" \
   --command "python process.py --input /data/input --output /data/output"
 ```
 
-The `--pre-stop` hook syncs output to S3 before any shutdown — whether that's TTL expiry, idle stop, or Spot interruption.
-
-**Using EFS for persistent shared storage:**
+For persistent shared storage across instances, mount EFS:
 
 ```sh
-spawn launch \
-  --name analysis \
-  --efs-id fs-0abc123 \
-  --efs-mount /shared \
+spawn launch analysis --efs-id fs-0abc123 --efs-mount /shared \
   --command "python analyze.py --data /shared/datasets --output /shared/results"
 ```
 
-Data written to `/shared` persists after the instance terminates and is accessible from other instances or a future launch.
+Data written to `/shared` persists after the instance terminates.

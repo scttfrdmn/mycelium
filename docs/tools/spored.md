@@ -13,6 +13,15 @@ Once started, spored runs a check every minute:
 
 Spot interruption notices are polled separately every 5 seconds and acted on immediately.
 
+## Versioning
+
+Spored is built and released **in lockstep with spawn** — the same version tag,
+the same GoReleaser run. Every spawn release publishes the matching spored
+binary (Linux `amd64`/`arm64`) to regional S3 buckets, and `spawn launch`
+provisions it onto the instance automatically. There is no separate spored
+version to track or install: `spored version` on an instance reports the spawn
+release it shipped with.
+
 ## Subcommands
 
 Spored is invoked directly on the instance (not from your laptop):

@@ -28,15 +28,26 @@ lagotto watch <instance-type-pattern>
 
 Registers a watch in DynamoDB. The deployed Lambda polls on a schedule and takes the configured action when capacity matching the pattern is found. If the polling schedule was self-disabled (no active watches), `lagotto watch` re-enables it.
 
-**Pattern syntax:** Wildcards supported — `p5.*` matches all p5 sizes, `g5.xlarge` is an exact match.
+**Pattern syntax:** Wildcards supported — `p5.*` matches all p5 sizes, `g5.xlarge` is an exact match. With `--service sagemaker` the pattern is an `ml.*` type (e.g. `ml.g5.2xlarge`), which is proxied to the correlated EC2 family (`g5.2xlarge`).
+
+**Services (`--service`):**
+
+| Service | Behavior |
+|---------|----------|
+| `ec2` (default) | Watch EC2 capacity directly. For `spawn`, the launch attempt is the capacity test. |
+| `sagemaker` | Watch SageMaker `ml.*` capacity via the correlated EC2 family as a **proxy heuristic** (no real SageMaker capacity API exists). **Notify-only** — `spawn`/`hold` are rejected. Pattern must start with `ml.`. |
 
 **Actions:**
 
 | Action | Behavior |
 |--------|----------|
 | `notify` | Send a notification via the configured channels |
-| `spawn` | Launch an instance using the provided spawn config file |
-| `hold` | Record the match but take no automatic action |
+| `spawn` | Launch an instance using the provided spawn config file. A capacity failure keeps the watch `active` to retry; a terminal failure (bad AMI/IAM, exhausted quota) marks it `failed` |
+| `hold` | Create a short-lived On-Demand Capacity Reservation to hold the matched capacity |
+
+The watch **TTL is the only time limit** — there is no max-retry count. A
+capacity failure (`InsufficientInstanceCapacity`) is not terminal: the watch
+retries on each poll until it succeeds or the TTL expires.
 
 **Examples:**
 ```sh
@@ -51,16 +62,20 @@ lagotto watch "g5.xlarge" --action spawn --spawn-config my-job.yaml
 
 # Watch specific regions only
 lagotto watch "p5.48xlarge" --regions us-east-1,us-west-2
+
+# Watch SageMaker ml.* capacity (proxy; notify-only)
+lagotto watch "ml.g5.2xlarge" --service sagemaker --notify email:you@example.com
 ```
 
 **Flags:**
 
 | Flag | Short | Type | Default | Description |
 |------|-------|------|---------|-------------|
+| `--service` | | string | `ec2` | Capacity service: `ec2`, or `sagemaker` (EC2-proxy for `ml.*` types; notify-only) |
 | `--regions` | `-r` | strings | (all enabled) | Regions to watch (comma-separated; empty = all enabled regions) |
 | `--spot` | | bool | `false` | Watch for Spot capacity (default: On-Demand) |
 | `--max-price` | | float | `0` | Maximum acceptable price per hour in USD; `0` = any price |
-| `--action` | | string | `notify` | Action on match: `notify`, `spawn`, `hold` |
+| `--action` | | string | `notify` | Action on match: `notify`, `spawn`, `hold` (SageMaker: `notify` only) |
 | `--ttl` | | string | `24h` | How long to keep watching (e.g., `24h`, `7d`, `168h`) |
 | `--notify` | | strings | | Notification channels: `email:user@example.com`, `webhook:https://...`, `sns:arn:...` |
 | `--spawn-config` | | string | | Path to YAML file with spawn LaunchConfig (required when `--action spawn`) |
@@ -75,9 +90,11 @@ List your active watches.
 lagotto list [--all]
 ```
 
-By default shows only active watches. Use `--all` to include expired and cancelled watches.
+By default shows only active watches. Use `--all` to include `matched`, `failed`, `expired`, and `cancelled` watches.
 
 **Output columns:** Watch ID, Status, Pattern, Regions, Spot, Action, Expires
+
+**Watch statuses:** `active` (being polled), `matched` (action succeeded), `failed` (terminal launch error — bad AMI/IAM, exhausted quota), `expired` (TTL elapsed), `cancelled`.
 
 **Examples:**
 ```sh
@@ -190,6 +207,8 @@ lagotto poll
 ```
 
 Triggers a single poll of all active watches — the same logic the Lambda runs on its schedule. Useful for testing your watches without waiting for the next scheduled poll.
+
+Within a poll, a `spawn` watch actually **attempts a launch** (the real capacity test). A capacity failure leaves the watch `active` to retry next cycle; a terminal failure sets it `failed`. The poller is a self-terminating per-account singleton: when no active watches remain, the Lambda disables its own schedule (a new `lagotto watch` re-enables it).
 
 **Examples:**
 ```sh

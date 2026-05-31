@@ -46,17 +46,15 @@ Detailed status for one instance:
 spawn status my-instance
 spawn status i-0a1b2c3d4e5f
 spawn status my-instance -o json       # machine-readable
-spawn status my-instance --check-complete && echo "done"  # exit 0=complete, 1=failed, 2=running, 3=error
 ```
 
-**`--check-complete` exit codes** — useful for polling from scripts:
-
-| Exit | Meaning |
-|------|---------|
-| 0 | Completed |
-| 1 | Failed or cancelled |
-| 2 | Still running |
-| 3 | Error querying status |
+::: warning `--check-complete` is sweep-only
+The `--check-complete` flag's standardized exit codes (`0`=complete, `1`=failed,
+`2`=running, `3`=error) are reliable for **parameter sweeps** only — use
+`spawn sweep status --check-complete`. For a single instance it currently always
+exits `0` ([#26](https://github.com/spore-host/spawn/issues/26)); poll the
+`-o json` output's `state` field or check the completion file over SSH instead.
+:::
 
 **JSON schema** (`-o json`) — key fields returned:
 
@@ -78,6 +76,19 @@ spawn status my-instance --check-complete && echo "done"  # exit 0=complete, 1=f
 spawn stop my-instance              # stop (billing pauses, data preserved)
 spawn hibernate my-instance         # hibernate to disk (saves RAM state)
 spawn start my-instance             # start stopped or hibernated instance
+```
+
+`stop` and `hibernate` preserve EBS volumes. To permanently destroy an instance, use `terminate`.
+
+### `spawn terminate`
+
+Permanently terminate an instance — destroys the instance and its EBS volumes
+(unlike `stop`/`hibernate`). Irreversible, so it confirms by default:
+
+```sh
+spawn terminate my-instance              # prompts, then terminates
+spawn terminate my-instance -y           # skip confirmation
+spawn terminate --job-array-name workers # terminate a whole job array
 ```
 
 ### `spawn extend`
@@ -184,10 +195,16 @@ inst = spore.spawn.status("my-job")
 inst.wait("terminated")
 ```
 
-Or poll `spawn status` directly:
+Or poll `spawn status -o json` directly and inspect `state` (for a single
+instance — `--check-complete` is sweep-only, see the warning above):
+```bash
+while [ "$(spawn status my-job -o json | jq -r '.state')" = "running" ]; do sleep 30; done
+```
+
+For a parameter sweep, `--check-complete` gives reliable exit codes:
 ```bash
 # Exit 0=complete, 1=failed, 2=running, 3=error
-spawn status my-job --check-complete
+spawn sweep status my-sweep --check-complete
 ```
 
 ## Full command reference

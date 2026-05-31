@@ -45,6 +45,18 @@ spawn launch mpi-job --instance-type hpc7i.48xlarge --count 4 --mpi --efa
 # With pre-stop S3 sync before lifecycle termination
 spawn launch analysis --instance-type r7i.4xlarge --ttl 8h \
   --pre-stop "aws s3 sync /results s3://bucket/run-001"
+
+# Larger root volume
+spawn launch big-disk --instance-type m7i.large --volume-size 200
+```
+
+**JSON output:** With `-o json`, the TUI progress display is suppressed and
+`spawn launch` emits a parseable JSON **array** of launched instances, each with
+`instance_id`, `name`, `instance_type`, `region`, `public_ip`, `state`, and
+`dns`. Capture the ID in scripts with:
+
+```sh
+id=$(spawn launch my-job --instance-type c6a.large -y -o json | jq -r '.[0].instance_id')
 ```
 
 ### Instance configuration
@@ -54,7 +66,7 @@ spawn launch analysis --instance-type r7i.4xlarge --ttl 8h \
 | `--instance-type` | string | | EC2 instance type |
 | `--region` | string | (config default) | AWS region |
 | `--az` | string | | Specific availability zone |
-| `--ami` | string | (auto-detects AL2023) | AMI ID |
+| `--ami` | string | (auto-detects AL2023) | AMI ID. Use `auto` (or omit) to auto-detect the latest AL2023 AMI |
 | `--volume-size` | int | (AMI default) | Root EBS volume size in GiB. Use for AMI-baking or large datasets that exceed the default root volume |
 | `--vpc` | string | | VPC ID (auto-creates if unset) |
 | `--subnet` | string | | Subnet ID |
@@ -271,6 +283,14 @@ spawn status i-0abc123
 |------|------|---------|-------------|
 | `--check-complete` | bool | `false` | Exit with standardized codes: `0`=complete, `1`=failed, `2`=running, `3`=error |
 
+::: warning
+For a **single instance**, `--check-complete` currently always exits `0`
+regardless of completion state ([#26](https://github.com/spore-host/spawn/issues/26)).
+The standardized exit codes are reliable for **sweeps** only — use
+`spawn sweep status --check-complete`. To wait on a single instance meanwhile,
+poll `spawn status` output or check the completion file over SSH.
+:::
+
 ---
 
 ## spawn connect
@@ -357,7 +377,36 @@ spawn start <instance-id-or-name>
 spawn hibernate <instance-id-or-name>
 ```
 
-All three commands accept `--job-array-id` or `--job-array-name` to operate on an entire job array at once.
+All three commands accept `--job-array-id` or `--job-array-name` to operate on an entire job array at once. `stop` and `hibernate` preserve EBS volumes — to permanently destroy an instance, use `spawn terminate`.
+
+---
+
+## spawn terminate
+
+Permanently terminate an instance. Unlike `stop`/`hibernate` (which preserve EBS
+volumes), `terminate` destroys the instance and its EBS volumes. This is
+irreversible, so it prompts for confirmation by default.
+
+```
+spawn terminate <instance-id-or-name>
+spawn terminate --job-array-id <id>
+spawn terminate --job-array-name <name>
+```
+
+**Examples:**
+```sh
+spawn terminate my-instance         # prompts, then terminates (EBS destroyed)
+spawn terminate my-instance -y      # skip the confirmation prompt
+spawn terminate --job-array-name workers   # terminate the whole array
+```
+
+**Flags:**
+
+| Flag | Short | Type | Default | Description |
+|------|-------|------|---------|-------------|
+| `--yes` | `-y` | bool | `false` | Skip the confirmation prompt |
+| `--job-array-id` | | string | | Terminate all instances in job array by ID |
+| `--job-array-name` | | string | | Terminate all instances in job array by name |
 
 ---
 
@@ -784,6 +833,7 @@ spawn plugin <subcommand>
 | `list` | List installed plugins |
 | `status` | Show plugin status |
 | `remove` | Remove a plugin |
+| `validate` | Lint one or more `plugin.yaml` files offline (no install): `spawn plugin validate <path>...` |
 
 See the [plugins guide](/guides/plugins) for usage.
 

@@ -128,13 +128,13 @@ This shows state, IP, type, uptime, and time remaining before auto-termination.
 
 ## 7. Clean up
 
-When you're done:
+When you're done, permanently terminate it (destroys the instance and its EBS volume):
 
 ```sh
-spawn stop my-first-instance
+spawn terminate my-first-instance       # confirms first; add -y to skip
 ```
 
-Or just leave it — it auto-terminates after 1 hour (the default idle timeout).
+Or `spawn stop my-first-instance` to keep the EBS volume and resume later — or just leave it, since it auto-terminates after 1 hour (the default idle timeout).
 
 ---
 
