@@ -9,6 +9,12 @@ on:
 permissions:
   contents: read
 
+# Force bundled Node 20 actions (e.g. github-script inside
+# codecov-action@v5) onto Node 24 ahead of GitHub's 2026-06-16 cutover
+# (spore-host#345). These jobs run on GitHub-hosted runners.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   lambda-tests:
     name: Lambda module tests
