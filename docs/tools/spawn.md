@@ -46,15 +46,23 @@ Detailed status for one instance:
 spawn status my-instance
 spawn status i-0a1b2c3d4e5f
 spawn status my-instance -o json       # machine-readable
+spawn status my-instance --check-complete   # exit 0=complete 1=failed 2=running 3=error
 ```
 
-::: warning `--check-complete` is sweep-only
-The `--check-complete` flag's standardized exit codes (`0`=complete, `1`=failed,
-`2`=running, `3`=error) are reliable for **parameter sweeps** only — use
-`spawn sweep status --check-complete`. For a single instance it currently always
-exits `0` ([#26](https://github.com/spore-host/spawn/issues/26)); poll the
-`-o json` output's `state` field or check the completion file over SSH instead.
-:::
+**`--check-complete`** polls the instance's completion file and exits with a
+standardized code, so scripts can wait for a workload to finish (v0.36.6+):
+
+| Exit | Meaning |
+|------|---------|
+| 0 | Complete — completion file present |
+| 1 | Failed — completion file reports a failure status |
+| 2 | Running — completion file not yet present |
+| 3 | Error — instance unreachable or status undeterminable |
+
+```sh
+# Wait for a workload to finish
+while spawn status my-job --check-complete; [ $? -eq 2 ]; do sleep 30; done
+```
 
 **JSON schema** (`-o json`) — key fields returned:
 
@@ -195,16 +203,11 @@ inst = spore.spawn.status("my-job")
 inst.wait("terminated")
 ```
 
-Or poll `spawn status -o json` directly and inspect `state` (for a single
-instance — `--check-complete` is sweep-only, see the warning above):
-```bash
-while [ "$(spawn status my-job -o json | jq -r '.state')" = "running" ]; do sleep 30; done
-```
-
-For a parameter sweep, `--check-complete` gives reliable exit codes:
+Or poll `spawn status --check-complete` and branch on its exit code (works for a
+single instance and, via `spawn sweep status --check-complete`, for sweeps):
 ```bash
 # Exit 0=complete, 1=failed, 2=running, 3=error
-spawn sweep status my-sweep --check-complete
+while spawn status my-job --check-complete; [ $? -eq 2 ]; do sleep 30; done
 ```
 
 ## Full command reference

@@ -283,13 +283,10 @@ spawn status i-0abc123
 |------|------|---------|-------------|
 | `--check-complete` | bool | `false` | Exit with standardized codes: `0`=complete, `1`=failed, `2`=running, `3`=error |
 
-::: warning
-For a **single instance**, `--check-complete` currently always exits `0`
-regardless of completion state ([#26](https://github.com/spore-host/spawn/issues/26)).
-The standardized exit codes are reliable for **sweeps** only — use
-`spawn sweep status --check-complete`. To wait on a single instance meanwhile,
-poll `spawn status` output or check the completion file over SSH.
-:::
+`--check-complete` inspects the instance's completion file (`spawn:completion-file`,
+default `/tmp/SPAWN_COMPLETE`): `0` if present, `1` if it reports a failure status,
+`2` if absent (still running), `3` on error. Works for a single instance (v0.36.6+)
+and, via `spawn sweep status --check-complete`, for parameter sweeps.
 
 ---
 
