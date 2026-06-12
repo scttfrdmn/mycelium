@@ -7,7 +7,7 @@
   <a href="https://spore.host"><img src="https://img.shields.io/badge/docs-spore.host-blue" alt="Documentation"></a>
 </p>
 
-**spore.host** is a suite of tools for launching and managing AWS EC2 instances — with automatic lifecycle management so instances clean up after themselves.
+**spore.host** is a suite of tools for launching and managing AWS EC2 instances (Linux **and Windows**) — with automatic lifecycle management so instances clean up after themselves.
 
 This repository (`spore-host/spore-host`) holds the **shared infrastructure** behind spore.host: the hosted REST API, the dashboard, the Python SDK, deployment automation, AMI builds, and the documentation site. **The CLI tools each live in their own repository** (see below).
 
@@ -20,7 +20,7 @@ Each tool is developed and released independently:
 | Tool | Repo | What it does |
 |------|------|--------------|
 | 🔍 **truffle** | [spore-host/truffle](https://github.com/spore-host/truffle) | Find capacity, compare spot prices, check quotas |
-| 🚀 **spawn** | [spore-host/spawn](https://github.com/spore-host/spawn) | Launch and manage instances (includes the `spored` lifecycle daemon) |
+| 🚀 **spawn** | [spore-host/spawn](https://github.com/spore-host/spawn) | Launch and manage Linux & Windows instances (build a Windows AMI from an ISO; connect via SSH, RDP, or SSM; includes the `spored` lifecycle daemon) |
 | 👁️ **lagotto** | [spore-host/lagotto](https://github.com/spore-host/lagotto) | Watch for EC2 capacity and act when it appears |
 | 🤖 **spore-host-mcp** | [spore-host/spore-host-mcp](https://github.com/spore-host/spore-host-mcp) | AI assistant integration (Claude, Cursor) |
 | 🧩 **spore-plugins** | [spore-host/spore-plugins](https://github.com/spore-host/spore-plugins) | Official plugin registry for spawn |
@@ -60,6 +60,16 @@ spawn connect my-job
 # Watch for scarce GPU capacity and auto-launch when it appears
 lagotto watch "p5.48xlarge" --action spawn --spawn-config training.yaml --ttl 7d
 ```
+
+**Windows, too** — turn a Windows 11 ISO into a fast-booting AMI, launch it, and connect by RDP or SSH:
+
+```bash
+spawn image import --iso Win11_Enterprise.iso --name win11   # ISO → AMI (auto-warmed)
+spawn launch winbox --ami <ami-id> --os windows --ttl 4h
+spawn connect winbox --rdp        # graphical desktop  (or --ssh, or a PowerShell-over-SSM shell)
+```
+
+See the [Windows beta guide](https://github.com/spore-host/spawn/blob/main/docs/windows-beta-guide.md) for the full walkthrough.
 
 Full usage at **[spore.host/docs](https://spore.host)**.
 
