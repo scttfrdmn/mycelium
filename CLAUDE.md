@@ -41,6 +41,14 @@
 - `component:truffle`, `component:spawn`, `component:spawnd`
 - Create custom labels as needed for project-specific categories
 
+## Versioning & Changelog
+- Follow **[Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html)**: MAJOR for breaking changes, MINOR for backward-compatible features, PATCH for fixes (pre-1.0, breaking changes bump MINOR).
+- Maintain a **[Keep a Changelog](https://keepachangelog.com/en/1.1.0/)**-format `CHANGELOG.md` at the repo root.
+- Update `CHANGELOG.md` in the **same PR** as any user-facing change: add an entry under `## [Unreleased]` in the right group (Added/Changed/Deprecated/Removed/Fixed/Security). Write for humans — describe the effect, not the implementation.
+- On release: promote `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`, open a fresh empty Unreleased, update the comparison links, and tag `vX.Y.Z`.
+- GoReleaser auto-generates the GitHub Release notes from commits; `CHANGELOG.md` is the curated, human-facing source of truth. Keep both.
+- This applies to every spore.host repo (truffle, spawn, lagotto, …), each with its own `CHANGELOG.md`.
+
 ## Go Standards
 - Go 1.21+ with modules
 - `gofmt`, `goimports` on all code
