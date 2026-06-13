@@ -183,7 +183,7 @@ func matchByEC2(ctx context.Context, regs []BotRegistration, target string) *Bot
 			return r
 		}
 		// Collect tags
-		var dnsShort, accountBase36 string
+		var dnsShort, accountBase36, accountName string
 		for _, tag := range inst.Tags {
 			if tag.Key == nil || tag.Value == nil {
 				continue
@@ -197,22 +197,44 @@ func matchByEC2(ctx context.Context, regs []BotRegistration, target string) *Bot
 				dnsShort = *tag.Value
 			case r.TagPrefix + ":account-base36":
 				accountBase36 = *tag.Value
+			case r.TagPrefix + ":account-name":
+				accountName = *tag.Value
 			}
 		}
-		// Match short DNS name or constructed full name
+		// Match short DNS name or either constructed full name. The instance may
+		// be reachable at both {short}.{base36}.spore.host (canonical) and
+		// {short}.{account-name}.spore.host (the friendly alias, #121), so accept
+		// whichever the user typed.
 		if dnsShort != "" {
 			if strings.EqualFold(dnsShort, target) {
 				return r
 			}
-			if accountBase36 != "" {
-				full := dnsShort + "." + accountBase36 + ".spore.host"
-				if strings.EqualFold(full, target) {
+			for _, seg := range []string{accountBase36, accountName} {
+				if seg != "" && strings.EqualFold(dnsShort+"."+seg+".spore.host", target) {
 					return r
 				}
 			}
 		}
 	}
 	return nil
+}
+
+// instanceFQDN builds the display FQDN for an instance, preferring the friendly
+// account-name segment ({short}.{account-name}.spore.host) when the account has
+// a name — that's the point of #121 — and falling back to the canonical base36
+// segment. Returns "" if there's no short DNS name or no account segment at all.
+func instanceFQDN(dnsShort, accountName, accountBase36 string) string {
+	if dnsShort == "" {
+		return ""
+	}
+	seg := accountName
+	if seg == "" {
+		seg = accountBase36
+	}
+	if seg == "" {
+		return ""
+	}
+	return dnsShort + "." + seg + ".spore.host"
 }
 
 func registrationNames(regs []BotRegistration) string {
@@ -399,7 +421,7 @@ func getStatus(ctx context.Context, client *ec2.Client, reg *BotRegistration) (s
 
 	// Collect useful tags
 	displayName := reg.Nickname
-	var dnsShort, accountBase36, ttl, onComplete, idleTimeout string
+	var dnsShort, accountBase36, accountName, ttl, onComplete, idleTimeout string
 	var hibernateOnIdle bool
 	var loggedInCount int
 	for _, tag := range inst.Tags {
@@ -413,6 +435,8 @@ func getStatus(ctx context.Context, client *ec2.Client, reg *BotRegistration) (s
 			dnsShort = *tag.Value
 		case reg.TagPrefix + ":account-base36":
 			accountBase36 = *tag.Value
+		case reg.TagPrefix + ":account-name":
+			accountName = *tag.Value
 		case reg.TagPrefix + ":ttl":
 			ttl = *tag.Value
 		case reg.TagPrefix + ":on-complete":
@@ -431,8 +455,8 @@ func getStatus(ctx context.Context, client *ec2.Client, reg *BotRegistration) (s
 	}
 
 	dnsName := reg.DNSName
-	if dnsName == "" && dnsShort != "" && accountBase36 != "" {
-		dnsName = dnsShort + "." + accountBase36 + ".spore.host"
+	if dnsName == "" {
+		dnsName = instanceFQDN(dnsShort, accountName, accountBase36)
 	}
 
 	launchTime := ""
