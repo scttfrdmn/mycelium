@@ -102,6 +102,11 @@ resource "aws_iam_role_policy" "spore_bot" {
         Resource = "arn:aws:lambda:${var.region}:${local.account_id}:function:${local.fn_name}"
       },
       {
+        # The account in this ARN is intentionally a wildcard: SpawnBotCrossAccount
+        # roles live in USERS' own AWS accounts (the bot assumes into them to run
+        # EC2 ops for /spore stop etc.), so the account id genuinely cannot be
+        # pinned. The role name is fixed, bounding the scope.
+        # nosemgrep: terraform.lang.security.iam.no-iam-creds-exposure.no-iam-creds-exposure
         Sid      = "SporeBotCrossAccountEC2"
         Effect   = "Allow"
         Action   = "sts:AssumeRole"
@@ -112,6 +117,12 @@ resource "aws_iam_role_policy" "spore_bot" {
         Effect   = "Allow"
         Action   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"]
         Resource = "arn:aws:logs:${var.region}:${local.account_id}:log-group:/aws/lambda/${local.fn_name}*"
+      },
+      {
+        Sid      = "SporeBotXRay"
+        Effect   = "Allow"
+        Action   = ["xray:PutTraceSegments", "xray:PutTelemetryRecords"]
+        Resource = "*"
       }
     ]
   })
@@ -129,6 +140,12 @@ resource "aws_lambda_function" "spore_bot" {
   architectures = ["arm64"]
   memory_size   = 256
   timeout       = 120
+
+  # End-to-end request tracing (Semgrep best-practice; paired with xray:Put* in
+  # the role). Applies on the next apply — a benign addition to the live function.
+  tracing_config {
+    mode = "Active"
+  }
 
   # Placeholder code reference; real code comes from `make deploy`. Required by
   # the provider but ignored below so a deploy is never reverted.
