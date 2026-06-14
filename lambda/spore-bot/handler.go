@@ -19,6 +19,13 @@ func handleWebhook(ctx context.Context, cfg aws.Config, reg *Registry, request e
 	var platform string
 	var err error
 
+	// Discord interactions are their own flow: a single app-wide endpoint, Ed25519
+	// verification, a PING/PONG handshake, and a synchronous DEFERRED ack with the
+	// real result delivered via follow-up. Handle it before the Slack/Teams path (#2).
+	if strings.HasSuffix(path, "/discord") {
+		return handleDiscordWebhook(ctx, cfg, reg, request)
+	}
+
 	// Handle Slack URL verification challenge before any signature checking.
 	// Slack sends this once when a slash command endpoint is configured.
 	if strings.HasSuffix(path, "/slack") {
@@ -96,6 +103,78 @@ func handleWebhook(ctx context.Context, cfg aws.Config, reg *Registry, request e
 		go executeAction(context.Background(), cfg, reg, action)
 	}
 	return jsonResp(200, fmt.Sprintf(`{"text":%q}`, ackMessage(command, nickname))), nil
+}
+
+// handleDiscordWebhook verifies a Discord interaction (Ed25519), answers the
+// PING handshake, and for a slash command ACKs with a DEFERRED response while
+// the real result is computed async and delivered via the interaction follow-up
+// webhook (#2). Discord's 3-second deadline is met by the deferred ack.
+func handleDiscordWebhook(ctx context.Context, cfg aws.Config, reg *Registry, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+	sig := headerLookup(request.Headers, "X-Signature-Ed25519")
+	ts := headerLookup(request.Headers, "X-Signature-Timestamp")
+	body := []byte(request.Body)
+
+	// Parse first to learn the guild, so we can fetch its app public key. (We
+	// verify before acting on anything; an unparseable body fails closed.)
+	var it discordInteraction
+	if err := json.Unmarshal(body, &it); err != nil {
+		return errorResp(400, "invalid interaction body"), nil
+	}
+
+	ws, err := reg.GetWorkspace(ctx, "discord", it.GuildID)
+	if err != nil || ws == nil {
+		logf("discord: no workspace for guild %s", it.GuildID)
+		return errorResp(401, "unknown guild"), nil
+	}
+	if err := verifyDiscordSignature(ws.PublicKey, sig, ts, body); err != nil {
+		logf("discord signature verification failed (guild %s): %v", it.GuildID, err)
+		return errorResp(401, "invalid request signature"), nil
+	}
+
+	// PING → PONG handshake (Discord verifies the endpoint this way).
+	if it.Type == discordInteractionPing {
+		return jsonResp(200, fmt.Sprintf(`{"type":%d}`, discordResponsePong)), nil
+	}
+
+	if it.Type != discordInteractionApplicationCommand {
+		// Components/autocomplete/etc. aren't used yet — ack harmlessly.
+		return jsonResp(200, fmt.Sprintf(`{"type":%d}`, discordResponsePong)), nil
+	}
+
+	// Map the slash command. We model `/spore <command> <nickname> [arg]` as
+	// subcommand options so it mirrors the Slack/Teams text parse.
+	command := it.optionString("command")
+	if command == "" {
+		command = "help"
+	}
+	action := &BotAction{
+		Platform:     "discord",
+		WorkspaceID:  it.GuildID,
+		UserID:       it.discordUserID(),
+		ResponseURL:  discordFollowupURL(it.AppID, it.Token),
+		Command:      command,
+		Nickname:     it.optionString("name"),
+		Arg:          it.optionString("arg"),
+		SlashCommand: "/" + it.Data.Name,
+	}
+
+	// Kick off the real work async; the deferred ack below buys >3s.
+	if err := invokeAsync(ctx, action); err != nil {
+		logf("discord async invoke failed: %v", err)
+		go executeAction(context.Background(), cfg, reg, action)
+	}
+	// DEFERRED ack: shows "spore-bot is thinking…"; executeAction edits it with
+	// the result via postDiscordResponse.
+	return jsonResp(200, fmt.Sprintf(`{"type":%d}`, discordResponseDeferredChannelMsg)), nil
+}
+
+// headerLookup returns a header value, tolerating canonical and lowercased keys
+// (API Gateway / Function URL casing varies).
+func headerLookup(headers map[string]string, key string) string {
+	if v := headers[key]; v != "" {
+		return v
+	}
+	return headers[strings.ToLower(key)]
 }
 
 // handleSlackWebhook verifies the Slack signature and parses the slash command.

@@ -20,6 +20,15 @@ own changelogs for CLI releases.
   instance/region/URL fields) to the workspace's channel webhook. Adds a
   `PublicKey` field to the workspace registry for Discord's Ed25519 interaction
   verification (used by Phase 2 slash commands). New `docs/guides/discord-setup.md`.
+- **spore-bot** Discord slash commands (Phase 2 of spore-host/spawn#2): a
+  `/discord` interactions endpoint verifies Discord's Ed25519 request signature
+  (per-application public key), answers the PING/PONG handshake, and dispatches
+  `/spore list|status|start|stop|hibernate|url|extend|connect` through the same
+  async action machinery as Slack/Teams — replying with a deferred ack and
+  editing in the result (meeting Discord's 3-second deadline). Multi-tenant: any
+  guild installs the published app and registers via `spawn notify workspace-add
+  --platform discord`. New `scripts/register-discord-commands.sh` registers the
+  global slash command; setup guide extended with the Phase 2 install flow.
 - **spore-bot** honors the friendly account-name DNS segment: it displays
   `{name}.{account-name}.spore.host` when the instance has a `spawn:account-name`
   tag (falling back to base36) and matches a user-typed target against either

@@ -77,3 +77,52 @@ posts the embed to your channel webhook.
 
 That's it — you'll see embeds in the channel as the instance warns, stops, or
 completes.
+
+## Phase 2: Slash commands (`/spore` in your own server)
+
+Add the spore-bot **application** to your guild so members can run
+`/spore list|status|start|stop|hibernate|url|extend|connect` — your instances,
+your server. This is separate from the community spore.host server; you install
+the app wherever you want to control spores.
+
+### 1. Configure the application
+
+In your Discord application (from Step 2 above):
+
+1. **General Information → Interactions Endpoint URL**: set it to the spore-bot
+   service URL with a `/discord` suffix, e.g.
+   `https://<spore-bot-function-url>/discord`. Discord sends a signed PING;
+   spore-bot answers the PONG, so save succeeds only once the endpoint is live
+   and your application **Public Key** is registered (Step 3 below).
+2. **Installation / OAuth2**: add an install link with the `applications.commands`
+   (and `bot`, if you want notifications via the bot) scopes, then add the app to
+   your server.
+
+### 2. Register the slash command (one-time)
+
+```bash
+DISCORD_APP_ID=<application-id> DISCORD_BOT_TOKEN=<bot-token> \
+  ./scripts/register-discord-commands.sh
+# fast testing in a single guild (instant vs ~1h global propagation):
+DISCORD_APP_ID=… DISCORD_BOT_TOKEN=… DISCORD_TEST_GUILD_ID=<guild> \
+  ./scripts/register-discord-commands.sh
+```
+
+### 3. Register your guild + its public key
+
+So spore-bot can verify your guild's interactions and map commands to your
+instances:
+
+```bash
+spawn notify workspace-add --platform discord \
+  --workspace-id <YOUR_GUILD_ID> \
+  --public-key <APPLICATION_PUBLIC_KEY>
+spawn notify register --platform discord \
+  --workspace-id <YOUR_GUILD_ID> --user-id <YOUR_DISCORD_USER_ID> \
+  --instance i-0abc… --nickname rstudio --allow status,stop,extend
+```
+
+Now `/spore status rstudio` in your server returns your instance's state, TTL,
+and URL; `/spore extend rstudio 4h` extends its deadline — all verified against
+your application's Ed25519 key. The bot replies "thinking…" and edits in the
+result (Discord's 3-second deadline is met by a deferred response).

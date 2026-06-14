@@ -1,6 +1,9 @@
 package main
 
 import (
+	"crypto/ed25519"
+	"encoding/hex"
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -62,5 +65,80 @@ func TestBuildDiscordEmbed_UnknownEventDefaultsBlue(t *testing.T) {
 	e := buildDiscordEmbed(NotifyRequest{EventType: "something_new", InstanceName: "x"})
 	if e.Color != discordColorBlue {
 		t.Errorf("unknown event color = %#x, want blue", e.Color)
+	}
+}
+
+func TestVerifyDiscordSignature_Valid(t *testing.T) {
+	pub, priv, _ := ed25519.GenerateKey(nil)
+	ts := "1700000000"
+	body := []byte(`{"type":1}`)
+	sig := ed25519.Sign(priv, append([]byte(ts), body...))
+	err := verifyDiscordSignature(hex.EncodeToString(pub), hex.EncodeToString(sig), ts, body)
+	if err != nil {
+		t.Errorf("valid signature rejected: %v", err)
+	}
+}
+
+func TestVerifyDiscordSignature_Tampered(t *testing.T) {
+	pub, priv, _ := ed25519.GenerateKey(nil)
+	ts := "1700000000"
+	sig := ed25519.Sign(priv, append([]byte(ts), []byte(`{"type":1}`)...))
+	// Verify against a DIFFERENT body — must fail.
+	err := verifyDiscordSignature(hex.EncodeToString(pub), hex.EncodeToString(sig), ts, []byte(`{"type":2}`))
+	if err == nil {
+		t.Error("tampered body passed verification")
+	}
+}
+
+func TestVerifyDiscordSignature_WrongKey(t *testing.T) {
+	_, priv, _ := ed25519.GenerateKey(nil)
+	otherPub, _, _ := ed25519.GenerateKey(nil)
+	ts := "1700000000"
+	body := []byte(`{"type":1}`)
+	sig := ed25519.Sign(priv, append([]byte(ts), body...))
+	if err := verifyDiscordSignature(hex.EncodeToString(otherPub), hex.EncodeToString(sig), ts, body); err == nil {
+		t.Error("signature verified against the wrong public key")
+	}
+}
+
+func TestVerifyDiscordSignature_BadInputs(t *testing.T) {
+	if err := verifyDiscordSignature("", "aa", "1", []byte("x")); err == nil {
+		t.Error("empty public key should error")
+	}
+	if err := verifyDiscordSignature("zzzz", "aa", "1", []byte("x")); err == nil {
+		t.Error("non-hex public key should error")
+	}
+}
+
+func TestDiscordInteraction_ParseOptions(t *testing.T) {
+	raw := `{
+	  "type": 2, "guild_id": "g1", "application_id": "app1", "token": "tok1",
+	  "member": {"user": {"id": "u123"}},
+	  "data": {"name": "spore", "options": [
+	    {"name": "command", "value": "status"},
+	    {"name": "name", "value": "rstudio"},
+	    {"name": "arg", "value": "4h"}
+	  ]}
+	}`
+	var it discordInteraction
+	if err := json.Unmarshal([]byte(raw), &it); err != nil {
+		t.Fatal(err)
+	}
+	if it.discordUserID() != "u123" {
+		t.Errorf("user id = %q, want u123", it.discordUserID())
+	}
+	if it.optionString("command") != "status" || it.optionString("name") != "rstudio" || it.optionString("arg") != "4h" {
+		t.Errorf("options parsed wrong: cmd=%q name=%q arg=%q", it.optionString("command"), it.optionString("name"), it.optionString("arg"))
+	}
+	if it.optionString("missing") != "" {
+		t.Error("missing option should be empty")
+	}
+}
+
+func TestDiscordFollowupURL(t *testing.T) {
+	got := discordFollowupURL("app1", "tok1")
+	want := "https://discord.com/api/v10/webhooks/app1/tok1/messages/@original"
+	if got != want {
+		t.Errorf("followup url = %q, want %q", got, want)
 	}
 }

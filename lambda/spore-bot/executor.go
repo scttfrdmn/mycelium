@@ -693,6 +693,8 @@ func postResponse(platform, responseURL, text string) error {
 		return postSlackResponse(responseURL, text, false)
 	case "teams":
 		return postTeamsResponse(responseURL, text)
+	case "discord":
+		return postDiscordResponse(responseURL, text)
 	default:
 		return fmt.Errorf("unknown platform: %s", platform)
 	}
