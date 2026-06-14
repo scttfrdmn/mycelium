@@ -106,9 +106,9 @@ resource "aws_iam_role_policy" "spore_bot" {
         # roles live in USERS' own AWS accounts (the bot assumes into them to run
         # EC2 ops for /spore stop etc.), so the account id genuinely cannot be
         # pinned. The role name is fixed, bounding the scope.
+        Sid    = "SporeBotCrossAccountEC2"
+        Effect = "Allow"
         # nosemgrep: terraform.lang.security.iam.no-iam-creds-exposure.no-iam-creds-exposure
-        Sid      = "SporeBotCrossAccountEC2"
-        Effect   = "Allow"
         Action   = "sts:AssumeRole"
         Resource = "arn:aws:iam::*:role/SpawnBotCrossAccount"
       },
