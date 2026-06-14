@@ -59,10 +59,10 @@ tofu apply
 - `tofu plan` should stay clean; a non-tag diff means something drifted
   out-of-band and is worth investigating.
 
-## Cleanup follow-up
+## Cleanup (done 2026-06-14)
 
-The old `spore-bot` CloudFormation stack is stuck empty in `REVIEW_IN_PROGRESS`
-and owns nothing — it can be deleted (`aws cloudformation delete-stack
---stack-name spore-bot`). The orphaned `SporeBotSelfInvoke` inline policy on the
-prism-bot role can also be removed now that spore-bot has its own role. Tracked
-as infra debt.
+- ✅ Deleted the empty stuck `spore-bot` CloudFormation stack (was
+  `REVIEW_IN_PROGRESS`, owned nothing).
+- ✅ Removed the orphaned `SporeBotSelfInvoke` inline policy from the prism-bot
+  role — spore-bot now has its own `spore-bot-role`, so the prism↔spore coupling
+  is fully severed.
