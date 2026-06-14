@@ -73,6 +73,19 @@ func handleNotify(ctx context.Context, cfg aws.Config, reg *Registry, request ev
 	slackCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	// Discord: post a color-coded embed to the channel webhook (#2). Discord
+	// uses its own embed payload rather than Slack's plain text/blocks; DM-by-bot
+	// is a later addition (interactions phase), so webhook is the delivery path.
+	if nr.Platform == "discord" {
+		embed := buildDiscordEmbed(nr)
+		for i := range workspaces {
+			if ws := &workspaces[i]; ws.IncomingWebhookURL != "" {
+				postDiscordWebhook(ws.IncomingWebhookURL, embed)
+			}
+		}
+		return jsonOK(), nil
+	}
+
 	for i := range workspaces {
 		ws := &workspaces[i]
 		// Pattern A: post to channel via incoming webhook — synchronous so Lambda stays alive

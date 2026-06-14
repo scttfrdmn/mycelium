@@ -50,6 +50,10 @@ type WorkspaceConfig struct {
 	AppID         string `dynamodbav:"app_id,omitempty"`
 	BotToken      string `dynamodbav:"bot_token"`
 	SigningSecret string `dynamodbav:"signing_secret"`
+	// PublicKey is the Discord application's Ed25519 public key (hex), used to
+	// verify inbound Discord interaction requests. Discord has no signing secret;
+	// set via `spawn notify workspace-add --platform discord --public-key` (#2).
+	PublicKey     string `dynamodbav:"public_key,omitempty"`
 	Platform      string `dynamodbav:"platform"`
 	WorkspaceName string `dynamodbav:"workspace_name"`
 	InstalledBy   string `dynamodbav:"installed_by"`

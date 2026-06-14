@@ -14,6 +14,12 @@ own changelogs for CLI releases.
 ## [Unreleased]
 
 ### Added
+- **spore-bot** delivers Discord lifecycle notifications (Phase 1 of
+  spore-host/spawn#2): when an instance's notify platform is `discord`, the
+  `/notify` handler posts a color-coded Discord embed (severity-colored, with
+  instance/region/URL fields) to the workspace's channel webhook. Adds a
+  `PublicKey` field to the workspace registry for Discord's Ed25519 interaction
+  verification (used by Phase 2 slash commands). New `docs/guides/discord-setup.md`.
 - **spore-bot** honors the friendly account-name DNS segment: it displays
   `{name}.{account-name}.spore.host` when the instance has a `spawn:account-name`
   tag (falling back to base36) and matches a user-typed target against either
