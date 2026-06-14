@@ -207,24 +207,45 @@ func discordFollowupURL(appID, token string) string {
 }
 
 // postDiscordResponse delivers an async command result to a Discord interaction
-// by editing the deferred ("thinking…") message via the follow-up webhook. Used
-// by postResponse's "discord" case (#2).
+// by editing the deferred ("thinking…") message via the follow-up webhook (#2).
+//
+// The deferred ACK (type 5) and this edit race: the async executor can PATCH
+// @original before Discord has registered the ACK, which returns 404 ("there is
+// no original message to edit yet"). The ACK lands within a fraction of a
+// second, so a 404 is retried with a short backoff rather than treated as fatal.
 func postDiscordResponse(followupURL, text string) error {
 	payload, _ := json.Marshal(map[string]string{"content": text})
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, "PATCH", followupURL, bytes.NewReader(payload))
-	if err != nil {
-		return fmt.Errorf("discord follow-up request: %w", err)
+
+	var lastErr error
+	delays := []time.Duration{0, 300 * time.Millisecond, 700 * time.Millisecond, 1500 * time.Millisecond}
+	for _, d := range delays {
+		if d > 0 {
+			time.Sleep(d)
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		req, err := http.NewRequestWithContext(ctx, "PATCH", followupURL, bytes.NewReader(payload))
+		if err != nil {
+			cancel()
+			return fmt.Errorf("discord follow-up request: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := httpClient.Do(req)
+		if err != nil {
+			cancel()
+			lastErr = fmt.Errorf("discord follow-up call: %w", err)
+			continue
+		}
+		status := resp.StatusCode
+		resp.Body.Close()
+		cancel()
+		if status < 300 {
+			return nil
+		}
+		// 404 = deferred ACK not registered yet; retry. Other 4xx/5xx: don't spin.
+		lastErr = fmt.Errorf("discord follow-up returned %d", status)
+		if status != http.StatusNotFound {
+			return lastErr
+		}
 	}
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("discord follow-up call: %w", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 300 {
-		return fmt.Errorf("discord follow-up returned %d", resp.StatusCode)
-	}
-	return nil
+	return lastErr
 }
