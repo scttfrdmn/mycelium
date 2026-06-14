@@ -23,6 +23,10 @@ own changelogs for CLI releases.
   migrating the rest of the hand-rolled `setup-*.sh` infra.
 
 ### Fixed
+- **spore-bot** Discord slash-command results now appear reliably: the async
+  executor could PATCH the interaction's response before Discord registered the
+  deferred ack (a 404 race — `/spore help` showed "thinking…" then nothing). The
+  follow-up now retries a 404 with short backoff (#2).
 - **spore-bot ran under prism-bot's IAM role** (`prism-bot-PrismBotFunctionRole`),
   a cross-project coupling that, among other things, denied writes to the
   `spore-bot-audit` table. Created a dedicated least-privilege **`spore-bot-role`**
