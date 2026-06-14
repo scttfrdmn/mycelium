@@ -26,7 +26,11 @@ var (
 	auditor      *Auditor
 	lambdaClient *lambdasvc.Client
 	functionName string
-	httpClient   = &http.Client{Timeout: 15 * time.Second}
+	// discordPublicKey is the spore-bot Discord application's Ed25519 public key
+	// (hex), used to verify all inbound Discord interactions. One per application
+	// (#2). Set via the DISCORD_PUBLIC_KEY env var.
+	discordPublicKey string
+	httpClient       = &http.Client{Timeout: 15 * time.Second}
 )
 
 func init() {
@@ -40,6 +44,7 @@ func init() {
 	auditor = NewAuditor(cfg)
 	lambdaClient = lambdasvc.NewFromConfig(cfg)
 	functionName = os.Getenv("AWS_LAMBDA_FUNCTION_NAME")
+	discordPublicKey = os.Getenv("DISCORD_PUBLIC_KEY")
 }
 
 // handler routes between webhook (Phase 1), admin API, and async action (Phase 2).

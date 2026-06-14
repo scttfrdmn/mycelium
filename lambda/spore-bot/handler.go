@@ -114,24 +114,23 @@ func handleDiscordWebhook(ctx context.Context, cfg aws.Config, reg *Registry, re
 	ts := headerLookup(request.Headers, "X-Signature-Timestamp")
 	body := []byte(request.Body)
 
-	// Parse first to learn the guild, so we can fetch its app public key. (We
-	// verify before acting on anything; an unparseable body fails closed.)
+	// Verify against the APPLICATION public key — Discord signs every interaction
+	// with the app's single Ed25519 key (one per application, not per guild), and
+	// the endpoint-verification PING carries no guild at all. So verification must
+	// use the app key (DISCORD_PUBLIC_KEY) independent of guild; the per-guild
+	// workspace lookup happens later, only to authorize the command (#2).
+	if err := verifyDiscordSignature(discordPublicKey, sig, ts, body); err != nil {
+		logf("discord signature verification failed: %v", err)
+		return errorResp(401, "invalid request signature"), nil
+	}
+
 	var it discordInteraction
 	if err := json.Unmarshal(body, &it); err != nil {
 		return errorResp(400, "invalid interaction body"), nil
 	}
 
-	ws, err := reg.GetWorkspace(ctx, "discord", it.GuildID)
-	if err != nil || ws == nil {
-		logf("discord: no workspace for guild %s", it.GuildID)
-		return errorResp(401, "unknown guild"), nil
-	}
-	if err := verifyDiscordSignature(ws.PublicKey, sig, ts, body); err != nil {
-		logf("discord signature verification failed (guild %s): %v", it.GuildID, err)
-		return errorResp(401, "invalid request signature"), nil
-	}
-
-	// PING → PONG handshake (Discord verifies the endpoint this way).
+	// PING → PONG handshake (Discord verifies the endpoint this way). This must
+	// work with no workspace registered — it's an app-level health check.
 	if it.Type == discordInteractionPing {
 		return jsonResp(200, fmt.Sprintf(`{"type":%d}`, discordResponsePong)), nil
 	}
@@ -139,6 +138,13 @@ func handleDiscordWebhook(ctx context.Context, cfg aws.Config, reg *Registry, re
 	if it.Type != discordInteractionApplicationCommand {
 		// Components/autocomplete/etc. aren't used yet — ack harmlessly.
 		return jsonResp(200, fmt.Sprintf(`{"type":%d}`, discordResponsePong)), nil
+	}
+
+	// Authorize: the guild must be a registered workspace before we act on a
+	// command (verification above already proved the request is genuinely Discord).
+	if ws, err := reg.GetWorkspace(ctx, "discord", it.GuildID); err != nil || ws == nil {
+		logf("discord: command from unregistered guild %s", it.GuildID)
+		return jsonResp(200, `{"type":4,"data":{"content":"This server isn't set up with spore-bot yet. An admin can run: spawn notify workspace-add --platform discord --workspace-id <guild> --public-key <key>"}}`), nil
 	}
 
 	// Map the slash command. We model `/spore <command> <nickname> [arg]` as
