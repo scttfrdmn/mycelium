@@ -14,6 +14,19 @@ own changelogs for CLI releases.
 ## [Unreleased]
 
 ### Added
+- **Infrastructure as code (OpenTofu), starting with spore-bot.** New
+  `infra/tofu/spore-bot/` module — the first IaC in the umbrella — reconciles the
+  previously hand-deployed spore-bot Lambda + Function URL under OpenTofu via
+  `tofu import` (imported to a zero-functional-diff plan; only additive
+  `managedby=opentofu` tags). Code and secret env vars stay out-of-band
+  (`ignore_changes`), so deploys and secrets are untouched. Reference pattern for
+  migrating the rest of the hand-rolled `setup-*.sh` infra.
+
+### Fixed
+- **spore-bot ran under prism-bot's IAM role** (`prism-bot-PrismBotFunctionRole`),
+  a cross-project coupling that, among other things, denied writes to the
+  `spore-bot-audit` table. Created a dedicated least-privilege **`spore-bot-role`**
+  and repointed the function; spore.host's bot no longer borrows prism's identity.
 - **spore-bot** delivers Discord lifecycle notifications (Phase 1 of
   spore-host/spawn#2): when an instance's notify platform is `discord`, the
   `/notify` handler posts a color-coded Discord embed (severity-colored, with
