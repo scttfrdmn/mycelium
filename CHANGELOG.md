@@ -13,6 +13,15 @@ own changelogs for CLI releases.
 
 ## [Unreleased]
 
+### Security
+- Security CI hardened to a consistent gate across the suite: govulncheck now
+  scans **all** Go modules (added `spore-bot` — previously only `rest-api`),
+  added **gitleaks** secret scanning (MIT binary; org-license-free; allowlist for
+  doc examples + test fixtures), and Trivy's filesystem scan now includes the
+  **secret** scanner. The same Security workflow (govulncheck/gitleaks/Trivy/
+  Semgrep) was added to the previously-unscanned tool repos (spawn, truffle,
+  lagotto, nf-spawn, spore-host-mcp).
+
 ### Added
 - **Infrastructure as code (OpenTofu), starting with spore-bot.** New
   `infra/tofu/spore-bot/` module — the first IaC in the umbrella — reconciles the
