@@ -223,6 +223,38 @@ func (r *Registry) ListUserInstances(ctx context.Context, platform, workspaceID,
 	return regs, nil
 }
 
+// InstanceRegisteredInWorkspace reports whether instanceID has at least one
+// registration scoped to platform#workspaceID. This is the authorization gate
+// for inbound /notify: a notification may only fan out to a workspace that has
+// actually registered the instance, so a caller can't spoof notifications for an
+// arbitrary instance_id (spore-host/spawn#2 audit, C2). Uses the instance_id-index
+// GSI and filters by the user_key prefix.
+func (r *Registry) InstanceRegisteredInWorkspace(ctx context.Context, platform, workspaceID, instanceID string) (bool, error) {
+	if instanceID == "" || workspaceID == "" {
+		return false, nil
+	}
+	result, err := r.client.Query(ctx, &dynamodb.QueryInput{
+		TableName:              aws.String(r.registryTable),
+		IndexName:              aws.String("instance_id-index"),
+		KeyConditionExpression: aws.String("instance_id = :iid"),
+		ExpressionAttributeValues: map[string]dynamodbtypes.AttributeValue{
+			":iid": &dynamodbtypes.AttributeValueMemberS{Value: instanceID},
+		},
+	})
+	if err != nil {
+		return false, fmt.Errorf("query instance registrations: %w", err)
+	}
+	prefix := platform + "#" + workspaceID + "#"
+	for _, item := range result.Items {
+		if uk, ok := item["user_key"].(*dynamodbtypes.AttributeValueMemberS); ok {
+			if strings.HasPrefix(uk.Value, prefix) {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+
 // GetInstance retrieves a specific registered instance by nickname.
 func (r *Registry) GetInstance(ctx context.Context, platform, workspaceID, userID, nickname string) (*BotRegistration, error) {
 	key := userKey(platform, workspaceID, userID)

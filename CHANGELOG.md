@@ -14,6 +14,18 @@ own changelogs for CLI releases.
 ## [Unreleased]
 
 ### Security
+- **spore-bot `/notify` now gates per-user DM and SMS fan-out on instance
+  registration** (audit C2, spore-host/spawn#369-370 class). Previously the
+  endpoint only checked that `workspace_id`/`instance_id` were non-empty, so
+  anyone who learned an instance_id + workspace_id could trigger DMs to
+  registered users and platform-billed SMS for an instance that wasn't theirs.
+  DM/SMS now require the instance to be registered in the workspace
+  (`InstanceRegisteredInWorkspace`); the channel-webhook path is left open (the
+  workspace owner opted in, no per-user targeting or SMS cost). PKCS#7 identity
+  verification is wired in as log-only for now (the embedded-cert path is
+  unreliable cross-region; #294) and will flip to hard-reject once certs are fixed.
+
+### Security
 - Security CI hardened to a consistent gate across the suite: govulncheck now
   scans **all** Go modules (added `spore-bot` — previously only `rest-api`),
   added **gitleaks** secret scanning (MIT binary; org-license-free; allowlist for

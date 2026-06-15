@@ -41,12 +41,29 @@ func handleNotify(ctx context.Context, cfg aws.Config, reg *Registry, request ev
 		return errorResp(400, "Invalid request body"), nil
 	}
 
-	// Auth: verify the instance_id is registered in this workspace.
-	// Cryptographic PKCS#7 verification was unreliable across AWS regions and
-	// cert rotations. Registry membership is the effective gate — an unregistered
-	// instance can't trigger DMs regardless of what it sends.
 	if nr.WorkspaceID == "" || nr.InstanceID == "" {
 		return errorResp(400, "workspace_id and instance_id are required"), nil
+	}
+
+	// AuthZ (spore-host/spawn#2 audit, C2): only fan out to per-user DMs / SMS
+	// when this instance is actually REGISTERED in the workspace. Without this,
+	// anyone who learns an instance_id + workspace_id could DM registered users
+	// and trigger platform-billed SMS for an instance that isn't theirs. The
+	// channel WEBHOOK path is left ungated: the workspace owner opted in by
+	// configuring the webhook, and it carries no per-user targeting or SMS cost.
+	registered, err := reg.InstanceRegisteredInWorkspace(ctx, nr.Platform, nr.WorkspaceID, nr.InstanceID)
+	if err != nil {
+		logf("notify: registration check failed for %s in %s#%s: %v", nr.InstanceID, nr.Platform, nr.WorkspaceID, err)
+		return errorResp(500, "registration check failed"), nil
+	}
+
+	// Cryptographic identity verification (PKCS#7). Log-only for now: the
+	// embedded-cert path has been unreliable across regions/rotations (see
+	// dns-updater #294), so failing hard here risks dropping legitimate
+	// notifications. The registry-membership gate above is the enforced control;
+	// flip this to a hard reject once cert reliability is resolved.
+	if err := verifyNotifyAuth(nr); err != nil {
+		logf("notify: identity verification did not pass for %s (membership-gated, allowing): %v", nr.InstanceID, err)
 	}
 
 	msg := formatNotification(nr)
@@ -88,21 +105,26 @@ func handleNotify(ctx context.Context, cfg aws.Config, reg *Registry, request ev
 
 	for i := range workspaces {
 		ws := &workspaces[i]
-		// Pattern A: post to channel via incoming webhook — synchronous so Lambda stays alive
+		// Pattern A: channel webhook — ungated (workspace opted in; no per-user
+		// targeting or SMS cost).
 		if ws.IncomingWebhookURL != "" {
 			postIncomingWebhook(ws.IncomingWebhookURL, msg)
 		}
-		// Pattern B: DM each registered Slack user
-		sendUserDMs(slackCtx, cfg, reg, ws, nr.InstanceID, msg)
+		// Pattern B: per-user DMs — only for a registered instance (C2).
+		if registered {
+			sendUserDMs(slackCtx, cfg, reg, ws, nr.InstanceID, msg)
+		}
 	}
 
-	// Teams DMs via Bot Framework proactive messaging
-	if nr.Platform == "slack" || nr.Platform == "" {
-		sendTeamsDMs(slackCtx, reg, nil, nr.InstanceID, msg)
+	// Per-user DM/SMS fan-out (Teams + SMS) — gated on registration like Slack DMs.
+	if registered {
+		if nr.Platform == "slack" || nr.Platform == "" {
+			sendTeamsDMs(slackCtx, reg, nil, nr.InstanceID, msg)
+		}
+		go sendUserSMS(context.Background(), reg, nr)
+	} else {
+		logf("notify: instance %s not registered in %s#%s — channel webhook only, skipping DM/SMS", nr.InstanceID, nr.Platform, nr.WorkspaceID)
 	}
-
-	// SMS notifications for users who have registered a phone number
-	go sendUserSMS(context.Background(), reg, nr)
 
 	return jsonOK(), nil
 }
