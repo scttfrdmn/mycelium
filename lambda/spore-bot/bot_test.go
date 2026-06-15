@@ -98,6 +98,21 @@ func TestVerifySlackSignature_EmptySignature(t *testing.T) {
 	}
 }
 
+// An empty signing secret must fail closed: OAuth-installed workspaces store no
+// secret, and HMAC with an empty key is forgeable (spore-host#373). Critically,
+// this must reject even when the attacker presents a "valid" HMAC computed with
+// the empty key.
+func TestVerifySlackSignature_EmptySecret(t *testing.T) {
+	ts := strconv.FormatInt(time.Now().Unix(), 10)
+	body := "body"
+	mac := hmac.New(sha256.New, []byte("")) // attacker forges with empty key
+	mac.Write([]byte("v0:" + ts + ":" + body))
+	forged := "v0=" + hex.EncodeToString(mac.Sum(nil))
+	if err := verifySlackSignature("", ts, body, forged); err == nil {
+		t.Error("expected empty signing secret to fail closed even with a matching forged HMAC")
+	}
+}
+
 // ── Teams signature verification ──────────────────────────────────────────────
 
 func TestVerifyTeamsSignature_Valid(t *testing.T) {
@@ -123,6 +138,16 @@ func TestVerifyTeamsSignature_MissingPrefix(t *testing.T) {
 	err := verifyTeamsSignature("secret", "body", "Bearer sometoken")
 	if err == nil {
 		t.Error("expected non-HMAC auth header to fail")
+	}
+}
+
+func TestVerifyTeamsSignature_EmptySecret(t *testing.T) {
+	body := "body"
+	mac := hmac.New(sha256.New, []byte("")) // forged with empty key
+	mac.Write([]byte(body))
+	forged := "HMAC " + encodeBase64(mac.Sum(nil))
+	if err := verifyTeamsSignature("", body, forged); err == nil {
+		t.Error("expected empty shared secret to fail closed even with a matching forged HMAC")
 	}
 }
 

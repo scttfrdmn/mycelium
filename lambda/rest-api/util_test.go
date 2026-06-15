@@ -119,6 +119,21 @@ func TestBuildOptionsHint(t *testing.T) {
 	}
 }
 
+func TestCapDuration(t *testing.T) {
+	ok := []string{"1h", "24h", "168h", "30m", "1h30m"}
+	for _, d := range ok {
+		if got, err := capDuration(d); err != nil || got != d {
+			t.Errorf("capDuration(%q) = %q, %v; want %q, nil", d, got, err, d)
+		}
+	}
+	bad := []string{"", "0h", "-1h", "169h", "8d", "abc", "100000h"}
+	for _, d := range bad {
+		if _, err := capDuration(d); err == nil {
+			t.Errorf("capDuration(%q) expected error, got nil", d)
+		}
+	}
+}
+
 // --- handler routing (auth happens before any AWS call) ---
 
 func TestHandler_MissingAPIKey(t *testing.T) {

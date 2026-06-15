@@ -14,6 +14,27 @@ own changelogs for CLI releases.
 ## [Unreleased]
 
 ### Security
+- **Teams Bot Framework requests now fully validate the bearer JWT** (audit H4,
+  #372). Previously a `Bearer …` request was trusted as long as the server-side
+  `TEAMS_APP_ID` env was set — no token validation at all — so any caller of the
+  public Function URL could forge a Teams activity. The token is now verified for
+  RS256 signature against Microsoft's published JWKS, issuer
+  (`https://api.botframework.com`), audience (`== TEAMS_APP_ID`), and expiry;
+  `alg:none`/HMAC-confusion are rejected. Verification fails closed.
+- **Slack/Teams signature verification now rejects an empty signing secret**
+  (audit H5, #373). HMAC with an empty key is forgeable, and OAuth-installed
+  Slack workspaces persist no per-workspace secret. Slack now falls back to the
+  app-level `SLACK_SIGNING_SECRET` env (the secret is app-level, not
+  per-workspace), and both verifiers fail closed when no secret is available.
+- **Hosted REST API now enforces lifecycle bounds** (audit H3, #371). Unlike the
+  CLI, the API called the spawn client directly and bypassed the 1h-idle
+  zombie-prevention default, so an empty-TTL launch produced an instance with no
+  deadline and no reaper tag. Launches with neither TTL nor idle timeout now get
+  a default idle timeout, all TTL/idle/extend durations are capped at a 7-day
+  maximum, and the `extend` action now writes `spawn:ttl-deadline` (not just
+  `spawn:ttl`) so the extension actually takes effect (it was a silent no-op,
+  same class as spore-host-mcp#11). The `/spore extend` and `/spore idle` bot
+  commands gained the same deadline fix and 7-day cap.
 - **spore-bot `/notify` now gates per-user DM and SMS fan-out on instance
   registration** (audit C2, spore-host/spawn#369-370 class). Previously the
   endpoint only checked that `workspace_id`/`instance_id` were non-empty, so

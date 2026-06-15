@@ -10,6 +10,11 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 )
 
+// maxBotTTL is the hard ceiling on the resulting TTL/idle timeout through the
+// bot (spore-host#371) — keeps a runaway `/spore extend foo 99999h` from
+// disabling the lifecycle backstop.
+const maxBotTTL = 7 * 24 * time.Hour
+
 // extendTTL adds duration to the instance's current TTL by updating the spawn:ttl EC2 tag.
 // Usage: /spore extend <name> <duration>  e.g. /spore extend rstudio 2h
 func extendTTL(ctx context.Context, client *ec2.Client, reg *BotRegistration, durationStr, slashCmd string) (string, error) {
@@ -23,7 +28,7 @@ func extendTTL(ctx context.Context, client *ec2.Client, reg *BotRegistration, du
 		return fmt.Sprintf("❌ Invalid duration `%s`. Use a format like `2h`, `30m`, or `1h30m`.", durationStr), nil
 	}
 
-	// Get current TTL tag
+	// Get current TTL + deadline tags
 	out, err := client.DescribeInstances(ctx, &ec2.DescribeInstancesInput{
 		InstanceIds: []string{reg.InstanceID},
 	})
@@ -34,6 +39,7 @@ func extendTTL(ctx context.Context, client *ec2.Client, reg *BotRegistration, du
 
 	var currentTTL time.Duration
 	var launchTime time.Time
+	var currentDeadline time.Time
 	if inst.LaunchTime != nil {
 		launchTime = *inst.LaunchTime
 	}
@@ -41,33 +47,51 @@ func extendTTL(ctx context.Context, client *ec2.Client, reg *BotRegistration, du
 		if tag.Key == nil || tag.Value == nil {
 			continue
 		}
-		if *tag.Key == reg.TagPrefix+":ttl" {
+		switch *tag.Key {
+		case reg.TagPrefix + ":ttl":
 			currentTTL, _ = time.ParseDuration(*tag.Value)
+		case reg.TagPrefix + ":ttl-deadline":
+			currentDeadline, _ = time.Parse(time.RFC3339, *tag.Value)
 		}
 	}
 
 	// New TTL = existing TTL + extension (relative to launch time)
 	newTTL := currentTTL + extension
+	if newTTL > maxBotTTL {
+		return fmt.Sprintf("❌ Resulting TTL %s exceeds the maximum of %s. Pick a shorter extension.",
+			formatTTLDuration(newTTL), formatTTLDuration(maxBotTTL)), nil
+	}
 	newTTLStr := formatTTLDuration(newTTL)
+
+	// spored treats <prefix>:ttl-deadline (absolute) as authoritative and ignores
+	// <prefix>:ttl. Writing only :ttl is a silent no-op — the instance still dies
+	// at its original deadline (same bug class as spore-host-mcp#11). Push the
+	// absolute deadline forward and write BOTH tags.
+	newDeadline := currentDeadline
+	if newDeadline.IsZero() {
+		// Older instance without the deadline tag — anchor to launch + new TTL.
+		newDeadline = launchTime.Add(newTTL)
+	} else {
+		newDeadline = newDeadline.Add(extension)
+	}
 
 	_, err = client.CreateTags(ctx, &ec2.CreateTagsInput{
 		Resources: []string{reg.InstanceID},
 		Tags: []ec2types.Tag{
 			{Key: aws.String(reg.TagPrefix + ":ttl"), Value: aws.String(newTTLStr)},
+			{Key: aws.String(reg.TagPrefix + ":ttl-deadline"), Value: aws.String(newDeadline.UTC().Format(time.RFC3339))},
 		},
 	})
 	if err != nil {
 		return "", fmt.Errorf("update TTL tag: %w", err)
 	}
 
-	// Calculate new termination time
-	newTerminateAt := launchTime.Add(newTTL)
-	remaining := time.Until(newTerminateAt)
+	remaining := time.Until(newDeadline)
 
 	return fmt.Sprintf("⏱️ Extended *%s* TTL by %s.\n  New deadline: %s (%s remaining)",
 		reg.Nickname,
 		durationStr,
-		newTerminateAt.UTC().Format("2 Jan 15:04 UTC"),
+		newDeadline.UTC().Format("2 Jan 15:04 UTC"),
 		formatHMS(remaining)), nil
 }
 
@@ -96,6 +120,9 @@ func setIdleTimeout(ctx context.Context, client *ec2.Client, reg *BotRegistratio
 	d, err := time.ParseDuration(durationStr)
 	if err != nil || d <= 0 {
 		return fmt.Sprintf("❌ Invalid duration `%s`. Use a format like `30m`, `1h`, or `off` to disable.", durationStr), nil
+	}
+	if d > maxBotTTL {
+		return fmt.Sprintf("❌ Idle timeout %s exceeds the maximum of %s.", durationStr, formatTTLDuration(maxBotTTL)), nil
 	}
 
 	_, err = client.CreateTags(ctx, &ec2.CreateTagsInput{

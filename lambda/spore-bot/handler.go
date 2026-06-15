@@ -215,7 +215,16 @@ func handleSlackWebhook(ctx context.Context, reg *Registry, request events.APIGa
 		return nil, fmt.Errorf("workspace not found: %w", err)
 	}
 
-	if err := verifySlackSignature(ws.SigningSecret, ts, request.Body, sig); err != nil {
+	// Slack's signing secret is app-level, not per-workspace, so OAuth-installed
+	// workspaces store none (oauth.go). Fall back to the hosted app's app-level
+	// secret from the environment; the per-workspace value (admin-registered /
+	// self-hosted) takes precedence. verifySlackSignature fails closed if both
+	// are empty (spore-host#373).
+	signingSecret := ws.SigningSecret
+	if signingSecret == "" {
+		signingSecret = os.Getenv("SLACK_SIGNING_SECRET")
+	}
+	if err := verifySlackSignature(signingSecret, ts, request.Body, sig); err != nil {
 		return nil, fmt.Errorf("signature verification failed: %w", err)
 	}
 
@@ -245,13 +254,16 @@ func handleTeamsWebhook(ctx context.Context, reg *Registry, request events.APIGa
 	isBotFramework := strings.HasPrefix(authHeader, "Bearer ")
 
 	if isBotFramework {
-		// Bot Framework JWT — issued by Microsoft, trusted via App ID match.
-		// Full JWT signature verification requires fetching Microsoft's OIDC keys;
-		// for now we trust the Azure Bot channel (messages come from Microsoft's servers)
-		// and verify the App ID matches our configured bot.
+		// Bot Framework JWT — issued by Microsoft for our bot. Fully validate the
+		// token (RS256 signature against Microsoft's JWKS, issuer, audience==App ID,
+		// expiry) before trusting the activity. The public Function URL means an
+		// unverified Bearer token is a forge-an-activity hole (spore-host#372).
 		appID := os.Getenv("TEAMS_APP_ID")
 		if appID == "" {
 			return nil, fmt.Errorf("TEAMS_APP_ID not configured")
+		}
+		if err := verifyTeamsJWT(ctx, authHeader, appID); err != nil {
+			return nil, fmt.Errorf("Bot Framework token verification failed: %w", err)
 		}
 		// Workspace lookup is optional for Bot Framework — tenant may not have signing secret
 		_, _ = reg.GetWorkspace(ctx, "teams", sc.WorkspaceID) // best-effort

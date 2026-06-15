@@ -60,5 +60,6 @@ checksums.txt
 # Local archive (not pushed to GitHub)
 .local-archive/
 spawn/lambda/rest-api/rest-api
+lambda/rest-api/rest-api
 lambda/spore-bot/spore-bot
 lambda/spore-bot/prism-bot

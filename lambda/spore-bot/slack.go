@@ -65,6 +65,13 @@ func parseSlackCommand(body string) (*SlashCommand, error) {
 // Uses HMAC-SHA256 with the workspace signing secret.
 // Rejects requests older than 5 minutes to prevent replay attacks.
 func verifySlackSignature(signingSecret, timestamp, body, sig string) error {
+	// Reject an empty signing secret outright. OAuth-installed workspaces persist
+	// no signing secret (the install flow can't obtain Slack's app-level secret),
+	// and HMAC with an empty key is forgeable by anyone who knows it's empty
+	// (spore-host#373). Fail closed rather than verifying against "".
+	if signingSecret == "" {
+		return fmt.Errorf("no signing secret configured for this workspace")
+	}
 	ts, err := strconv.ParseInt(timestamp, 10, 64)
 	if err != nil {
 		return fmt.Errorf("invalid timestamp: %w", err)

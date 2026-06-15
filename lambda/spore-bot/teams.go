@@ -63,6 +63,11 @@ type TeamsConversationRef struct {
 
 // verifyTeamsSignature validates Teams outgoing webhook HMAC-SHA256 signature.
 func verifyTeamsSignature(sharedSecret, body, authHeader string) error {
+	// Reject an empty shared secret outright — HMAC with an empty key is
+	// forgeable (spore-host#373). Fail closed.
+	if sharedSecret == "" {
+		return fmt.Errorf("no shared secret configured for this workspace")
+	}
 	if !strings.HasPrefix(authHeader, "HMAC ") {
 		return fmt.Errorf("missing HMAC authorization")
 	}
