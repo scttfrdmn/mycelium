@@ -40,7 +40,11 @@ func handleOAuthRedirect(platform string, request events.APIGatewayProxyRequest)
 		return oauthError(500, "Failed to generate PKCE verifier"), nil
 	}
 	challenge := oauthSHA256B64URL(verifier)
-	state := oauthSignedState(platform, verifier)
+	state, err := oauthSignedState(platform, verifier)
+	if err != nil {
+		logf("oauth: %v", err)
+		return oauthError(500, "OAuth is not configured"), nil
+	}
 
 	redirectURI := oauthRedirectURI(platform, request)
 	authURL := fmt.Sprintf("%s?client_id=%s&scope=%s&redirect_uri=%s&code_challenge=%s&code_challenge_method=S256&state=%s",
@@ -230,11 +234,14 @@ func oauthSHA256B64URL(s string) string {
 
 // oauthSignedState embeds platform + code_verifier in an HMAC-signed state parameter.
 // Signed with BOT_OAUTH_SECRET env var (shared across platforms).
-func oauthSignedState(platform, verifier string) string {
+func oauthSignedState(platform, verifier string) (string, error) {
 	ts := strconv.FormatInt(time.Now().Unix(), 10)
 	payload := base64.RawURLEncoding.EncodeToString([]byte(platform + ":" + verifier + ":" + ts))
-	sig := oauthHMAC(payload)
-	return payload + "." + sig
+	sig, err := oauthHMAC(payload)
+	if err != nil {
+		return "", err
+	}
+	return payload + "." + sig, nil
 }
 
 func oauthExtractVerifier(platform, state string) (string, error) {
@@ -246,7 +253,11 @@ func oauthExtractVerifier(platform, state string) (string, error) {
 		return "", fmt.Errorf("malformed state")
 	}
 	payload, sig := parts[0], parts[1]
-	if expected := oauthHMAC(payload); !hmac.Equal([]byte(expected), []byte(sig)) {
+	expected, err := oauthHMAC(payload)
+	if err != nil {
+		return "", err
+	}
+	if !hmac.Equal([]byte(expected), []byte(sig)) {
 		return "", fmt.Errorf("state signature invalid")
 	}
 	raw, err := base64.RawURLEncoding.DecodeString(payload)
@@ -283,11 +294,29 @@ func oauthExtractVerifier(platform, state string) (string, error) {
 	return verifier, nil
 }
 
-func oauthHMAC(data string) string {
-	secret := getEnv("BOT_OAUTH_SECRET", "change-me")
+// errOAuthSecretUnset signals a misconfigured BOT_OAUTH_SECRET. The OAuth state
+// HMAC must never fall back to a known constant (the old "change-me" default
+// let anyone forge a valid state and complete the CSRF-protected flow).
+var errOAuthSecretUnset = fmt.Errorf("BOT_OAUTH_SECRET is not configured")
+
+// oauthSecret returns the configured OAuth signing secret, or an error if it is
+// empty or still the placeholder. Fail closed (2026-06 audit, M-sec).
+func oauthSecret() (string, error) {
+	secret := os.Getenv("BOT_OAUTH_SECRET")
+	if secret == "" || secret == "change-me" {
+		return "", errOAuthSecretUnset
+	}
+	return secret, nil
+}
+
+func oauthHMAC(data string) (string, error) {
+	secret, err := oauthSecret()
+	if err != nil {
+		return "", err
+	}
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write([]byte(data))
-	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil)), nil
 }
 
 func oauthRedirectResult(successURL, params string) events.APIGatewayProxyResponse {

@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"strconv"
 	"strings"
@@ -606,6 +608,16 @@ func platformConnectTTL() time.Duration {
 	return 24 * time.Hour
 }
 
+// generateConnectCode returns an unguessable 8-char uppercase hex connect code
+// (4 bytes of crypto/rand entropy).
+func generateConnectCode() (string, error) {
+	b := make([]byte, 4)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return strings.ToUpper(hex.EncodeToString(b)), nil
+}
+
 // cmdConnect generates a connect code for self-registration.
 // Usage: /<cmd> connect [duration]   e.g. /spore connect 4h
 // Duration cannot exceed the workspace or platform maximum.
@@ -639,8 +651,13 @@ func cmdConnect(ctx context.Context, reg *Registry, action *BotAction) (string, 
 		ttl = requested
 	}
 
-	// Generate a human-friendly 6-character uppercase hex code
-	code := strings.ToUpper(fmt.Sprintf("%06x", time.Now().UnixNano()%0xFFFFFF))
+	// Generate an unguessable connect code. The old scheme was time-seeded
+	// (UnixNano % 0xFFFFFF → ~16.7M, predictable from the request time); use
+	// crypto/rand → 8 uppercase hex chars (~4.3B) instead (2026-06 audit L-sec).
+	code, err := generateConnectCode()
+	if err != nil {
+		return "", fmt.Errorf("generate connect code: %w", err)
+	}
 
 	cc := ConnectCode{
 		CodeKey:     "connect#" + code,

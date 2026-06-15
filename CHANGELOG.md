@@ -14,6 +14,14 @@ own changelogs for CLI releases.
 ## [Unreleased]
 
 ### Security
+- **Medium/Low audit hardening** (#374): the OAuth state HMAC now fails closed
+  when `BOT_OAUTH_SECRET` is unset or still `change-me` (the old default let a
+  forged state complete the flow); Twilio webhook signature verification is
+  **required in production** (`SPORE_ENV=production`) and the
+  `SKIP_TWILIO_SIGNATURE` escape hatch is ignored there; connect codes are now
+  generated with `crypto/rand` (8 hex chars, ~4.3B) instead of a time-seeded
+  value; and `MarkTerminated`'s DynamoDB retention now matches its documented
+  7 days (was 24h).
 - **Hosted REST API now enforces per-project tenant isolation** (audit C1, #369).
   Previously every handler received a validated API-key principal but never used
   it, so any valid key could list/launch/stop/terminate/extend **every** instance

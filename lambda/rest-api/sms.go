@@ -25,8 +25,17 @@ import (
 // handleSMSIncoming processes a Twilio webhook for an inbound SMS reply.
 // The To field identifies the project; the From field identifies the user.
 func handleSMSIncoming(ctx context.Context, req events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
+	// Twilio signature enforcement (2026-06 audit, M-sec). In production the auth
+	// token is REQUIRED and the skip flag is ignored — otherwise an unset token or
+	// a stray SKIP_TWILIO_SIGNATURE=true would silently accept forged webhooks
+	// (which can start instances and reset idle timers). The skip escape hatch is
+	// honored only outside production.
 	authToken := os.Getenv("TWILIO_AUTH_TOKEN")
-	skipSig := os.Getenv("SKIP_TWILIO_SIGNATURE") == "true"
+	prod := isProd()
+	if prod && authToken == "" {
+		return errResp(http.StatusServiceUnavailable, "SMS not configured"), nil
+	}
+	skipSig := !prod && os.Getenv("SKIP_TWILIO_SIGNATURE") == "true"
 	if authToken != "" && !skipSig && !validateTwilioSignature(req, authToken) {
 		return errResp(http.StatusForbidden, "invalid Twilio signature"), nil
 	}
