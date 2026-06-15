@@ -13,6 +13,25 @@ import (
 	spawnconfig "github.com/spore-host/spawn/pkg/config"
 )
 
+// projectTag is the EC2 tag that scopes an instance to the API-key principal's
+// project. The hosted API is single-account: every launch runs as the same
+// Lambda role, so identity tags (spawn:iam-user, spawn:account-id) are identical
+// across tenants and can't isolate anything. The principal's project is the only
+// real tenant discriminator, so we stamp it on launch and gate every read/action
+// on it (spore-host#369).
+const projectTag = "spawn:project"
+
+// ownsInstance reports whether the principal may see/act on an instance. It is
+// fail-closed: a principal with an empty project, or an instance with no/blank
+// project tag, never matches — so a leaked key with no project can't reach
+// pre-existing untagged instances, and an empty project can't act as a wildcard.
+func ownsInstance(p *Principal, tags map[string]string) bool {
+	if p == nil || p.Project == "" {
+		return false
+	}
+	return tags[projectTag] == p.Project
+}
+
 func handleListInstances(ctx context.Context, cfg aws.Config, req events.APIGatewayV2HTTPRequest, p *Principal) (events.APIGatewayV2HTTPResponse, error) {
 	region := req.QueryStringParameters["region"]
 	state := req.QueryStringParameters["state"]
@@ -43,6 +62,11 @@ func handleListInstances(ctx context.Context, cfg aws.Config, req events.APIGate
 
 	out := make([]instanceOut, 0, len(instances))
 	for _, inst := range instances {
+		// Tenant isolation: only surface instances belonging to this principal's
+		// project (spore-host#369).
+		if !ownsInstance(p, inst.Tags) {
+			continue
+		}
 		dns := inst.Tags["spawn:dns-name"]
 		out = append(out, instanceOut{
 			InstanceID:       inst.InstanceID,
@@ -117,6 +141,13 @@ func handleLaunch(ctx context.Context, cfg aws.Config, req events.APIGatewayV2HT
 		return errResp(http.StatusBadRequest, "instance_type and region are required"), nil
 	}
 
+	// Tenant isolation (spore-host#369): the launched instance must be stamped
+	// with the principal's project so later list/get/action can scope to it.
+	// Reject a key with no project rather than create an un-isolated instance.
+	if p == nil || p.Project == "" {
+		return errResp(http.StatusForbidden, "API key has no project; cannot launch"), nil
+	}
+
 	// Enforce lifecycle bounds (spore-host#371). Validate any caller-supplied
 	// TTL/idle timeout against the hard maximum, and if BOTH are empty inject a
 	// default idle timeout so the instance can never become a zombie.
@@ -148,6 +179,7 @@ func handleLaunch(ctx context.Context, cfg aws.Config, req events.APIGatewayV2HT
 		CompletionFile:     body.CompletionFile,
 		SlackWorkspaceID:   body.SlackWorkspace,
 		ActiveProcessesRaw: body.ActiveProcesses,
+		Tags:               map[string]string{projectTag: p.Project},
 	}
 
 	// Inject notification URL for hosted spore.host
@@ -182,6 +214,11 @@ func handleGetInstance(ctx context.Context, cfg aws.Config, id string, p *Princi
 	}
 	for _, inst := range instances {
 		if inst.InstanceID == id || strings.EqualFold(inst.Name, id) {
+			// Tenant isolation: 404 (not 403) for instances outside the
+			// principal's project, so we don't leak their existence (#369).
+			if !ownsInstance(p, inst.Tags) {
+				return errResp(http.StatusNotFound, fmt.Sprintf("instance %q not found", id)), nil
+			}
 			return jsonResp(http.StatusOK, inst), nil
 		}
 	}
@@ -204,6 +241,11 @@ func handleInstanceAction(ctx context.Context, cfg aws.Config, id, action string
 		}
 	}
 	if target == nil {
+		return errResp(http.StatusNotFound, fmt.Sprintf("instance %q not found", id)), nil
+	}
+	// Tenant isolation: refuse to act on an instance outside the principal's
+	// project, masked as 404 so existence isn't leaked (#369).
+	if !ownsInstance(p, target.Tags) {
 		return errResp(http.StatusNotFound, fmt.Sprintf("instance %q not found", id)), nil
 	}
 

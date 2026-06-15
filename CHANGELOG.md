@@ -14,6 +14,20 @@ own changelogs for CLI releases.
 ## [Unreleased]
 
 ### Security
+- **Hosted REST API now enforces per-project tenant isolation** (audit C1, #369).
+  Previously every handler received a validated API-key principal but never used
+  it, so any valid key could list/launch/stop/terminate/extend **every** instance
+  in the account. Launches are now stamped with `spawn:project=<key's project>`,
+  and list/get/stop/start/hibernate/terminate/extend are scoped to the
+  principal's project (fail-closed: a key with no project can't launch or reach
+  any instance; non-owned instances return 404, not 403, so existence isn't
+  leaked). **Operator note:** instances launched before this change carry no
+  `spawn:project` tag and become invisible to the API — backfill the tag
+  (`aws ec2 create-tags --tags Key=spawn:project,Value=<project>`) to re-expose
+  them.
+- **SMS "extend" reply now writes `spawn:ttl-deadline`** (not just `spawn:ttl`,
+  which spored ignores — a silent no-op, same class as #371) and is capped at the
+  7-day maximum.
 - **Teams Bot Framework requests now fully validate the bearer JWT** (audit H4,
   #372). Previously a `Bearer …` request was trusted as long as the server-side
   `TEAMS_APP_ID` env was set — no token validation at all — so any caller of the

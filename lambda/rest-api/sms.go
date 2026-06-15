@@ -97,8 +97,38 @@ func executeAction(ctx context.Context, p *sms.PendingNotification, action strin
 
 	case strings.HasPrefix(action, "extend:"):
 		dur := strings.TrimPrefix(action, "extend:")
+		if _, err := capDuration(dur); err != nil {
+			return "", err
+		}
+		extendDuration, err := time.ParseDuration(dur)
+		if err != nil {
+			return "", fmt.Errorf("invalid duration: %w", err)
+		}
+		// Push the absolute deadline forward and write BOTH tags. Writing only
+		// spawn:ttl is a silent no-op — spored honors spawn:ttl-deadline
+		// (same bug class as spore-host#371 / spore-host-mcp#11).
+		var newDeadline time.Time
+		if insts, lerr := client.ListInstances(ctx, p.Region, ""); lerr == nil {
+			for _, inst := range insts {
+				if inst.InstanceID != p.InstanceID {
+					continue
+				}
+				if dl, ok := inst.Tags["spawn:ttl-deadline"]; ok {
+					if parsed, perr := time.Parse(time.RFC3339, dl); perr == nil {
+						newDeadline = parsed.Add(extendDuration)
+					}
+				} else if cur, cerr := time.ParseDuration(inst.TTL); cerr == nil {
+					newDeadline = time.Now().Add(cur).Add(extendDuration)
+				}
+				break
+			}
+		}
+		if newDeadline.IsZero() {
+			newDeadline = time.Now().Add(extendDuration)
+		}
 		if err := client.UpdateInstanceTags(ctx, p.Region, p.InstanceID, map[string]string{
-			"spawn:ttl": dur,
+			"spawn:ttl":          dur,
+			"spawn:ttl-deadline": newDeadline.UTC().Format(time.RFC3339),
 		}); err != nil {
 			return "", err
 		}

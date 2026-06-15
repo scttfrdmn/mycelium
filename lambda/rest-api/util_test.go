@@ -119,6 +119,34 @@ func TestBuildOptionsHint(t *testing.T) {
 	}
 }
 
+func TestOwnsInstance(t *testing.T) {
+	tests := []struct {
+		name    string
+		project string
+		tags    map[string]string
+		want    bool
+	}{
+		{"match", "acme", map[string]string{"spawn:project": "acme"}, true},
+		{"mismatch", "acme", map[string]string{"spawn:project": "other"}, false},
+		{"untagged instance", "acme", map[string]string{}, false},
+		{"blank tag", "acme", map[string]string{"spawn:project": ""}, false},
+		{"empty principal project never matches untagged", "", map[string]string{}, false},
+		{"empty principal project never matches blank tag", "", map[string]string{"spawn:project": ""}, false},
+		{"nil tags", "acme", nil, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ownsInstance(&Principal{Project: tt.project}, tt.tags)
+			if got != tt.want {
+				t.Errorf("ownsInstance(project=%q, tags=%v) = %v, want %v", tt.project, tt.tags, got, tt.want)
+			}
+		})
+	}
+	if ownsInstance(nil, map[string]string{"spawn:project": "acme"}) {
+		t.Error("nil principal must never own an instance")
+	}
+}
+
 func TestCapDuration(t *testing.T) {
 	ok := []string{"1h", "24h", "168h", "30m", "1h30m"}
 	for _, d := range ok {
