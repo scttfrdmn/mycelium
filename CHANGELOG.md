@@ -13,6 +13,16 @@ own changelogs for CLI releases.
 
 ## [Unreleased]
 
+### Fixed
+- **`extend` can no longer prematurely reap an instance** (audit M-corr, #374).
+  The bot `/spore extend`, the REST API `extend` action, and the SMS `extend`
+  reply now floor the new TTL deadline at `now + requested-duration`. Previously,
+  if the instance had a missing/unparseable `spawn:ttl` (deadline anchored to a
+  long-past launch time) or an already-expired `spawn:ttl-deadline`, the
+  recomputed deadline could land in the past — terminating the instance at the
+  moment the user asked to keep it alive. An extend now always grants at least
+  the requested duration from the current moment.
+
 ### Security
 - **Medium/Low audit hardening** (#374): the OAuth state HMAC now fails closed
   when `BOT_OAUTH_SECRET` is unset or still `change-me` (the old default let a

@@ -312,6 +312,13 @@ func handleInstanceAction(ctx context.Context, cfg aws.Config, id, action string
 				newDeadline = time.Now().Add(extendDuration)
 			}
 		}
+		// Safety floor (2026-06 audit, M-corr): an extend must never produce a
+		// deadline earlier than the requested duration from now — otherwise a
+		// past/expired existing deadline would reap the instance the moment the
+		// caller asked to keep it.
+		if floor := time.Now().Add(extendDuration); newDeadline.Before(floor) {
+			newDeadline = floor
+		}
 		if err := client.UpdateInstanceTags(ctx, target.Region, target.InstanceID, map[string]string{
 			"spawn:ttl":          body.Duration,
 			"spawn:ttl-deadline": newDeadline.UTC().Format(time.RFC3339),

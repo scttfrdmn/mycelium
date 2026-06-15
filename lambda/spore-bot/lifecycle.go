@@ -15,6 +15,26 @@ import (
 // disabling the lifecycle backstop.
 const maxBotTTL = 7 * 24 * time.Hour
 
+// computeExtendedDeadline returns the new absolute TTL deadline for an extend.
+// It pushes the existing deadline forward by extension; if there is no deadline
+// tag it anchors to launchTime+newTTL. A safety floor (2026-06 audit, M-corr)
+// guarantees the result is never earlier than now+extension — so a missing or
+// already-expired prior deadline (or a stale launch anchor) can never set a
+// deadline in the past and reap the instance the moment the user asks to keep
+// it. An extend always grants at least `extension` from the current moment.
+func computeExtendedDeadline(now, currentDeadline, launchTime time.Time, newTTL, extension time.Duration) time.Time {
+	var d time.Time
+	if currentDeadline.IsZero() {
+		d = launchTime.Add(newTTL)
+	} else {
+		d = currentDeadline.Add(extension)
+	}
+	if floor := now.Add(extension); d.Before(floor) {
+		d = floor
+	}
+	return d
+}
+
 // extendTTL adds duration to the instance's current TTL by updating the spawn:ttl EC2 tag.
 // Usage: /spore extend <name> <duration>  e.g. /spore extend rstudio 2h
 func extendTTL(ctx context.Context, client *ec2.Client, reg *BotRegistration, durationStr, slashCmd string) (string, error) {
@@ -67,13 +87,7 @@ func extendTTL(ctx context.Context, client *ec2.Client, reg *BotRegistration, du
 	// <prefix>:ttl. Writing only :ttl is a silent no-op — the instance still dies
 	// at its original deadline (same bug class as spore-host-mcp#11). Push the
 	// absolute deadline forward and write BOTH tags.
-	newDeadline := currentDeadline
-	if newDeadline.IsZero() {
-		// Older instance without the deadline tag — anchor to launch + new TTL.
-		newDeadline = launchTime.Add(newTTL)
-	} else {
-		newDeadline = newDeadline.Add(extension)
-	}
+	newDeadline := computeExtendedDeadline(time.Now(), currentDeadline, launchTime, newTTL, extension)
 
 	_, err = client.CreateTags(ctx, &ec2.CreateTagsInput{
 		Resources: []string{reg.InstanceID},

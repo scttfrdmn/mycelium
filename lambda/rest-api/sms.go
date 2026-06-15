@@ -135,6 +135,12 @@ func executeAction(ctx context.Context, p *sms.PendingNotification, action strin
 		if newDeadline.IsZero() {
 			newDeadline = time.Now().Add(extendDuration)
 		}
+		// Safety floor (2026-06 audit, M-corr): never set a deadline earlier than
+		// the requested duration from now — a past/expired existing deadline must
+		// not reap the instance the moment the user replies to keep it.
+		if floor := time.Now().Add(extendDuration); newDeadline.Before(floor) {
+			newDeadline = floor
+		}
 		if err := client.UpdateInstanceTags(ctx, p.Region, p.InstanceID, map[string]string{
 			"spawn:ttl":          dur,
 			"spawn:ttl-deadline": newDeadline.UTC().Format(time.RFC3339),
