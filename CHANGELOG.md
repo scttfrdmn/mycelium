@@ -13,6 +13,13 @@ own changelogs for CLI releases.
 
 ## [Unreleased]
 
+### Removed
+- Dead `Registry.RedeemConnectCode` in spore-bot (audit L-health, #374). Connect
+  codes are redeemed on the spawn side (`spawn bot register --connect-code`,
+  which atomically deletes the shared-table item); the Lambda only issues them.
+  The duplicate, never-called Lambda-side redeem method is removed to avoid
+  misrepresenting the flow.
+
 ### Fixed
 - **`extend` can no longer prematurely reap an instance** (audit M-corr, #374).
   The bot `/spore extend`, the REST API `extend` action, and the SMS `extend`

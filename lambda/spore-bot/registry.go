@@ -482,32 +482,10 @@ func (r *Registry) PutConnectCode(ctx context.Context, code ConnectCode) error {
 	return err
 }
 
-// RedeemConnectCode atomically deletes a connect code and returns it.
-// Returns nil if the code does not exist or has expired (DynamoDB TTL is eventual
-// so we also check the TTL field explicitly).
-func (r *Registry) RedeemConnectCode(ctx context.Context, code string) (*ConnectCode, error) {
-	result, err := r.client.DeleteItem(ctx, &dynamodb.DeleteItemInput{
-		TableName: &r.workspacesTable,
-		Key: map[string]dynamodbtypes.AttributeValue{
-			"workspace_key": &dynamodbtypes.AttributeValueMemberS{Value: "connect#" + code},
-		},
-		ReturnValues: dynamodbtypes.ReturnValueAllOld,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("redeem connect code: %w", err)
-	}
-	if result.Attributes == nil {
-		return nil, nil
-	}
-	var cc ConnectCode
-	if err := attributevalue.UnmarshalMap(result.Attributes, &cc); err != nil {
-		return nil, fmt.Errorf("unmarshal connect code: %w", err)
-	}
-	if time.Now().Unix() > cc.TTL {
-		return nil, nil // expired
-	}
-	return &cc, nil
-}
+// Connect codes are redeemed on the spawn side (spawn `bot register
+// --connect-code`, which atomically DeleteItems the shared table); the Lambda
+// only issues them via PutConnectCode. A duplicate Lambda-side redeem method was
+// removed as dead code (2026-06 audit, L-health, #374).
 
 // MarkTerminated stamps terminated_at and sets a 7-day DynamoDB TTL on a registration.
 // Called by /spore list when EC2 reports the instance as terminated.
