@@ -46,18 +46,37 @@ func TestBuildDiscordEmbed_ColorAndFields(t *testing.T) {
 
 func TestBuildDiscordEmbed_SeverityColors(t *testing.T) {
 	cases := map[string]int{
-		"completion":     discordColorGreen,
-		"ttl_expired":    discordColorRed,
-		"idle_stopped":   discordColorRed,
-		"spot_interrupt": discordColorYellow,
-		"idle_warning":   discordColorYellow,
-		"pre_stop_start": discordColorBlue,
+		"completion":       discordColorGreen,
+		"ttl_expired":      discordColorRed,
+		"idle_stopped":     discordColorRed,
+		"spot_interrupt":   discordColorYellow,
+		"idle_warning":     discordColorYellow,
+		"pre_stop_start":   discordColorBlue,
+		"pre_stop_failed":  discordColorRed,
+		"pre_stop_timeout": discordColorRed,
 	}
 	for event, want := range cases {
 		e := buildDiscordEmbed(NotifyRequest{EventType: event, InstanceName: "x"})
 		if e.Color != want {
 			t.Errorf("%s color = %#x, want %#x", event, e.Color, want)
 		}
+	}
+}
+
+func TestBuildDiscordEmbed_PreStopFailureCarriesDetail(t *testing.T) {
+	e := buildDiscordEmbed(NotifyRequest{
+		EventType:    "pre_stop_failed",
+		InstanceName: "gpu1",
+		Detail:       "exit 1 — fatal error: Unable to locate credentials",
+	})
+	var hasDetail bool
+	for _, f := range e.Fields {
+		if f.Name == "Details" && strings.Contains(f.Value, "Unable to locate credentials") {
+			hasDetail = true
+		}
+	}
+	if !hasDetail {
+		t.Errorf("pre_stop_failed embed should carry a Details field with the hook output: %+v", e.Fields)
 	}
 }
 

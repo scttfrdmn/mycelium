@@ -13,6 +13,14 @@ own changelogs for CLI releases.
 
 ## [Unreleased]
 
+### Added
+- spore-bot formats the new `pre_stop_failed` / `pre_stop_timeout` lifecycle
+  events (spawn#186): a failed or timed-out `--pre-stop` hook now shows as a
+  loud orange/red Slack/Teams/Discord message (and SMS) carrying the hook's
+  error/output tail, instead of being indistinguishable from a clean shutdown.
+  Surfaces the spawn#184 data-loss shape (a pre-stop that "succeeded" saving
+  nothing).
+
 ### Removed
 - Dead `Registry.RedeemConnectCode` in spore-bot (audit L-health, #374). Connect
   codes are redeemed on the spawn side (`spawn bot register --connect-code`,

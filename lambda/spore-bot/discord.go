@@ -64,6 +64,10 @@ func buildDiscordEmbed(nr NotifyRequest) discordEmbed {
 		icon, title, color = "⚠️", fmt.Sprintf("%s received a Spot interruption notice — %s", name, nr.Detail), discordColorYellow
 	case "pre_stop_start":
 		icon, title, color = "🔄", fmt.Sprintf("%s is running its shutdown task before terminating", name), discordColorBlue
+	case "pre_stop_failed":
+		icon, title, color = "🟠", fmt.Sprintf("%s shutdown task FAILED — output may NOT have been saved", name), discordColorRed
+	case "pre_stop_timeout":
+		icon, title, color = "🟠", fmt.Sprintf("%s shutdown task TIMED OUT — output may be incomplete", name), discordColorRed
 	default:
 		icon, title = "ℹ️", fmt.Sprintf("%s: %s", name, nr.EventType)
 	}
@@ -77,6 +81,10 @@ func buildDiscordEmbed(nr NotifyRequest) discordEmbed {
 		embed.URL = "https://" + nr.DNSName
 		embed.Fields = append(embed.Fields, discordEmbedField{Name: "URL", Value: "https://" + nr.DNSName, Inline: false})
 	}
+	// Surface the hook's error/output tail for failed/timed-out pre-stop (#186).
+	if (nr.EventType == "pre_stop_failed" || nr.EventType == "pre_stop_timeout") && nr.Detail != "" {
+		embed.Fields = append(embed.Fields, discordEmbedField{Name: "Details", Value: "```" + truncateDetail(nr.Detail, 1000) + "```", Inline: false})
+	}
 	if nr.InstanceID != "" {
 		embed.Fields = append(embed.Fields, discordEmbedField{Name: "Instance", Value: "`" + nr.InstanceID + "`", Inline: true})
 	}
@@ -84,6 +92,16 @@ func buildDiscordEmbed(nr NotifyRequest) discordEmbed {
 		embed.Fields = append(embed.Fields, discordEmbedField{Name: "Region", Value: nr.Region, Inline: true})
 	}
 	return embed
+}
+
+// truncateDetail trims a detail string to max runes (Discord embed field values
+// are capped at 1024 chars; we leave headroom for the code fences).
+func truncateDetail(s string, max int) string {
+	r := []rune(s)
+	if len(r) <= max {
+		return s
+	}
+	return string(r[:max]) + "…"
 }
 
 // postDiscordWebhook POSTs an embed to a Discord channel webhook URL (#2).

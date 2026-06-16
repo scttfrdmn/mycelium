@@ -253,6 +253,16 @@ func formatNotification(nr NotifyRequest) string {
 		icon, verb = "⚠️", fmt.Sprintf("*%s* received a Spot interruption notice — %s", name, nr.Detail)
 	case "pre_stop_start":
 		icon, verb = "🔄", fmt.Sprintf("*%s* is running its shutdown task before terminating", name)
+	case "pre_stop_failed":
+		icon, verb = "🟠", fmt.Sprintf("*%s* shutdown task FAILED — output may NOT have been saved", name)
+		if nr.Detail != "" {
+			verb += fmt.Sprintf("\n  ```%s```", nr.Detail)
+		}
+	case "pre_stop_timeout":
+		icon, verb = "🟠", fmt.Sprintf("*%s* shutdown task TIMED OUT — output may be incomplete", name)
+		if nr.Detail != "" {
+			verb += fmt.Sprintf("\n  ```%s```", nr.Detail)
+		}
 	default:
 		icon, verb = "ℹ️", fmt.Sprintf("*%s*: %s", name, nr.EventType)
 	}
@@ -308,6 +318,7 @@ func sendUserSMS(ctx context.Context, reg *Registry, nr NotifyRequest) {
 	if nr.Detail != "" {
 		extra["remaining"] = nr.Detail
 		extra["idle_duration"] = nr.Detail
+		extra["detail"] = nr.Detail // pre_stop_failed/timeout carry the hook's error/output tail (#186)
 	}
 	msgText, options := twilioMessage(nr.InstanceName, nr.EventType, extra)
 
