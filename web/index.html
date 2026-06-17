@@ -314,9 +314,21 @@ tar -xzf truffle_*_$(uname -s)_$(uname -m).tar.gz</code></pre>
         fit: 'width',
         idleTimeLimit: 2    // compress idle gaps in the cast to max 2s
       });
-      // Pause 10 seconds at the end so viewers can see the final state, then restart
+      // Hold on the final frame for 10s so viewers can read the end state, then
+      // restart from the top. Explicitly pause() (the prior code only re-played,
+      // which restarted immediately with no visible hold), then seek(0)+play()
+      // after the delay. Guarded so a repeated 'ended' can't stack timers.
+      var PAUSE_MS = 10000;
+      var looping = false;
       p.addEventListener('ended', function() {
-        setTimeout(function() { p.play(); }, 10000);
+        if (looping) return;
+        looping = true;
+        p.pause();
+        setTimeout(function() {
+          p.seek(0);
+          p.play();
+          looping = false;
+        }, PAUSE_MS);
       });
     };
     document.head.appendChild(script);
