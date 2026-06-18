@@ -95,11 +95,39 @@ lagotto history --watch-id <watch-id>  # one watch
 
 ### `lagotto poll`
 
-Manually trigger one polling cycle (useful for testing):
+Manually trigger one polling cycle (useful for testing), or loop in the foreground with `--daemon`:
 
 ```sh
-lagotto poll
+lagotto poll                                 # one cycle
+lagotto poll --daemon --interval 5m          # loop, infra-free (no Lambda needed)
 ```
+
+In a **shared account**, scope a daemon to your own watches so it doesn't drive another project's:
+
+```sh
+lagotto poll --daemon --project fieldwork    # only that project (or $LAGOTTO_PROJECT)
+lagotto poll --daemon --mine                 # only watches you created
+lagotto poll --daemon --watch w-aaa,w-bbb    # only these watch IDs
+```
+
+A scoped daemon exits when **its** watches drain. Before acting on a match a poller claims a short **lease** on the watch, so two daemons — or a daemon racing the hosted Lambda — can't both launch it (`--no-lease` opts out). Tag a watch for scoping with `lagotto watch --project NAME` (or `$LAGOTTO_PROJECT`).
+
+### `lagotto launch`
+
+Schedule a launch by **time** rather than capacity — fire once at a clock time (`--at`), after a delay (`--after`), or on a recurring cron (`--cron`):
+
+```sh
+# Launch into a Capacity Block at its reserved start time
+lagotto launch --at 2026-07-01T08:00:00Z --az us-east-1a --spawn-config block.yaml
+
+# Launch 6 hours from now
+lagotto launch --after 6h --spawn-config job.yaml
+
+# Recurring: every weekday at 09:00 UTC
+lagotto launch --cron "0 9 ? * MON-FRI *" --spawn-config nightly.yaml
+```
+
+The motivating case is launching into an **EC2 Capacity Block for ML** at its reserved start time — see [Capacity Blocks](#capacity-blocks-for-ml) below. Scheduled launches run on EventBridge Scheduler in the hosted poller stack, so they require `lagotto deploy` first; the launched instance always carries a TTL. If an instance with the same `Name` tag already exists at fire time, `--if-exists skip|launch|replace` decides what happens (default: `skip` for one-shots so a Capacity Block can't double-book, `launch` for cron).
 
 ## Actions
 
@@ -143,9 +171,26 @@ drop out of the active set as they launch, fail, or expire. When **zero** active
 watches remain, the Lambda disables its own schedule — no watches, no Lambda.
 Creating a new watch re-arms it.
 
+## Capacity Blocks for ML
+
+Lagotto is the last step of the end-to-end Capacity Block flow across the three tools:
+
+1. **Discover** a purchasable offering — `truffle capacity-blocks --instance-type p5.48xlarge --count 1 --duration-hours 24` (read-only).
+2. **Purchase** it — `spawn capacity-block purchase <offering-id> ...` (billed up front, non-refundable; three typed confirmations, interactive-only).
+3. **Launch into it at the reserved start time** — `lagotto launch --at <block-start> --az <block-az> --spawn-config block.yaml`, where `block.yaml` sets `reservation_id` + `capacity_block: true` (forwarded to `spawn launch --reservation-id … --capacity-block`).
+
+Step 3 is why `lagotto launch --at` exists: the block becomes usable at its start time, and a scheduled launch brings the instance up automatically — no one awake at 08:00 to run it.
+
 ## Deploy
 
-Lagotto is deployed via CloudFormation — not through the CLI. See the [deployment guide](https://github.com/spore-host/spore-host/blob/main/lagotto/DEPLOYMENT.md) for the full setup: Lambda, EventBridge schedule, DynamoDB tables, and IAM role. Once deployed, the `lagotto` CLI manages watches in that infrastructure.
+Deploy the hosted poller stack **into your own account** with one command:
+
+```sh
+lagotto deploy                 # stand up Lambda + EventBridge + DynamoDB + IAM
+lagotto deploy --teardown      # remove it
+```
+
+`lagotto deploy` downloads the published poller Lambda artifact, uploads it to a bucket in your account, and deploys the embedded CloudFormation template. The poller schedule deploys disabled and the first `lagotto watch` arms it; the stack self-tears-down when no watches or pending scheduled launches remain. See the [deployment guide](https://github.com/spore-host/spore-host/blob/main/lagotto/DEPLOYMENT.md) for the manual CloudFormation path and details. Once deployed, the `lagotto` CLI manages watches and scheduled launches in that infrastructure.
 
 ## Full command reference
 

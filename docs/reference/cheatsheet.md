@@ -94,15 +94,43 @@ spawn notify list --platform slack --workspace-id T0...
 ## lagotto
 
 ```sh
+# Watch for capacity, act when it appears
 lagotto watch "p5.48xlarge" --action notify
 lagotto watch "p5.48xlarge" --regions us-east-1 --action notify \
   --notify email:you@example.com
 lagotto watch "g5.xlarge" --action spawn --spawn-config job.yaml
+lagotto watch "g5.xlarge" --action spawn --spawn-config job.yaml --project fieldwork
 lagotto list
 lagotto status <watch-id>
 lagotto cancel <watch-id>
 lagotto extend <watch-id> --ttl 7d
 lagotto history
+
+# Schedule a launch by time (requires `lagotto deploy` first)
+lagotto launch --at 2026-07-01T08:00:00Z --az us-east-1a --spawn-config block.yaml
+lagotto launch --after 6h --spawn-config job.yaml
+lagotto launch --cron "0 9 ? * MON-FRI *" --spawn-config nightly.yaml
+
+# Poll: one cycle, or an infra-free daemon (scope it in a shared account)
+lagotto poll
+lagotto poll --daemon --interval 5m --project fieldwork
+lagotto poll --daemon --mine
+
+# Deploy / remove the hosted poller stack in your account
+lagotto deploy
+lagotto deploy --teardown
+```
+
+## Capacity Blocks for ML (truffle → spawn → lagotto)
+
+```sh
+# 1. Find a purchasable offering (read-only)
+truffle capacity-blocks --instance-type p5.48xlarge --count 1 --duration-hours 24
+# 2. Purchase it (up-front, non-refundable; three typed confirmations, interactive only)
+spawn capacity-block purchase <offering-id> --instance-type p5.48xlarge \
+  --count 1 --duration-hours 24 --region us-east-1 --dry-run   # preview; drop --dry-run to buy
+# 3. Launch into it at the reserved start time (block.yaml sets reservation_id + capacity_block)
+lagotto launch --at <block-start> --az <block-az> --spawn-config block.yaml
 ```
 
 ## Environment variables

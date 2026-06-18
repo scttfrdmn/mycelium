@@ -83,15 +83,28 @@ truffle quotas --family Standard --request             # generate increase comma
 | `Inf` | inf1, inf2 (Inferentia) |
 | `Trn` | trn1 (Trainium) |
 
-### `truffle capacity` — capacity reservations
+### `truffle capacity` — capacity reservations you own
 
-Check existing On-Demand Capacity Reservations in your account.
+Check existing On-Demand Capacity Reservations and Capacity Blocks **already in your account**.
 
 ```sh
 truffle capacity
 truffle capacity --gpu-only
 truffle capacity --instance-types p5.48xlarge,p4d.24xlarge
+truffle capacity --blocks                              # Capacity Blocks you already own
 ```
+
+### `truffle capacity-blocks` — discover purchasable Capacity Blocks
+
+Find purchasable [EC2 Capacity Block for ML](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/capacity-blocks.html) **offerings** — "what can I reserve?" (read-only; queries `DescribeCapacityBlockOfferings`). This is distinct from `truffle capacity --blocks`, which lists blocks you *already* own.
+
+```sh
+truffle capacity-blocks --instance-type p5.48xlarge --count 1 --duration-hours 24
+truffle capacity-blocks --instance-type p5.48xlarge --count 2 --duration-hours 48 \
+  --region us-east-1 --start-after 2026-07-01T00:00:00Z
+```
+
+Each offering shows its **id** (what `spawn capacity-block purchase` reserves), instance type/count, AZ, start/end, duration, and up-front price. `--instance-type` and `--duration-hours` are required. This is step 1 of the Capacity Block flow — see [Capacity Blocks for ML](#capacity-blocks-for-ml) below.
 
 ## Typical workflow: find → search → spot → check quota → launch
 
@@ -121,6 +134,25 @@ spawn launch my-job \
   --instance-type $(truffle search "m8a.*" --min-vcpu 16 --pick-first) \
   --spot --ttl 4h
 ```
+
+## Capacity Blocks for ML
+
+A Capacity Block reserves scarce GPU capacity (e.g. p5.48xlarge) for a future window. The flow spans all three tools — truffle discovers, spawn buys, lagotto launches:
+
+```sh
+# 1. truffle — find a purchasable offering (read-only)
+truffle capacity-blocks --instance-type p5.48xlarge --count 1 --duration-hours 24
+
+# 2. spawn — purchase it (billed up front, NON-REFUNDABLE; three typed
+#    confirmations, interactive only; --dry-run to preview)
+spawn capacity-block purchase <offering-id> --instance-type p5.48xlarge \
+  --count 1 --duration-hours 24 --region us-east-1
+
+# 3. lagotto — launch into it at the reserved start time
+lagotto launch --at <block-start> --az <block-az> --spawn-config block.yaml
+```
+
+Truffle stays read-only throughout — the purchase (a real-money, non-refundable write) lives in spawn behind its confirmation gates.
 
 ## Full command reference
 

@@ -50,6 +50,8 @@ lagotto list   # see active watches
 
 Lagotto is useful when you have a job queued but can't launch it yet — you want to be notified the moment capacity opens up, or you want the launch to happen automatically.
 
+It triggers on two things: **capacity** (`lagotto watch`) and **time** (`lagotto launch --at/--after/--cron`). The time-based mode exists so you can launch into an EC2 Capacity Block for ML at its reserved start time — the block becomes usable at a fixed hour, and the launch fires automatically with no one awake to run it.
+
 ### <span class="tool-badge bot">Spore-bot</span> — Control from anywhere
 
 Once an instance is running, you might not want to open a terminal to manage it. Spore-bot connects your Slack or Teams workspace to your running instances. Any team member you've authorized can type `/spore status`, `/spore stop`, or `/spore extend 4h` and it just works — from any device, any location.

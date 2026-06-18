@@ -80,7 +80,8 @@ id=$(spawn launch my-job --instance-type c6a.large -y -o json | jq -r '.[0].inst
 | `--spot` | bool | `false` | Launch as Spot instance |
 | `--spot-max-price` | string | | Maximum Spot price (e.g., `0.50`) |
 | `--use-reservation` | bool | `false` | Use On-Demand Capacity Reservation |
-| `--reservation-id` | string | | Specific reservation ID to use |
+| `--reservation-id` | string | | Capacity Reservation / Capacity Block ID to launch into (`cr-…`). The instance must be in the reservation's AZ (set `--az`) |
+| `--capacity-block` | bool | `false` | The `--reservation-id` is a Capacity Block for ML (sets `MarketType=capacity-block`); mutually exclusive with `--spot` |
 
 ### Lifecycle
 
@@ -928,6 +929,43 @@ spawn ami <subcommand>
 | `--tag` | strings | Tags in `key=value` format (repeatable) |
 | `--reboot` | bool | Reboot instance before creating (default: no-reboot) |
 | `--wait` | bool | Wait for AMI to become available |
+
+---
+
+## spawn capacity-block
+
+Purchase EC2 Capacity Blocks for ML from an offering discovered with `truffle capacity-blocks`.
+
+```
+spawn capacity-block purchase <offering-id> [flags]
+```
+
+⚠️ A Capacity Block is billed **up front** and is **non-refundable** — the full block duration is charged at purchase, making this the single most expensive action spawn can take. The purchase requires you to **type three confirmations** (the exact price, `purchase <offering-id>`, and an acknowledgement phrase) and **refuses to run on a non-interactive terminal** — there is no `--yes` bypass. Use `--dry-run` first to preview the price and terms without buying anything.
+
+The offering's instance type, count, and duration must be supplied so the exact offering can be re-validated and its current price re-confirmed immediately before purchase. This is step 2 of the [Capacity Block flow](/tools/truffle#capacity-blocks-for-ml); launch into the reservation afterward with `spawn launch --reservation-id … --capacity-block` or `lagotto launch --at <block-start>`.
+
+**Examples:**
+```sh
+# Preview only — no charge, no write API call
+spawn capacity-block purchase cbo-0abc123 --instance-type p5.48xlarge \
+  --count 1 --duration-hours 24 --region us-east-1 --dry-run
+
+# Real purchase (prompts for the three typed confirmations)
+spawn capacity-block purchase cbo-0abc123 --instance-type p5.48xlarge \
+  --count 1 --duration-hours 24 --region us-east-1
+```
+
+**`spawn capacity-block purchase` flags:**
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--instance-type` | string | | Instance type of the offering (**required**, e.g. `p5.48xlarge`) |
+| `--duration-hours` | int | | Capacity Block duration in hours (**required**) |
+| `--count` | int | `1` | Number of instances in the block |
+| `--region` | string | | AWS region of the offering (**required**) |
+| `--platform` | string | `Linux/UNIX` | Instance platform |
+| `--dry-run` | bool | `false` | Preview the price and terms without purchasing |
+| `--tag` | strings | | Tag to apply to the reservation (`key=value`; repeatable) |
 
 ---
 

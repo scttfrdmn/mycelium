@@ -162,15 +162,48 @@ truffle az c7i.xlarge --output json
 
 ---
 
+## truffle capacity-blocks
+
+Discover **purchasable** EC2 Capacity Block for ML offerings (read-only).
+
+```
+truffle capacity-blocks --instance-type <type> --duration-hours <n> [--count <n>]
+```
+
+Queries `DescribeCapacityBlockOfferings` — "what can I reserve?" — and lists each offering's id, instance type/count, AZ, start/end, duration, and up-front price. The offering id is what `spawn capacity-block purchase` reserves. For Capacity Blocks you **already own**, use `truffle capacity --blocks` instead.
+
+**Examples:**
+```sh
+truffle capacity-blocks --instance-type p5.48xlarge --count 1 --duration-hours 24
+truffle capacity-blocks --instance-type p5.48xlarge --count 2 --duration-hours 48 \
+  --region us-east-1 --output json
+truffle capacity-blocks --instance-type p5.48xlarge --duration-hours 24 \
+  --start-after 2026-07-01T00:00:00Z
+```
+
+**Flags:**
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--instance-type` | string | | Instance type to find offerings for (**required**, e.g. `p5.48xlarge`) |
+| `--duration-hours` | int | | Capacity Block duration in hours (**required**, e.g. `24`) |
+| `--count` | int | `1` | Number of instances in the block |
+| `--start-after` | string | | Only offerings starting after this RFC3339 time |
+| `--start-before` | string | | Only offerings ending before this RFC3339 time |
+| `--regions` | strings | (all enabled) | Filter by specific regions |
+| `--timeout` | duration | `5m` | Timeout for AWS API calls |
+
+---
+
 ## truffle capacity
 
-Show On-Demand Capacity Reservations and Capacity Blocks.
+Show On-Demand Capacity Reservations and Capacity Blocks **you already own**.
 
 ```
 truffle capacity
 ```
 
-Queries your AWS account for existing capacity reservations and capacity blocks. Requires AWS credentials.
+Queries your AWS account for existing capacity reservations and capacity blocks. Requires AWS credentials. To discover **purchasable** Capacity Block offerings, use [`truffle capacity-blocks`](#truffle-capacity-blocks) instead.
 
 **Examples:**
 ```sh
@@ -190,7 +223,7 @@ truffle capacity --blocks
 | `--active-only` | bool | `true` | Only show active reservations |
 | `--min-capacity` | int | `0` | Minimum available capacity |
 | `--gpu-only` | bool | `false` | Only show GPU/ML instance reservations (p, g, inf, trn families) |
-| `--blocks` | bool | `false` | Show Capacity Blocks for ML (training workloads) |
+| `--blocks` | bool | `false` | Show Capacity Blocks for ML **you already own** (to discover purchasable offerings, use `truffle capacity-blocks`) |
 | `--odcr` | bool | `true` | Show On-Demand Capacity Reservations |
 | `--timeout` | duration | `5m` | Timeout for AWS API calls |
 

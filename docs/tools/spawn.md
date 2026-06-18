@@ -148,6 +148,22 @@ spawn notify list ...
 
 See [Slack Setup](/guides/slack-setup) or [Teams Setup](/guides/teams-setup) for the full walkthrough.
 
+### `spawn capacity-block purchase`
+
+Purchase an EC2 Capacity Block for ML from an offering discovered with `truffle capacity-blocks`:
+
+```sh
+# Preview the price and terms (no charge)
+spawn capacity-block purchase <offering-id> --instance-type p5.48xlarge \
+  --count 1 --duration-hours 24 --region us-east-1 --dry-run
+
+# Real purchase — prompts for three typed confirmations
+spawn capacity-block purchase <offering-id> --instance-type p5.48xlarge \
+  --count 1 --duration-hours 24 --region us-east-1
+```
+
+A Capacity Block is billed **up front** and is **non-refundable**, so the purchase requires three typed confirmations (the exact price, `purchase <offering-id>`, and an acknowledgement phrase) and refuses to run non-interactively — no `--yes` bypass. Once purchased, launch into it with `spawn launch --reservation-id <id> --capacity-block --az <block-az>`, or have lagotto launch it automatically at the reserved start time (`lagotto launch --at`). See [Capacity Blocks for ML](/tools/truffle#capacity-blocks-for-ml) for the full three-tool flow.
+
 ## Key concepts
 
 **TTL** — every instance has an absolute termination deadline: `launch_time + TTL`. When it fires, the instance terminates. The deadline is stored in a tag at launch and is **never reset** by stop/wake cycles — it keeps counting even while the instance is stopped. `spawn extend` pushes the deadline forward, not from now.

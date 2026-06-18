@@ -79,6 +79,58 @@ lagotto watch "ml.g5.2xlarge" --service sagemaker --notify email:you@example.com
 | `--ttl` | | string | `24h` | How long to keep watching (e.g., `24h`, `7d`, `168h`) |
 | `--notify` | | strings | | Notification channels: `email:user@example.com`, `webhook:https://...`, `sns:arn:...` |
 | `--spawn-config` | | string | | Path to YAML file with spawn LaunchConfig (required when `--action spawn`) |
+| `--project` | | string | (`$LAGOTTO_PROJECT`) | Project label for scoping a local `poll --daemon --project` in a shared account |
+
+---
+
+## lagotto launch
+
+Schedule a future or recurring instance launch — by **time**, as opposed to `watch`, which fires on **capacity**.
+
+```
+lagotto launch (--at <time> | --after <delay> | --cron <expr>) --spawn-config <file>
+```
+
+Where `watch` waits for capacity to appear, `launch` fires at a clock time (`--at`), after a delay (`--after`), or on a recurring cron (`--cron`). The motivating case is launching into an [EC2 Capacity Block for ML](/tools/truffle#capacity-blocks-for-ml) at its reserved start time. The launched instance always carries a TTL.
+
+Scheduled launches are driven by EventBridge Scheduler in the hosted poller stack, so they require **`lagotto deploy`** first (the per-launch schedule targets the poller Lambda in your account with a routing payload). A one-shot's schedule self-deletes after it fires; a cron schedule stays armed.
+
+**Overlap policy (`--if-exists`):** when an instance with the same `Name` tag already exists at fire time:
+
+| `--if-exists` | Behavior | Default for |
+|---------------|----------|-------------|
+| `skip` | Don't launch; treat the existing instance as the fulfillment | `--at` / `--after` (a Capacity Block must not double-book) |
+| `launch` | Launch anyway — each fire is a fresh box | `--cron` |
+| `replace` | Terminate the existing instance, then launch | — |
+
+The dedup key is the instance `Name` tag (`--name`, or the spawn config's `name`).
+
+**Examples:**
+```sh
+# Launch into a Capacity Block at its reserved start time (block.yaml sets
+# reservation_id + capacity_block; --az matches the block's AZ)
+lagotto launch --at 2026-07-01T08:00:00Z --az us-east-1a --spawn-config block.yaml
+
+# Launch 6 hours from now
+lagotto launch --after 6h --spawn-config job.yaml
+
+# Recurring: every weekday at 09:00 UTC
+lagotto launch --cron "0 9 ? * MON-FRI *" --spawn-config nightly.yaml
+```
+
+**Flags:**
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--at` | string | | Fire once at this RFC3339 time (e.g. `2026-07-01T08:00:00Z`) |
+| `--after` | string | | Fire once after this delay (e.g. `6h`, `30m`, `2d`) |
+| `--cron` | string | | Fire on this cron schedule (e.g. `0 9 ? * MON-FRI *`) |
+| `--spawn-config` | string | | YAML file with the spawn LaunchConfig (**required**) |
+| `--if-exists` | string | `skip` (one-shot) / `launch` (cron) | Overlap policy: `skip`, `launch`, or `replace` |
+| `--name` | string | (config's name) | Instance Name tag — the overlap dedup key |
+| `--az` | string | | Availability zone (required to match a Capacity Block's AZ) |
+| `--region` | string | (AWS config) | AWS region to launch in |
+| `--stack-name` | string | `lagotto` | Deployed lagotto stack name (provides the poller target) |
 
 ---
 
@@ -200,21 +252,43 @@ lagotto history --output json
 
 ## lagotto poll
 
-Run one polling cycle manually.
+Run one polling cycle, or loop in the foreground with `--daemon`.
 
 ```
-lagotto poll
+lagotto poll [--daemon] [--interval <dur>] [scoping flags]
 ```
 
-Triggers a single poll of all active watches — the same logic the Lambda runs on its schedule. Useful for testing your watches without waiting for the next scheduled poll.
+By default triggers a single poll of all active watches — the same logic the Lambda runs on its schedule. Useful for testing your watches without waiting for the next scheduled poll. With `--daemon` it loops on `--interval` (default 5m), so `lagotto watch --action spawn` works hands-off with **no** Lambda/EventBridge/CloudFormation — the infra-free alternative to the hosted poller.
 
 Within a poll, a `spawn` watch actually **attempts a launch** (the real capacity test). A capacity failure leaves the watch `active` to retry next cycle; a terminal failure sets it `failed`. The poller is a self-terminating per-account singleton: when no active watches remain, the Lambda disables its own schedule (a new `lagotto watch` re-enables it).
+
+**Scoping in a shared account:** by default a daemon services **every** active watch in the account. Scope it to your own so it doesn't drive (and launch) another project's watches:
+
+```sh
+lagotto poll --daemon --project fieldwork   # only that project's watches (or $LAGOTTO_PROJECT)
+lagotto poll --daemon --mine                # only watches you created
+lagotto poll --daemon --watch w-aaa,w-bbb   # only these watch IDs
+```
+
+A scoped daemon exits when **its** watches drain, not the whole account's. Before acting on a match, a poller claims a short **processing lease** on the watch, so two daemons — or a local daemon racing the hosted Lambda — can't both launch the same watch. A crashed poller's lease ages out automatically. Disable with `--no-lease` (not recommended when more than one poller runs).
 
 **Examples:**
 ```sh
 lagotto poll
 lagotto poll --verbose
+lagotto poll --daemon --interval 5m --project fieldwork
 ```
+
+**Flags:**
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--daemon` | bool | `false` | Loop in the foreground until no active watches in scope remain |
+| `--interval` | duration | `5m` | Polling interval in `--daemon` mode (e.g. `30s`, `5m`) |
+| `--project` | string | (`$LAGOTTO_PROJECT`) | Only poll watches with this project label |
+| `--mine` | bool | `false` | Only poll watches created by the calling identity |
+| `--watch` | strings | | Only poll these watch IDs (comma-separated or repeated) |
+| `--no-lease` | bool | `false` | Disable the per-watch processing lease |
 
 ---
 
