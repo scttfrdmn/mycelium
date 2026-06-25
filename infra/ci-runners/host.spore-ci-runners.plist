@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  launchd unit for orion.local — recreate the runner fleet at boot
+  (spore-host#381). The fleet uses the ephemeral model, so on boot we must
+  RECREATE containers (fresh writable layers, clean registration) rather than let
+  Docker restart the stale pre-reboot containers in place — which crash-looped on
+  the baked "already configured" .runner state and accumulated disk.
+
+  Install:
+    cp host.spore-ci-runners.plist ~/Library/LaunchAgents/com.spore.ci-runners.plist
+    launchctl load -w ~/Library/LaunchAgents/com.spore.ci-runners.plist
+
+  It waits for colima (the docker backend) to be up, then `down --remove-orphans
+  && up -d` from the deploy dir, then prunes any leftover offline org runners.
+  Idempotent and safe to run repeatedly.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.spore.ci-runners</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>-lc</string>
+    <string>/Users/scttfrdmn/spore-runner-deploy/boot-recreate.sh</string>
+  </array>
+  <key>StandardOutPath</key>
+  <string>/tmp/spore-ci-runners.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/spore-ci-runners.err.log</string>
+</dict>
+</plist>

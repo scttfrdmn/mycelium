@@ -1,0 +1,25 @@
+# spore.host self-hosted GitHub Actions runner fleet (orion.local)
+# Ephemeral org runners — each handles one job, then re-registers.
+# Token: ACCESS_TOKEN is read from .env (a GitHub PAT/gh token with admin:org).
+# Scale:  docker compose up -d   (replicas controls count)
+#
+# Reboot resilience (spore-host#381): on the host, recreate (not restart) the
+# fleet at boot via the launchd unit in this dir, and the entrypoint self-heals
+# (--replace re-registers; per-cycle _work/cache cleanup bounds disk). Build the
+# image from ./Dockerfile + ./entrypoint.sh in this dir (`docker build -t
+# spore-runner:latest .`).
+services:
+  runner:
+    image: spore-runner:latest
+    pull_policy: never # locally built image; never try to pull from a registry
+    restart: always
+    environment:
+      ACCESS_TOKEN: ${ACCESS_TOKEN:?set ACCESS_TOKEN in .env}
+      ORG_NAME: spore-host
+      # RUNNER_NAME is derived from the replica's hostname so each is unique.
+      RUNNER_NAME: orion
+      # FORCE_JAVASCRIPT_ACTIONS_TO_NODE24 is injected per-job via /home/runner/.env
+      # by the entrypoint (covers bundled Node 20 actions like github-script in
+      # codecov-action@v5). See spore-host#345.
+    deploy:
+      replicas: 6
