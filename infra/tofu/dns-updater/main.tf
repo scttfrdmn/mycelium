@@ -140,6 +140,20 @@ resource "aws_iam_role_policy" "route53" {
   })
 }
 
+# X-Ray write permission, paired with the function's tracing_config (Active).
+resource "aws_iam_role_policy" "xray" {
+  name = "XRayWrite"
+  role = aws_iam_role.dns_updater.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["xray:PutTraceSegments", "xray:PutTelemetryRecords"]
+      Resource = "*"
+    }]
+  })
+}
+
 # ── Lambda function ──────────────────────────────────────────────────────────
 # Tofu owns the function's SHAPE (role, runtime, arch, memory, timeout) but
 # ignores code + environment (deployed/managed out-of-band).
@@ -152,6 +166,13 @@ resource "aws_lambda_function" "dns_updater" {
   architectures = ["x86_64"]
   memory_size   = 256
   timeout       = 30
+
+  # End-to-end request tracing (Semgrep best-practice; paired with xray:Put* in
+  # the role). Applies on the next apply — a benign addition to the live function
+  # (same treatment as the spore-bot module).
+  tracing_config {
+    mode = "Active"
+  }
 
   # Placeholder code reference; real code comes from deploy-custom-dns.sh. Ignored
   # below so a deploy is never reverted.
