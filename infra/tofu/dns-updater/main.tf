@@ -66,8 +66,11 @@ variable "aws_profile" {
 #     spoofing this issue is about, cryptographically, with no allow-list to
 #     maintain and no per-region certs (the reason IAM auth beat PKCS#7).
 variable "enable_iam_invoke" {
-  type    = bool
-  default = false
+  type = bool
+  # Default true since the #173 cutover (2026-06-25): the Function URL runs under
+  # AuthType: AWS_IAM. This is the committed live state — a plain `tofu apply`
+  # must NOT silently revert it to NONE. Set false only for a deliberate rollback.
+  default = true
 }
 
 locals {
@@ -196,12 +199,13 @@ resource "aws_lambda_function" "dns_updater" {
 # ── Function URL ──────────────────────────────────────────────────────────────
 # The endpoint instances POST to (zqonqra6…lambda-url.us-east-1.on.aws). Its value
 # is deterministic from function name + account + region, so it is preserved
-# across this import. AuthType stays NONE until the #173 cutover flips it to
-# AWS_IAM (step 3) — see README; the flip is a one-line change here but MUST be
-# lockstep with fielding SigV4-signing instances or all DNS registration breaks.
+# across this import. AuthType is driven by enable_iam_invoke so the flip to
+# AWS_IAM (#173 step 3, done 2026-06-25) moves in LOCKSTEP with the matching
+# invoke grant below — you cannot enable IAM auth without the grant, or disable
+# the grant while IAM auth is on.
 resource "aws_lambda_function_url" "dns_updater" {
   function_name      = aws_lambda_function.dns_updater.function_name
-  authorization_type = "NONE"
+  authorization_type = var.enable_iam_invoke ? "AWS_IAM" : "NONE"
   cors {
     allow_methods = ["POST"]
     allow_origins = ["*"]
@@ -209,8 +213,12 @@ resource "aws_lambda_function_url" "dns_updater" {
   }
 }
 
-# Public invoke permission for the Function URL (NONE auth) — the live grant.
+# Public invoke permission under NONE auth. Present only while NONE is in effect;
+# the #173 flip (enable_iam_invoke=true) removes it as AuthType switches to
+# AWS_IAM and the AWS_IAM grant below is added — so this permission's auth_type
+# condition always matches the live AuthType.
 resource "aws_lambda_permission" "url_public" {
+  count                  = var.enable_iam_invoke ? 0 : 1
   statement_id           = "FunctionURLAllowPublicAccess"
   action                 = "lambda:InvokeFunctionUrl"
   function_name          = aws_lambda_function.dns_updater.function_name
