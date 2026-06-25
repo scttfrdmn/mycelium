@@ -26,6 +26,15 @@ own changelogs for CLI releases.
   and added the missing `docs/public/favicon.svg`.
 
 ### Added
+- **`infra/tofu/dns-updater`** — OpenTofu module bringing the hand-deployed
+  `spawn-dns-updater` Lambda (Route53 record updater) under IaC, mirroring the
+  `spore-bot` import-onto-live pattern (imports to a near-zero diff: only additive
+  `managedby` tags). This is step 0 of the spawn#173 cutover that moves the DNS
+  updater off the spoofable instance-identity-document auth onto the Function URL's
+  `AuthType: AWS_IAM`. The module carries a gated `enable_iam_invoke` toggle (the
+  `Principal: "*"` AWS_IAM invoke grant — scalable, no per-account enumeration) and
+  documents the full cutover ordering; the destructive `AuthType` flip stays gated
+  on a SigV4-signing fleet being fielded. See the module README.
 - spore-bot formats the new `pre_stop_failed` / `pre_stop_timeout` lifecycle
   events (spawn#186): a failed or timed-out `--pre-stop` hook now shows as a
   loud orange/red Slack/Teams/Discord message (and SMS) carrying the hook's
