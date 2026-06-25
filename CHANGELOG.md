@@ -13,6 +13,25 @@ own changelogs for CLI releases.
 
 ## [Unreleased]
 
+### Added
+- **`infra/ci-runners/` — the self-hosted CI runner fleet is now versioned** (it
+  previously lived only on orion.local, so fixes weren't reviewable) (#381). The
+  Dockerfile, self-healing `entrypoint.sh`, compose, boot launchd unit, and a
+  `boot-recreate.sh` recovery/boot script, with a README documenting the failure
+  modes and operations.
+
+### Fixed
+- **CI runner fleet no longer fills its disk and orphans jobs** (#381). The
+  ephemeral runners ran under `restart: always`, which restarts each finished
+  container **in place** — so its writable layer (`_work` + a ~3.5GB Go build
+  cache) grew unbounded across cycles (~7GB × 6) until the colima volume hit 80%+
+  and a job mid-run ran out of space, dying with no recorded steps (a ~10-min
+  GitHub timeout — this is what spuriously failed spawn#258). The entrypoint now
+  self-heals each cycle (clears `_work`, caps the go-build cache, `--replace`
+  re-registers), and a launchd boot unit recreates the fleet (not restart-in-place)
+  after a host reboot, fixing the prior reboot crash-loop too. Recovery on the
+  host reclaimed ~38GB (80%→13%).
+
 ### Fixed
 - Corrected broken GitHub and pkg.go.dev links on the website and docs that
   assumed a monorepo layout: the tools are split repos, so `truffle`, `spawn`,
