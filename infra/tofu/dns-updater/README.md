@@ -79,19 +79,22 @@ Instead, security comes from three layers that need **zero** allow-list upkeep:
 
 Execution order (each step gated; the flip is destructive):
 
-| # | Where | Action | Safe to land alone? |
-|---|-------|--------|---------------------|
-| 0 | here | Import the resource under tofu (this module). | ✅ additive tags only |
-| 1 | here | `enable_iam_invoke = true` → add the `Principal:"*"` AWS_IAM invoke grant. | ✅ additive + inert while AuthType is NONE |
-| 2 | spawn | Client SigV4-signs (PR #242, gated `SPORE_DNS_SIGV4`). | ✅ dormant; signed request still accepted by NONE URL |
-| — | spawn | **Enabler:** set `SPORE_DNS_SIGV4=1` in spored's bootstrap + release; let old instances age out under their TTLs so the fleet is signing. | ✅ |
-| 3 | spawn + here | Deploy the IAM-aware handler (verified-account namespacing), then flip `authorization_type = "AWS_IAM"`. | ❌ **DESTRUCTIVE** — breaks DNS for any instance not yet signing. Do only after the enabler is fielded. |
-| 4 | spawn | Delete the legacy identity-doc parsing / `signature.go` / embedded certs / cross-account default-allow. | ✅ dead code removal post-cutover |
+| # | Where | Action | Status |
+|---|-------|--------|--------|
+| 0 | here | Import the resource under tofu (this module). | ✅ done |
+| 2 | spawn | Client SigV4-signs (PR #242, gated `SPORE_DNS_SIGV4`). | ✅ shipped |
+| — | spawn | **Enabler:** spored sets `SPORE_DNS_SIGV4=1` (v0.67.0+). | ✅ shipped |
+| 3 | spawn | IAM-aware handler (verified-account namespacing), deployed to the live fn. | ✅ deployed |
+| 1+3 | here | `enable_iam_invoke = true` → flip `authorization_type` to `AWS_IAM` (lockstep) + add the `Principal:"*"` invoke grant, remove the NONE public grant. | ✅ **done 2026-06-25** |
+| 4 | spawn | Delete the legacy identity-doc parsing / `signature.go` / embedded certs / cross-account default-allow. | ⏳ post-cutover cleanup (dual-path handler serves both until then) |
 
-**The step-3 flip must be lockstep with a signing fleet.** As of step 0, nothing
-sets `SPORE_DNS_SIGV4`, so *no* instance signs yet — flipping AuthType now would
-break 100% of DNS registration. The enabler must ship and old instances must age
-out first.
+**The flip (now done) was lockstep with a signing fleet:** spored has signed
+since v0.67.0, the IAM-aware handler was deployed, and there were no live
+non-signing instances. `enable_iam_invoke` is now the committed default (`true`).
+Verified post-flip: an unsigned POST returns `403 {"Message":"Forbidden"}` from
+the URL auth layer (the vuln is closed), and a SigV4-signed call reaches the
+handler and is namespaced to the verified caller account. Rollback if ever
+needed: `tofu apply -var enable_iam_invoke=false` (AuthType ← NONE, seconds).
 
 ## Day-to-day
 
