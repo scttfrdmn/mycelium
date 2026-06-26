@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+# build-push.sh — build a spore.host app container and push it to a public ECR
+# repository (#290 container catalog).
+#
+# Replaces the per-app Packer AMI build (paraview.pkr.hcl): instead of baking the
+# app onto a per-region AMI, we publish ONE container image that runs on the
+# shared spore-dcv-base AMI in every region.
+#
+# Usage:
+#   ./build-push.sh <app> <version> [registry]
+#   ./build-push.sh paraview 5.13.2
+#   ./build-push.sh paraview 5.13.2 public.ecr.aws/spore-host
+#
+# Environment:
+#   SPORE_ECR_REGISTRY   default registry (default: public.ecr.aws/spore-host)
+#   SPORE_ECR_REGION     region for ECR Public auth (always us-east-1 for public)
+#   SPORE_BUILD_DRYRUN   "true" → build only, do not push
+#
+# Prerequisites:
+#   - docker (with buildx) and AWS CLI v2
+#   - AWS creds for the registry's account (the dedicated infra account 812107987990)
+#   - The per-app Dockerfile at containers/<app>/Dockerfile
+#
+# Public ECR is auth'd in us-east-1 regardless of where the registry "lives".
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+APP="${1:-}"
+VERSION="${2:-}"
+REGISTRY="${3:-${SPORE_ECR_REGISTRY:-public.ecr.aws/spore-host}}"
+DRYRUN="${SPORE_BUILD_DRYRUN:-false}"
+ECR_REGION="${SPORE_ECR_REGION:-us-east-1}"
+
+if [[ -z "$APP" || -z "$VERSION" ]]; then
+  echo "Usage: $0 <app> <version> [registry]" >&2
+  exit 2
+fi
+
+DOCKERFILE="${SCRIPT_DIR}/${APP}/Dockerfile"
+if [[ ! -f "$DOCKERFILE" ]]; then
+  echo "ERROR: no Dockerfile for '${APP}' at ${DOCKERFILE}" >&2
+  echo "Available: $(ls -d "${SCRIPT_DIR}"/*/ 2>/dev/null | xargs -n1 basename | tr '\n' ' ')" >&2
+  exit 1
+fi
+
+IMAGE="${REGISTRY}/${APP}"
+TAG="${IMAGE}:${VERSION}"
+
+# ParaView needs PV_MAJOR_MINOR derived from the version; pass both build-args.
+MAJOR_MINOR="$(echo "$VERSION" | cut -d. -f1,2)"
+
+echo "==> Building ${TAG}"
+docker build \
+  --build-arg "PV_VERSION=${VERSION}" \
+  --build-arg "PV_MAJOR_MINOR=${MAJOR_MINOR}" \
+  -t "$TAG" \
+  -f "$DOCKERFILE" \
+  "${SCRIPT_DIR}/${APP}"
+
+if [[ "$DRYRUN" == "true" ]]; then
+  echo "==> DRYRUN — built ${TAG}, not pushing"
+  exit 0
+fi
+
+echo "==> Authenticating to ECR Public (${ECR_REGION})"
+aws ecr-public get-login-password --region "$ECR_REGION" \
+  | docker login --username AWS --password-stdin public.ecr.aws
+
+# Ensure the public repository exists (idempotent). The ECR Public repo name is
+# just the app (the registry namespace is the public.ecr.aws/<alias> prefix).
+aws ecr-public describe-repositories --region "$ECR_REGION" \
+  --repository-names "$APP" >/dev/null 2>&1 \
+  || aws ecr-public create-repository --region "$ECR_REGION" \
+       --repository-name "$APP" >/dev/null
+
+echo "==> Pushing ${TAG}"
+docker push "$TAG"
+
+echo "==> Done: ${TAG}"
+echo "    Add to catalog (libs/catalog/catalog.yaml):"
+echo "      image: ${IMAGE}"
+echo "      tag_default: \"${VERSION}\""
