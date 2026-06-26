@@ -1,3 +1,9 @@
+# DEPRECATED (#290): this baked ParaView onto a per-app, per-region AMI — the
+# model retired by the container catalog. New builds use
+# infra/amis/containers/paraview/ + build-push.sh (one ECR image, runs on the
+# shared spore-dcv-base AMI). Kept for reference (the kiosk-wm/fullscreen logic
+# here was ported into containers/paraview/entrypoint.sh). Do NOT use for new
+# builds — its output AMIs are exactly the dangling/unshared ones from #389.
 packer {
   required_plugins {
     amazon = {
