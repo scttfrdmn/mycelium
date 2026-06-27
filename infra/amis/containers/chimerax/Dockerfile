@@ -30,6 +30,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 libglx-mesa0 libglu1-mesa libxrender1 libxtst6 \
     fontconfig fonts-dejavu-core \
     ca-certificates \
+    `# ChimeraX 1.12 uses Qt6, whose xcb platform plugin needs libxcb-cursor0` \
+    `# (+ the xcb helper libs); without it Qt aborts: "no Qt platform plugin".` \
+    libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 \
+    libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1 \
+    libxkbcommon-x11-0 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install ChimeraX from the human-provided .deb. apt resolves its dependencies.
