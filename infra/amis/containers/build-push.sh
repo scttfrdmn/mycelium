@@ -47,8 +47,30 @@ fi
 IMAGE="${REGISTRY}/${APP}"
 TAG="${IMAGE}:${VERSION}"
 
-# ParaView needs PV_MAJOR_MINOR derived from the version; pass both build-args.
-MAJOR_MINOR="$(echo "$VERSION" | cut -d. -f1,2)"
+# Per-app build-args + preconditions.
+BUILD_ARGS=()
+case "$APP" in
+  paraview)
+    # ParaView needs PV_MAJOR_MINOR derived from the version.
+    BUILD_ARGS+=(--build-arg "PV_VERSION=${VERSION}")
+    BUILD_ARGS+=(--build-arg "PV_MAJOR_MINOR=$(echo "$VERSION" | cut -d. -f1,2)")
+    ;;
+  chimerax)
+    # LICENSE GATE: ChimeraX has no unattended download (UCSF requires accepting a
+    # non-commercial license per download). The .deb must be placed in the app dir
+    # by a human who accepted the license. Fail clearly if it's missing.
+    DEB_GLOB=("${SCRIPT_DIR}/${APP}"/ucsf-chimerax_*.deb)
+    if [[ ! -e "${DEB_GLOB[0]}" ]]; then
+      echo "ERROR: no ChimeraX .deb in ${SCRIPT_DIR}/${APP}/" >&2
+      echo "  ChimeraX requires accepting a non-commercial license to download." >&2
+      echo "  1) Visit https://www.cgl.ucsf.edu/chimerax/download.html, accept the license," >&2
+      echo "     and download the Ubuntu 24.04 .deb (ucsf-chimerax_${VERSION}ubuntu24.04_amd64.deb)." >&2
+      echo "  2) Place it in ${SCRIPT_DIR}/${APP}/ and re-run this script." >&2
+      exit 1
+    fi
+    BUILD_ARGS+=(--build-arg "CHIMERAX_DEB=$(basename "${DEB_GLOB[0]}")")
+    ;;
+esac
 
 # Always build linux/amd64 — the base AMI and the app binaries are x86_64. On an
 # arm64 host this cross-builds via buildx+QEMU. --load (dry-run) imports the
@@ -58,8 +80,7 @@ PLATFORM="linux/amd64"
 echo "==> Building ${TAG} (${PLATFORM})"
 if [[ "$DRYRUN" == "true" ]]; then
   docker buildx build --platform "$PLATFORM" --load \
-    --build-arg "PV_VERSION=${VERSION}" \
-    --build-arg "PV_MAJOR_MINOR=${MAJOR_MINOR}" \
+    "${BUILD_ARGS[@]}" \
     -t "$TAG" -f "$DOCKERFILE" "${SCRIPT_DIR}/${APP}"
   echo "==> DRYRUN — built ${TAG}, not pushing"
   exit 0
@@ -80,8 +101,7 @@ echo "==> Building + pushing ${TAG} (${PLATFORM})"
 # buildx --push builds the amd64 image and pushes it in one step (so an arm64
 # host publishes a correct x86_64 image, not its native arch).
 docker buildx build --platform "$PLATFORM" --push \
-  --build-arg "PV_VERSION=${VERSION}" \
-  --build-arg "PV_MAJOR_MINOR=${MAJOR_MINOR}" \
+  "${BUILD_ARGS[@]}" \
   -t "$TAG" -f "$DOCKERFILE" "${SCRIPT_DIR}/${APP}"
 
 echo "==> Done: ${TAG}"

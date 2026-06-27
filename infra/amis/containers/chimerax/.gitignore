@@ -1,0 +1,3 @@
+# The ChimeraX .deb is downloaded by a human after accepting UCSF's
+# non-commercial license — never commit it (license + size).
+*.deb

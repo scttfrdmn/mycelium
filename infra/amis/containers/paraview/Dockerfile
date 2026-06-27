@@ -15,14 +15,15 @@
 # spore-dcv-base AMI runs on x86_64 GPU instances (g6/g5/g4dn). Without this
 # pin, building on an arm64 host (e.g. Apple Silicon) produces an arm64 image
 # wrapping an x86_64 binary that cannot exec.
-FROM --platform=linux/amd64 ubuntu:22.04
+FROM --platform=linux/amd64 ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
 # ParaView runtime libs + a minimal WM (metacity) + X utilities the launcher uses
 # to maximize the window after DCV resizes the display to the browser viewport.
+# (ParaView bundles its own Python/Qt, so the base distro version is not load-bearing.)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgl1-mesa-glx \
+    libgl1 libglx-mesa0 \
     libglu1-mesa \
     libxt6 libxrender1 libxext6 libxcursor1 \
     libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 \
@@ -52,7 +53,9 @@ RUN curl -fsSL \
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
-RUN useradd -m -u 1000 paraview
+# Ubuntu 24.04 ships a default 'ubuntu' user at uid 1000; remove it so we can own
+# 1000 (matches the DCV session's ec2-user uid). 22.04 had no such user.
+RUN userdel -r ubuntu 2>/dev/null || true; useradd -m -u 1000 paraview
 USER paraview
 # The container's job IS the DCV session: launch the WM + ParaView fullscreen and
 # block until ParaView exits (then DCV closes the session → spored sees idle).
