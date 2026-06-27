@@ -34,7 +34,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install ChimeraX from the human-provided .deb. apt resolves its dependencies.
 COPY ${CHIMERAX_DEB} /tmp/chimerax.deb
-RUN apt-get update && apt-get install -y /tmp/chimerax.deb \
+RUN apt-get update && apt-get install -y --no-install-recommends /tmp/chimerax.deb \
     && rm -f /tmp/chimerax.deb \
     && rm -rf /var/lib/apt/lists/* \
     && test -x /usr/bin/chimerax
