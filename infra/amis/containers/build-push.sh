@@ -50,15 +50,17 @@ TAG="${IMAGE}:${VERSION}"
 # ParaView needs PV_MAJOR_MINOR derived from the version; pass both build-args.
 MAJOR_MINOR="$(echo "$VERSION" | cut -d. -f1,2)"
 
-echo "==> Building ${TAG}"
-docker build \
-  --build-arg "PV_VERSION=${VERSION}" \
-  --build-arg "PV_MAJOR_MINOR=${MAJOR_MINOR}" \
-  -t "$TAG" \
-  -f "$DOCKERFILE" \
-  "${SCRIPT_DIR}/${APP}"
+# Always build linux/amd64 — the base AMI and the app binaries are x86_64. On an
+# arm64 host this cross-builds via buildx+QEMU. --load (dry-run) imports the
+# single-arch image locally; the push path builds and pushes in one step.
+PLATFORM="linux/amd64"
 
+echo "==> Building ${TAG} (${PLATFORM})"
 if [[ "$DRYRUN" == "true" ]]; then
+  docker buildx build --platform "$PLATFORM" --load \
+    --build-arg "PV_VERSION=${VERSION}" \
+    --build-arg "PV_MAJOR_MINOR=${MAJOR_MINOR}" \
+    -t "$TAG" -f "$DOCKERFILE" "${SCRIPT_DIR}/${APP}"
   echo "==> DRYRUN — built ${TAG}, not pushing"
   exit 0
 fi
@@ -74,8 +76,13 @@ aws ecr-public describe-repositories --region "$ECR_REGION" \
   || aws ecr-public create-repository --region "$ECR_REGION" \
        --repository-name "$APP" >/dev/null
 
-echo "==> Pushing ${TAG}"
-docker push "$TAG"
+echo "==> Building + pushing ${TAG} (${PLATFORM})"
+# buildx --push builds the amd64 image and pushes it in one step (so an arm64
+# host publishes a correct x86_64 image, not its native arch).
+docker buildx build --platform "$PLATFORM" --push \
+  --build-arg "PV_VERSION=${VERSION}" \
+  --build-arg "PV_MAJOR_MINOR=${MAJOR_MINOR}" \
+  -t "$TAG" -f "$DOCKERFILE" "${SCRIPT_DIR}/${APP}"
 
 echo "==> Done: ${TAG}"
 echo "    Add to catalog (libs/catalog/catalog.yaml):"

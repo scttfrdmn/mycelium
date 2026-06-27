@@ -10,7 +10,12 @@
 #     -v /tmp/.X11-unix:/tmp/.X11-unix public.ecr.aws/spore-host/paraview:<tag>
 #
 # Build/push: infra/amis/containers/build-push.sh paraview <version>
-FROM ubuntu:22.04
+#
+# Pinned to linux/amd64: the ParaView tarball below is x86_64, and the
+# spore-dcv-base AMI runs on x86_64 GPU instances (g6/g5/g4dn). Without this
+# pin, building on an arm64 host (e.g. Apple Silicon) produces an arm64 image
+# wrapping an x86_64 binary that cannot exec.
+FROM --platform=linux/amd64 ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
