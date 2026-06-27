@@ -10,8 +10,9 @@ xsetroot -solid black 2>/dev/null || true
 metacity --sm-disable &
 sleep 1
 
-# ChimeraX honors --fullscreen; start it and capture the PID.
-/usr/bin/chimerax --fullscreen &
+# ChimeraX has no --fullscreen flag; the WM (metacity) + the re-maximize loop
+# below own fullscreen. Start it plain and capture the PID.
+/usr/bin/chimerax &
 CX_PID=$!
 
 # After DCV resizes the display to the browser viewport, re-maximize the main
