@@ -11,6 +11,8 @@ updates:
       day: "monday"
       time: "09:00"
       timezone: "America/Los_Angeles"
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 10
     labels:
       - "dependencies"
@@ -39,6 +41,8 @@ updates:
       day: "monday"
       time: "09:00"
       timezone: "America/Los_Angeles"
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 10
     labels:
       - "dependencies"
@@ -72,6 +76,8 @@ updates:
       day: "monday"
       time: "09:00"
       timezone: "America/Los_Angeles"
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
@@ -90,6 +96,8 @@ updates:
       day: "monday"
       time: "09:00"
       timezone: "America/Los_Angeles"
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
