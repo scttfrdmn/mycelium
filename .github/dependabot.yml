@@ -11,6 +11,8 @@ updates:
       day: "monday"
       time: "09:00"
       timezone: "America/Los_Angeles"
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 10
     labels:
       - "dependencies"
@@ -39,6 +41,8 @@ updates:
       day: "monday"
       time: "09:00"
       timezone: "America/Los_Angeles"
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 10
     labels:
       - "dependencies"
@@ -58,18 +62,25 @@ updates:
           - "minor"
           - "patch"
 
-  # Docker for spawn
+  # Docker — point at the directories that actually contain Dockerfiles. The
+  # previous single "/spawn" entry had no Dockerfile there and errored every run
+  # ("No Dockerfiles nor Kubernetes YAML found in /spawn").
   - package-ecosystem: "docker"
-    directory: "/spawn"
+    directories:
+      - "/infra/ci-runners"
+      - "/infra/amis"
+      - "/infra/amis/containers/paraview"
+      - "/infra/amis/containers/chimerax"
     schedule:
       interval: "weekly"
       day: "monday"
       time: "09:00"
       timezone: "America/Los_Angeles"
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
-      - "component:spawn"
       - "type:security"
     commit-message:
       prefix: "deps(docker)"
@@ -85,6 +96,8 @@ updates:
       day: "monday"
       time: "09:00"
       timezone: "America/Los_Angeles"
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
