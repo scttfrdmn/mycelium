@@ -58,9 +58,15 @@ updates:
           - "minor"
           - "patch"
 
-  # Docker for spawn
+  # Docker — point at the directories that actually contain Dockerfiles. The
+  # previous single "/spawn" entry had no Dockerfile there and errored every run
+  # ("No Dockerfiles nor Kubernetes YAML found in /spawn").
   - package-ecosystem: "docker"
-    directory: "/spawn"
+    directories:
+      - "/infra/ci-runners"
+      - "/infra/amis"
+      - "/infra/amis/containers/paraview"
+      - "/infra/amis/containers/chimerax"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -69,7 +75,6 @@ updates:
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
-      - "component:spawn"
       - "type:security"
     commit-message:
       prefix: "deps(docker)"
