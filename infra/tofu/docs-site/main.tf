@@ -88,6 +88,12 @@ resource "aws_cloudfront_origin_access_control" "docs" {
 
 # ── S3 origin bucket ──────────────────────────────────────────────────────────
 # Content is deployed by docs.yaml; Tofu owns only the bucket shape.
+#
+# AVD-AWS-0132 (no customer-managed KMS key) ignored below: this bucket holds
+# ONLY the public VitePress docs site, served unauthenticated to the world via
+# CloudFront anyway. No sensitive data to protect; default SSE-S3 (AES256) is
+# appropriate and a CMK would add key-management overhead for zero benefit.
+#trivy:ignore:AVD-AWS-0132
 resource "aws_s3_bucket" "docs" {
   bucket = local.bucket_name
   tags   = local.common_tags
@@ -122,6 +128,12 @@ resource "aws_s3_bucket_policy" "docs" {
 }
 
 # ── CloudFront distribution ───────────────────────────────────────────────────
+#
+# AVD-AWS-0011 (no WAF) ignored below deliberately: this distribution serves a
+# public, static, read-only documentation site (GET/HEAD only, no forms, no auth,
+# no dynamic origin). A WAF would add cost and operational surface for no
+# meaningful risk reduction here.
+#trivy:ignore:AVD-AWS-0011
 resource "aws_cloudfront_distribution" "docs" {
   enabled             = true
   is_ipv6_enabled     = true
