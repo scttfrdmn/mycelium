@@ -77,6 +77,7 @@ export default defineConfig({
             { text: 'MPI Clusters', link: '/guides/mpi' },
             { text: 'Pipelines', link: '/guides/pipelines' },
             { text: 'Plugins', link: '/guides/plugins' },
+            { text: 'Workflow Engines', link: '/guides/workflow-engines' },
             { text: 'Nextflow (nf-spawn)', link: '/guides/nextflow' },
           ]
         },
