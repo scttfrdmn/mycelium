@@ -35,3 +35,10 @@ Task-oriented guides for common workflows. If you're new, start with **Getting S
 | [Pipelines](/guides/pipelines) | Chain jobs so each stage launches the next |
 | [Plugins](/guides/plugins) | Extend instances with pre-built or custom plugins at launch time |
 | [Job Arrays](/guides/job-arrays) | Launch and manage groups of related instances |
+
+## Workflow Engines
+
+| Guide | What you'll learn |
+|-------|------------------|
+| [Workflow Engines](/guides/workflow-engines) | Run Nextflow, WDL, CWL, Snakemake, or Airflow with spawn as the execution backend — each task on an ephemeral instance |
+| [Nextflow (nf-spawn)](/guides/nextflow) | Dispatch each Nextflow process to its own ephemeral EC2 instance |

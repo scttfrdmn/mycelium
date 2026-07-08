@@ -4,9 +4,8 @@
 
 This lets you run bioinformatics pipelines (including [nf-core](https://nf-co.re) pipelines) without AWS Batch, ECS, or any queue infrastructure.
 
-::: warning Early prototype
-nf-spawn is under active development. Not production-ready — expect rough edges.
-:::
+nf-spawn is one of five [workflow-engine integrations](/guides/workflow-engines)
+on spore.host; it's under active development with its own roadmap.
 
 ## How it works
 
@@ -21,31 +20,29 @@ Each task gets a fresh instance. When the task script finishes, spored terminate
 
 ## Requirements
 
-- [spawn](https://github.com/spore-host/spawn) installed and on `PATH`
+- [spawn](https://github.com/spore-host/spawn) and [truffle](https://github.com/spore-host/truffle) on `PATH`
 - AWS credentials configured
-- Nextflow 23.10+
-- Java 17+ (to build the plugin)
+- Nextflow 26.04.x (the version nf-spawn v0.8.0 is built against)
+- JDK 21+ (to build the plugin)
 
 ## Installation
 
 ```bash
-# Clone and build
+# Clone and build+install into ~/.nextflow/plugins/
 git clone https://github.com/spore-host/nf-spawn
 cd nf-spawn
-./gradlew jar
-
-# Install into Nextflow plugins directory
-NXF_HOME=${NXF_HOME:-$HOME/.nextflow}
-mkdir -p $NXF_HOME/plugins/nf-spawn-0.1.0
-cp build/libs/nf-spawn-0.1.0.jar $NXF_HOME/plugins/nf-spawn-0.1.0/
+./gradlew installPlugin
 ```
+
+See the [nf-spawn README](https://github.com/spore-host/nf-spawn) for the exact
+plugin id/version to declare (it tracks the built version).
 
 ## Configuration
 
 ```groovy
 // nextflow.config
 plugins {
-    id 'nf-spawn@0.1.0'
+    id 'nf-spawn@0.8.0'
 }
 
 process {
@@ -112,6 +109,7 @@ No Batch job queue, no ECS cluster, no idle capacity — instances spin up and d
 
 ## See also
 
+- [Workflow Engines overview](/guides/workflow-engines) — all five engine integrations
 - [nf-spawn on GitHub](https://github.com/spore-host/nf-spawn)
 - [spawn launch reference](/tools/reference/spawn#spawn-launch)
 - [Instance sizing with truffle](/tools/truffle)
