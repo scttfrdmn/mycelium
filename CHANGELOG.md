@@ -13,6 +13,11 @@ own changelogs for CLI releases.
 
 ## [Unreleased]
 
+### Security
+- **Pinned the CI Go toolchain to 1.26.5** to clear GO-2026-5856, a `crypto/tls`
+  standard-library advisory present in go1.26.4 (affects the Go Lambdas / modules
+  built by CI). govulncheck is green again.
+
 ### Added
 - **`infra/ci-runners/` — the self-hosted CI runner fleet is now versioned** (it
   previously lived only on orion.local, so fixes weren't reviewable) (#381). The
