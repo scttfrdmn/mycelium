@@ -13,6 +13,15 @@ own changelogs for CLI releases.
 
 ## [Unreleased]
 
+### Changed
+- **rest-api SMS handler owns its pending-reply types locally.** spawn is
+  removing its dead `pkg/sms` (spawn#293); rest-api was the only cross-repo
+  consumer and used only the inbound types (`PendingKey`/`PendingNotification`/
+  `PendingTable`). Those now live in `lambda/rest-api/sms.go` (mirroring
+  `lambda/spore-bot/sms_notify.go`, which already keeps its own copy); the
+  `pkg/sms` import is dropped. No behavior change; rest-api still depends on
+  spawn's `pkg/aws`/`pkg/config`.
+
 ### Security
 - **Pinned the CI Go toolchain to 1.26.5** to clear GO-2026-5856, a `crypto/tls`
   standard-library advisory present in go1.26.4 (affects the Go Lambdas / modules
