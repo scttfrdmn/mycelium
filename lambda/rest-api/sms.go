@@ -19,8 +19,28 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	dynamodbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	spawnclient "github.com/spore-host/spawn/pkg/aws"
-	"github.com/spore-host/spawn/pkg/sms"
 )
+
+// SMS pending-reply store, kept local here (mirrors spore-bot/sms_notify.go's own
+// copy). This is only the inbound-reply half the REST API needs; spawn's former
+// pkg/sms was retired (spawn#293), so these types live with their consumer.
+const smsPendingTable = "spore-sms-pending"
+
+// smsPendingNotification tracks a sent SMS while waiting for the user's numbered reply.
+type smsPendingNotification struct {
+	TwilioNumber string // the Twilio number that sent the message (identifies the project)
+	UserPhone    string // the recipient's phone number
+	Project      string // "spore", "prism", etc.
+	InstanceID   string
+	Region       string
+	EventType    string
+	Options      map[string]string // "1" -> "extend:1h", "0" -> "dismiss", etc.
+}
+
+// smsPendingKey returns the DynamoDB primary key for a (twilioNumber, userPhone) pair.
+func smsPendingKey(twilioNumber, userPhone string) string {
+	return twilioNumber + "#" + userPhone
+}
 
 // handleSMSIncoming processes a Twilio webhook for an inbound SMS reply.
 // The To field identifies the project; the From field identifies the user.
@@ -59,7 +79,7 @@ func handleSMSIncoming(ctx context.Context, req events.APIGatewayV2HTTPRequest) 
 		return twilioResp("")
 	}
 
-	pending, err := fetchPending(ctx, sms.PendingKey(to, from))
+	pending, err := fetchPending(ctx, smsPendingKey(to, from))
 	if err != nil || pending == nil {
 		return twilioResp("No pending notification. Use the spore.host CLI or Slack bot to manage your instances.")
 	}
@@ -70,7 +90,7 @@ func handleSMSIncoming(ctx context.Context, req events.APIGatewayV2HTTPRequest) 
 	}
 
 	if action == "dismiss" {
-		clearPending(ctx, sms.PendingKey(to, from))
+		clearPending(ctx, smsPendingKey(to, from))
 		return twilioResp("Dismissed.")
 	}
 
@@ -79,11 +99,11 @@ func handleSMSIncoming(ctx context.Context, req events.APIGatewayV2HTTPRequest) 
 		return twilioResp(fmt.Sprintf("Error: %v", err))
 	}
 
-	clearPending(ctx, sms.PendingKey(to, from))
+	clearPending(ctx, smsPendingKey(to, from))
 	return twilioResp(reply)
 }
 
-func executeAction(ctx context.Context, p *sms.PendingNotification, action string) (string, error) {
+func executeAction(ctx context.Context, p *smsPendingNotification, action string) (string, error) {
 	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(p.Region))
 	if err != nil {
 		return "", fmt.Errorf("AWS config: %w", err)
@@ -245,10 +265,10 @@ func validateTwilioSignature(req events.APIGatewayV2HTTPRequest, authToken strin
 	return hmac.Equal([]byte(expected), []byte(req.Headers["x-twilio-signature"]))
 }
 
-func fetchPending(ctx context.Context, key string) (*sms.PendingNotification, error) {
+func fetchPending(ctx context.Context, key string) (*smsPendingNotification, error) {
 	cfg, _ := config.LoadDefaultConfig(ctx, config.WithRegion("us-east-1"))
 	out, err := dynamodb.NewFromConfig(cfg).GetItem(ctx, &dynamodb.GetItemInput{
-		TableName: aws.String(sms.PendingTable),
+		TableName: aws.String(smsPendingTable),
 		Key: map[string]dynamodbtypes.AttributeValue{
 			"pending_key": &dynamodbtypes.AttributeValueMemberS{Value: key},
 		},
@@ -267,7 +287,7 @@ func fetchPending(ctx context.Context, key string) (*sms.PendingNotification, er
 	if len(parts) == 2 {
 		twilioNum, userPhone = parts[0], parts[1]
 	}
-	return &sms.PendingNotification{
+	return &smsPendingNotification{
 		TwilioNumber: twilioNum,
 		UserPhone:    userPhone,
 		Project:      get("project"),
@@ -281,7 +301,7 @@ func fetchPending(ctx context.Context, key string) (*sms.PendingNotification, er
 func clearPending(ctx context.Context, key string) {
 	cfg, _ := config.LoadDefaultConfig(ctx, config.WithRegion("us-east-1"))
 	_, _ = dynamodb.NewFromConfig(cfg).DeleteItem(ctx, &dynamodb.DeleteItemInput{
-		TableName: aws.String(sms.PendingTable),
+		TableName: aws.String(smsPendingTable),
 		Key: map[string]dynamodbtypes.AttributeValue{
 			"pending_key": &dynamodbtypes.AttributeValueMemberS{Value: key},
 		},
