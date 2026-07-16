@@ -186,7 +186,13 @@ func (r *Registry) GetWorkspacesForPlatform(ctx context.Context, platform, works
 			":pfx": &dynamodbtypes.AttributeValueMemberS{Value: prefix},
 		},
 	})
-	if err != nil || len(result.Items) == 0 {
+	if err != nil {
+		// Don't silently return "no workspaces" on a failed scan — that reads as
+		// an empty result and masks the outage (#374). Log so it's diagnosable.
+		logf("registry: GetWorkspacesForPlatform scan failed for %s: %v", prefix, err)
+		return nil
+	}
+	if len(result.Items) == 0 {
 		return nil
 	}
 	var workspaces []WorkspaceConfig
