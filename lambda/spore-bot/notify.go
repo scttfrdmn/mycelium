@@ -17,20 +17,19 @@ import (
 )
 
 // NotifyRequest is sent by spored when a lifecycle event fires.
-// Authentication: PKCS#7 (preferred) or legacy document+signature.
+// Authentication is the registry-membership gate in handleNotify (#374); the
+// former PKCS#7/identity-document fields were removed with the log-only cert
+// path. Unknown JSON fields from older senders are ignored on decode.
 type NotifyRequest struct {
-	PKCS7                     string `json:"pkcs7,omitempty"`
-	InstanceIdentityDocument  string `json:"instance_identity_document,omitempty"`
-	InstanceIdentitySignature string `json:"instance_identity_signature,omitempty"`
-	Command                   string `json:"command,omitempty"` // e.g. "/spore" — routes to correct workspace config
-	Platform                  string `json:"platform"`          // "slack"
-	WorkspaceID               string `json:"workspace_id"`      // e.g. "T03NE3GTY"
-	EventType                 string `json:"event_type"`        // ttl_warning, completion, etc.
-	InstanceName              string `json:"instance_name"`
-	InstanceID                string `json:"instance_id"`
-	Region                    string `json:"region"`
-	DNSName                   string `json:"dns_name,omitempty"`
-	Detail                    string `json:"detail,omitempty"`
+	Command      string `json:"command,omitempty"` // e.g. "/spore" — routes to correct workspace config
+	Platform     string `json:"platform"`          // "slack"
+	WorkspaceID  string `json:"workspace_id"`      // e.g. "T03NE3GTY"
+	EventType    string `json:"event_type"`        // ttl_warning, completion, etc.
+	InstanceName string `json:"instance_name"`
+	InstanceID   string `json:"instance_id"`
+	Region       string `json:"region"`
+	DNSName      string `json:"dns_name,omitempty"`
+	Detail       string `json:"detail,omitempty"`
 }
 
 // handleNotify receives lifecycle events from spored and routes them to Slack.
@@ -57,14 +56,12 @@ func handleNotify(ctx context.Context, cfg aws.Config, reg *Registry, request ev
 		return errorResp(500, "registration check failed"), nil
 	}
 
-	// Cryptographic identity verification (PKCS#7). Log-only for now: the
-	// embedded-cert path has been unreliable across regions/rotations (see
-	// dns-updater #294), so failing hard here risks dropping legitimate
-	// notifications. The registry-membership gate above is the enforced control;
-	// flip this to a hard reject once cert reliability is resolved.
-	if err := verifyNotifyAuth(nr); err != nil {
-		logf("notify: identity verification did not pass for %s (membership-gated, allowing): %v", nr.InstanceID, err)
-	}
+	// Authentication is the registry-membership gate above (a notification is
+	// only delivered for an instance registered in the target workspace). The
+	// former PKCS#7/embedded-cert identity check was log-only — it never rejected
+	// anything and its embedded certs were unreliable across regions/rotations
+	// (mirrors the dns-updater #294 retirement) — so it misrepresented the crypto
+	// posture and has been removed (#374). Membership is the enforced control.
 
 	msg := formatNotification(nr)
 

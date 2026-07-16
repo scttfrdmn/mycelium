@@ -13,6 +13,22 @@ own changelogs for CLI releases.
 
 ## [Unreleased]
 
+### Security
+- **spore-bot: removed the dead log-only instance-identity verification.** The
+  PKCS#7/embedded-cert check in the notify path (`verifyNotifyAuth` + embedded EC2
+  certs, `signature.go`) never rejected anything — it only logged — and its
+  embedded certs were unreliable across regions/rotations (same reason the
+  dns-updater cert path was retired, #294). Keeping it misrepresented the crypto
+  posture. The enforced control is (and was) the registry-membership gate: a
+  notification is only delivered for an instance registered in the target
+  workspace. Removed the file, the log-only call, the now-unused `NotifyRequest`
+  identity fields, and the `fullsailor/pkcs7` dependency (#374).
+
+### Fixed
+- **spore-bot: `GetWorkspacesForPlatform` no longer hides a failed DynamoDB scan.**
+  It previously returned "no workspaces" identically for an empty result and a
+  scan error, masking outages; the error is now logged (#374).
+
 ### Changed
 - **rest-api SMS handler owns its pending-reply types locally.** spawn is
   removing its dead `pkg/sms` (spawn#293); rest-api was the only cross-repo
