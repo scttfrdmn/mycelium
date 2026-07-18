@@ -14,6 +14,16 @@ own changelogs for CLI releases.
 ## [Unreleased]
 
 ### Security
+- **spore-bot: removed the static `BOT_EXTERNAL_ID` cross-account fallback (fail
+  closed).** Assuming a registration's cross-account role now requires that
+  registration's own per-account `external_id` (generated at register time since
+  the per-registration ExternalId change); a registration without one can no
+  longer assume its role via the shared `spawn-bot` value, which has been
+  removed. Safe now that both bot deployments run the per-account read path and
+  no live registration depends on the shared value. Any account's
+  `SpawnBotCrossAccount` trust policy must require its per-account ExternalId
+  (spawn CFN `ExternalId` parameter) before that account's instances can be
+  controlled (#413, #374).
 - **rest-api: API keys are now stored and looked up by SHA-256 hash.** The raw
   `sk_...` key was the DynamoDB partition key, so a table dump yielded usable
   credentials. `validateAPIKey` now hashes the presented key and looks it up by
@@ -28,10 +38,10 @@ own changelogs for CLI releases.
 - **spore-bot: cross-account role assumption now uses a per-registration STS
   ExternalId.** Registrations get a high-entropy `external_id` (generated at
   register time, or supplied by the admin so it can be pre-baked into the
-  customer role's trust policy), and the assume uses it. Existing registrations
-  without one fall back to the shared `BOT_EXTERNAL_ID` so nothing breaks; the
-  static fallback (and EC2 `Resource:"*"` scoping) will be removed in a later,
-  coordinated customer-role redeploy (#374).
+  customer role's trust policy), and the assume uses it. (The shared
+  `BOT_EXTERNAL_ID` fallback that initially backed this has since been removed —
+  see above; EC2 `Resource:"*"` scoping is opt-in via the spawn CFN template.)
+  (#374).
 - **spore-bot: removed the dead log-only instance-identity verification.** The
   PKCS#7/embedded-cert check in the notify path (`verifyNotifyAuth` + embedded EC2
   certs, `signature.go`) never rejected anything — it only logged — and its

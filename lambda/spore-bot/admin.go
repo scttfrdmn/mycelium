@@ -195,9 +195,9 @@ func adminRegister(ctx context.Context, reg *Registry, r adminRequest, callerARN
 
 	// Per-registration STS ExternalId (#374): use the admin-supplied value when
 	// present (so it can be pre-baked into the customer role's trust policy),
-	// otherwise generate a high-entropy one. The customer role must trust this
-	// ExternalId; until it does, the assume falls back to the shared
-	// BOT_EXTERNAL_ID in crossAccountEC2.
+	// otherwise generate a high-entropy one. Every registration must carry one —
+	// there is no shared fallback (#413), so the customer role's trust policy
+	// must be updated to require this ExternalId before the bot can act on it.
 	externalID := r.ExternalID
 	if externalID == "" {
 		generated, err := generateExternalID()
