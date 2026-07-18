@@ -379,16 +379,17 @@ func cmdEC2Op(ctx context.Context, cfg aws.Config, action *BotAction, op string)
 }
 
 func crossAccountEC2(ctx context.Context, cfg aws.Config, roleARN, instanceID, externalID string) (*ec2.Client, error) {
+	// Fail closed: every registration must carry its own per-account ExternalId
+	// (generated at register time since #412). The shared static "spawn-bot"
+	// fallback has been removed (#413) now that no live registration depends on
+	// it — a missing ExternalId is a misconfigured registration, not something
+	// to paper over with a guessable shared secret.
+	if externalID == "" {
+		return nil, fmt.Errorf("registration has no external_id; re-register the instance (per-account ExternalId is required since #412)")
+	}
 	stsClient := sts.NewFromConfig(cfg)
 	creds := stscreds.NewAssumeRoleProvider(stsClient, roleARN, func(o *stscreds.AssumeRoleOptions) {
 		o.RoleSessionName = "spore-bot-" + instanceID
-		// Prefer the per-registration ExternalId; fall back to the shared
-		// BOT_EXTERNAL_ID for legacy records whose trust policy still uses it
-		// (#374 — the static fallback stays until every customer role is
-		// re-deployed with its own high-entropy ExternalId).
-		if externalID == "" {
-			externalID = getEnv("BOT_EXTERNAL_ID", "spawn-bot")
-		}
 		o.ExternalID = aws.String(externalID)
 	})
 	ec2Cfg, err := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithCredentialsProvider(creds))
