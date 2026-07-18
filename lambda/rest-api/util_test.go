@@ -100,6 +100,35 @@ func TestGenerateAPIKey(t *testing.T) {
 	}
 }
 
+func TestHashKeyAndKeyID(t *testing.T) {
+	const key = "sk_deadbeef"
+	h := hashKey(key)
+	// SHA-256 hex is 64 chars and deterministic.
+	if len(h) != 64 {
+		t.Errorf("hashKey len = %d, want 64", len(h))
+	}
+	if h != hashKey(key) {
+		t.Error("hashKey not deterministic")
+	}
+	// The hash must not reveal the plaintext (not a prefix/substring).
+	if strings.Contains(h, key) || strings.Contains(h, "deadbeef") {
+		t.Errorf("hash %q leaks plaintext", h)
+	}
+	// keyID is the first 8 hex chars of the hash — stable, non-secret, and
+	// derived from the hash (never the raw key prefix).
+	id := keyID(key)
+	if id != h[:8] {
+		t.Errorf("keyID = %q, want %q", id, h[:8])
+	}
+	if strings.HasPrefix(key, id) {
+		t.Errorf("keyID %q is a prefix of the raw key — leaks the secret", id)
+	}
+	// Different keys → different ids.
+	if keyID("sk_other") == id {
+		t.Error("keyID collision across distinct keys")
+	}
+}
+
 func TestDecodeOptions(t *testing.T) {
 	got := decodeOptions("ttl=4h,idle=30m,bad,name=test")
 	want := map[string]string{"ttl": "4h", "idle": "30m", "name": "test"} // "bad" (no =) skipped

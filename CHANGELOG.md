@@ -14,6 +14,24 @@ own changelogs for CLI releases.
 ## [Unreleased]
 
 ### Security
+- **rest-api: API keys are now stored and looked up by SHA-256 hash.** The raw
+  `sk_...` key was the DynamoDB partition key, so a table dump yielded usable
+  credentials. `validateAPIKey` now hashes the presented key and looks it up by
+  hash; legacy plaintext-keyed rows still authenticate (dual-read) and are
+  rewritten to their hashed form on first use, so the migration is transparent
+  and needs no client changes. New keys must be inserted hashed (see
+  `infra/DEPLOY.md`) (#374).
+- **rest-api: request log now includes a truncated, non-secret KeyID.** Each
+  request logs `keyid=` (first 8 hex chars of the key's SHA-256) for
+  attribution; the previous `Principal.KeyID` exposed the raw key's first 8
+  chars, which leaked the secret's prefix (#374).
+- **spore-bot: cross-account role assumption now uses a per-registration STS
+  ExternalId.** Registrations get a high-entropy `external_id` (generated at
+  register time, or supplied by the admin so it can be pre-baked into the
+  customer role's trust policy), and the assume uses it. Existing registrations
+  without one fall back to the shared `BOT_EXTERNAL_ID` so nothing breaks; the
+  static fallback (and EC2 `Resource:"*"` scoping) will be removed in a later,
+  coordinated customer-role redeploy (#374).
 - **spore-bot: removed the dead log-only instance-identity verification.** The
   PKCS#7/embedded-cert check in the notify path (`verifyNotifyAuth` + embedded EC2
   certs, `signature.go`) never rejected anything — it only logged — and its

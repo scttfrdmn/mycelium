@@ -168,7 +168,7 @@ func matchByEC2(ctx context.Context, regs []BotRegistration, target string) *Bot
 		if r.RoleARN == "" {
 			continue
 		}
-		ec2Client, err := crossAccountEC2(ctx, cfg, r.RoleARN, r.InstanceID)
+		ec2Client, err := crossAccountEC2(ctx, cfg, r.RoleARN, r.InstanceID, r.ExternalID)
 		if err != nil {
 			continue
 		}
@@ -310,7 +310,7 @@ func cmdList(ctx context.Context, reg *Registry, action *BotAction) (string, err
 
 // isTerminatedInEC2 returns true if the instance is terminated or not found in EC2.
 func isTerminatedInEC2(ctx context.Context, reg *BotRegistration) bool {
-	ec2Client, err := crossAccountEC2(ctx, cfg, reg.RoleARN, reg.InstanceID)
+	ec2Client, err := crossAccountEC2(ctx, cfg, reg.RoleARN, reg.InstanceID, reg.ExternalID)
 	if err != nil {
 		return false
 	}
@@ -353,7 +353,7 @@ func cmdEC2Op(ctx context.Context, cfg aws.Config, action *BotAction, op string)
 	}
 
 	// Assume cross-account role for this instance's AWS account
-	ec2Client, err := crossAccountEC2(ctx, cfg, reg.RoleARN, reg.InstanceID)
+	ec2Client, err := crossAccountEC2(ctx, cfg, reg.RoleARN, reg.InstanceID, reg.ExternalID)
 	if err != nil {
 		return "", fmt.Errorf("assume role: %w", err)
 	}
@@ -378,12 +378,17 @@ func cmdEC2Op(ctx context.Context, cfg aws.Config, action *BotAction, op string)
 	return "", fmt.Errorf("unknown op: %s", op)
 }
 
-func crossAccountEC2(ctx context.Context, cfg aws.Config, roleARN, instanceID string) (*ec2.Client, error) {
+func crossAccountEC2(ctx context.Context, cfg aws.Config, roleARN, instanceID, externalID string) (*ec2.Client, error) {
 	stsClient := sts.NewFromConfig(cfg)
 	creds := stscreds.NewAssumeRoleProvider(stsClient, roleARN, func(o *stscreds.AssumeRoleOptions) {
 		o.RoleSessionName = "spore-bot-" + instanceID
-		// ExternalId matches what bot-cross-account-role.yaml sets in the trust policy
-		externalID := getEnv("BOT_EXTERNAL_ID", "spawn-bot")
+		// Prefer the per-registration ExternalId; fall back to the shared
+		// BOT_EXTERNAL_ID for legacy records whose trust policy still uses it
+		// (#374 — the static fallback stays until every customer role is
+		// re-deployed with its own high-entropy ExternalId).
+		if externalID == "" {
+			externalID = getEnv("BOT_EXTERNAL_ID", "spawn-bot")
+		}
 		o.ExternalID = aws.String(externalID)
 	})
 	ec2Cfg, err := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithCredentialsProvider(creds))
@@ -616,6 +621,17 @@ func generateConnectCode() (string, error) {
 		return "", err
 	}
 	return strings.ToUpper(hex.EncodeToString(b)), nil
+}
+
+// generateExternalID returns a high-entropy STS ExternalId for a cross-account
+// role assumption (32 bytes of crypto/rand, hex-encoded), prefixed so it's
+// self-describing in trust policies and logs (#374).
+func generateExternalID() (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return "spore-" + hex.EncodeToString(b), nil
 }
 
 // cmdConnect generates a connect code for self-registration.

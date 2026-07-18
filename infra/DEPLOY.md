@@ -373,14 +373,19 @@ echo "REST API URL: $REST_API_URL"
 
 ## Step 7 — Create an API key for the CLI
 
+Keys are stored **hashed** — the `api_key` partition key holds the SHA-256 of
+the key, never the plaintext, so a table dump yields no usable credentials
+(#374). Hand the plaintext to the user; store only its hash.
+
 ```sh
-# Generate a key and insert it into DynamoDB
+# Generate a key; the table stores its SHA-256, not the key itself.
 API_KEY="sk_integ_$(openssl rand -hex 16)"
+API_KEY_HASH=$(printf '%s' "$API_KEY" | shasum -a 256 | cut -d' ' -f1)
 
 aws dynamodb put-item \
   --table-name spore-api-keys \
   --item "{
-    \"api_key\": {\"S\": \"$API_KEY\"},
+    \"api_key\": {\"S\": \"$API_KEY_HASH\"},
     \"project\": {\"S\": \"spore-aws-internal\"},
     \"created_at\": {\"S\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"},
     \"active\": {\"BOOL\": true}
@@ -388,8 +393,12 @@ aws dynamodb put-item \
   --region us-east-1
 
 echo "API key: $API_KEY"
-echo "Save this — it will not be shown again."
+echo "Save this — it will not be shown again (only its hash is stored)."
 ```
+
+> Legacy keys inserted with the plaintext as the partition key still work: the
+> rest-api looks up by hash first, then falls back to plaintext and rewrites the
+> row to its hashed form on first use.
 
 ---
 

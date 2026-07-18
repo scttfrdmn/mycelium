@@ -33,6 +33,7 @@ type adminRequest struct {
 	UserEmail      string   `json:"user_email,omitempty"` // alternative to user_id; resolved server-side
 	InstanceID     string   `json:"instance_id"`
 	RoleARN        string   `json:"role_arn"`
+	ExternalID     string   `json:"external_id,omitempty"` // STS ExternalId for RoleARN; generated if omitted
 	DNSName        string   `json:"dns_name,omitempty"`
 	TagPrefix      string   `json:"tag_prefix,omitempty"`
 	AllowedActions []string `json:"allowed_actions"`
@@ -192,11 +193,26 @@ func adminRegister(ctx context.Context, reg *Registry, r adminRequest, callerARN
 		r.AllowedActions = []string{"status"}
 	}
 
+	// Per-registration STS ExternalId (#374): use the admin-supplied value when
+	// present (so it can be pre-baked into the customer role's trust policy),
+	// otherwise generate a high-entropy one. The customer role must trust this
+	// ExternalId; until it does, the assume falls back to the shared
+	// BOT_EXTERNAL_ID in crossAccountEC2.
+	externalID := r.ExternalID
+	if externalID == "" {
+		generated, err := generateExternalID()
+		if err != nil {
+			return adminError(500, fmt.Sprintf("generate external id: %v", err)), nil
+		}
+		externalID = generated
+	}
+
 	registration := &BotRegistration{
 		UserKey:        userKey(r.Platform, r.WorkspaceID, r.UserID),
 		Nickname:       r.Nickname,
 		InstanceID:     r.InstanceID,
 		RoleARN:        r.RoleARN,
+		ExternalID:     externalID,
 		DNSName:        r.DNSName,
 		TagPrefix:      r.TagPrefix,
 		AllowedActions: r.AllowedActions,
@@ -212,10 +228,11 @@ func adminRegister(ctx context.Context, reg *Registry, r adminRequest, callerARN
 		"user_key":        registration.UserKey,
 		"nickname":        registration.Nickname,
 		"instance_id":     registration.InstanceID,
+		"external_id":     registration.ExternalID,
 		"allowed_actions": registration.AllowedActions,
 		"enabled":         registration.Enabled,
 		"registered_by":   callerARN,
-		"note":            "Registration created. Run set-enabled with enabled:true to grant access.",
+		"note":            "Registration created. Add external_id to the cross-account role's trust policy, then run set-enabled with enabled:true to grant access.",
 	})
 }
 
