@@ -48,7 +48,7 @@ func handler(ctx context.Context, req events.APIGatewayV2HTTPRequest) (events.AP
 	}
 	_ = cfg // used by sub-handlers
 
-	log.Printf("%s %s principal=%s", method, path, principal.Project)
+	log.Printf("%s %s principal=%s keyid=%s", method, path, principal.Project, principal.KeyID)
 
 	// Route
 	parts := strings.Split(strings.Trim(path, "/"), "/")

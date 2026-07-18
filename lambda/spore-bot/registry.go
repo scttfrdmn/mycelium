@@ -17,10 +17,15 @@ type BotRegistration struct {
 	// PK: {platform}#{workspace-id}#{user-id}
 	UserKey string `dynamodbav:"user_key"`
 	// SK: {nickname}
-	Nickname       string   `dynamodbav:"nickname"`
-	InstanceID     string   `dynamodbav:"instance_id"`
-	AWSAccountID   string   `dynamodbav:"aws_account_id"`
-	RoleARN        string   `dynamodbav:"role_arn"`
+	Nickname     string `dynamodbav:"nickname"`
+	InstanceID   string `dynamodbav:"instance_id"`
+	AWSAccountID string `dynamodbav:"aws_account_id"`
+	RoleARN      string `dynamodbav:"role_arn"`
+	// ExternalID is the per-registration STS ExternalId used when assuming
+	// RoleARN. Generated at register time (or supplied by the admin so it can
+	// be baked into the customer role's trust policy). Empty on legacy records,
+	// which fall back to the shared BOT_EXTERNAL_ID (#374).
+	ExternalID     string   `dynamodbav:"external_id,omitempty"`
 	DNSName        string   `dynamodbav:"dns_name,omitempty"`
 	TagPrefix      string   `dynamodbav:"tag_prefix"`
 	AllowedActions []string `dynamodbav:"allowed_actions"`
