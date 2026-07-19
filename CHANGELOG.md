@@ -13,6 +13,12 @@ own changelogs for CLI releases.
 
 ## [Unreleased]
 
+### Added
+- **Docs: job arrays now document `--min-viable`** (spot partial-success floor)
+  and parameter sweeps document `spawn alerts` (completion/failure/cost-threshold
+  notifications via email/Slack/SNS/webhook) — both features the reference listed
+  but no guide explained.
+
 ### Fixed
 - **Docs: corrected the SSH/connectivity FAQ** — `spawn connect` logs you in as
   your own username (the instance matches your local user) and reuses your

@@ -39,6 +39,25 @@ spawn extend --job-array-name data-proc 2h   # extend all at once
 spawn terminate --job-array-name data-proc   # permanently terminate the whole array
 ```
 
+## Partial success (`--min-viable`)
+
+Spot capacity can be uneven — you ask for 8 instances but only 6 land. By default
+a job array succeeds if **at least one** member launches. Set a floor with
+`--min-viable`:
+
+```sh
+spawn launch --name data-proc --count 8 --min-viable 6 \
+  --job-array-name data-proc --spot \
+  --command "python process.py --shard {index} --total {total}"
+```
+
+If fewer than `--min-viable` members launch, the array is treated as failed and
+the launched instances are cleaned up, so you don't pay for a run that can't
+complete. Because the members that *did* launch are cleaned up on failure, size
+`--min-viable` to the smallest count your job can actually finish with. It
+defaults to `1` and is ignored for `--mpi` clusters (which need all ranks — see
+the [MPI guide](/guides/mpi)).
+
 ## Available template variables and environment variables
 
 Inside `--command`, you can use template substitutions:
