@@ -78,6 +78,11 @@ jobs:
       - name: Open sync PR
         uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e # v7
         with:
+          # Use the DOCS_SYNC_TOKEN PAT, not GITHUB_TOKEN: the org forbids Actions
+          # from creating pull requests ("GitHub Actions is not permitted to create
+          # or approve pull requests"), and a PAT acts as a user, bypassing that
+          # restriction without loosening the org-wide policy.
+          token: ${{ secrets.DOCS_SYNC_TOKEN }}
           branch: sync/cli-docs
           title: 'docs: sync generated CLI reference'
           commit-message: 'docs: sync generated CLI reference from latest tags'
