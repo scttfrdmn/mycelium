@@ -62,6 +62,21 @@ complete. Because the members that *did* launch are cleaned up on failure, size
 defaults to `1` and is ignored for `--mpi` clusters (which need all ranks — see
 the [MPI guide](/guides/mpi)).
 
+::: warning `{total}` is the requested count, and indexes can be sparse
+`{total}` / `JOB_ARRAY_SIZE` is always the count you **requested** (`--count`), not
+the number that actually launched. If you ask for 8 with `--min-viable 6` and only
+6 land, each surviving member still sees `{total}` = 8, and the launched indexes
+are whatever subset succeeded (e.g. 0,1,2,4,5,7) — **there can be gaps**. So a
+shard scheme that assumes a dense `0…{total}-1` will skip the work of the missing
+indexes. If your job must cover every shard, either don't rely on `--min-viable`,
+or have the surviving members detect and redistribute the missing indexes.
+
+There isn't yet a first-class way to list which requested indexes failed, retry
+only those, or pull per-index logs (you manage members today via the generic
+`spawn list/status --job-array-name` shown above). That reporting is tracked in
+[spawn#389](https://github.com/spore-host/spawn/issues/389).
+:::
+
 ## Available template variables and environment variables
 
 Inside `--command`, you can use template substitutions:

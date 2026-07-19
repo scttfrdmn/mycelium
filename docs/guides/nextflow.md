@@ -2,14 +2,20 @@
 description: "nf-spawn is a Nextflow executor plugin that dispatches each pipeline process step to its own ephemeral EC2 instance — purpose-sized and auto-terminated when…"
 ---
 
-# Nextflow Integration (nf-spawn)
+# Nextflow Adapter (nf-spawn) <span class="doc-badge experimental">Experimental</span>
 
 [nf-spawn](https://github.com/spore-host/nf-spawn) is a Nextflow executor plugin that dispatches each pipeline process step to its own ephemeral EC2 instance — purpose-sized and auto-terminated when the task completes.
 
 This lets you run bioinformatics pipelines (including [nf-core](https://nf-co.re) pipelines) without AWS Batch, ECS, or any queue infrastructure.
 
-nf-spawn is one of five [workflow-engine integrations](/guides/workflow-engines)
-on spore.host; it's under active development with its own roadmap.
+::: warning Early prototype
+nf-spawn is an **early prototype — not production-ready** (per its
+[README](https://github.com/spore-host/nf-spawn)). It's one of five
+[workflow adapters](/guides/workflow-engines), each early-stage; see the
+[maturity matrix](/guides/workflow-engines#maturity-compatibility). Install today
+requires cloning and building the plugin (below), not a drop-in registry install.
+Validate against your own pipeline before relying on it.
+:::
 
 ## How it works
 

@@ -1,18 +1,37 @@
 ---
-description: "A batch queue runs a sequence of dependent jobs on a single instance, automatically chaining them in order."
+description: "An instance queue runs a sequence of dependent jobs on a single instance, one at a time in dependency order. Launched with --batch-queue."
 ---
 
-# Batch Job Queues
+# Instance queues
 
-A batch queue runs a sequence of dependent jobs on a single instance, automatically chaining them in order. Unlike [pipelines](/guides/pipelines), which chain stages across separate instances, a batch queue runs all jobs on the same instance — useful when jobs need to share local data or a common environment.
+An **instance queue** runs several dependent jobs **on one instance, one at a time,
+in dependency order**. Unlike [pipelines](/guides/pipelines), which chain stages
+across *separate* instances, an instance queue keeps everything on the same
+machine — ideal when the steps share large local data, packages, model weights, or
+cached indexes and you don't want to pay to boot (and re-stage) a machine per step.
 
-## When to use a batch queue
+::: tip Name vs. flag
+This feature is launched with the `--batch-queue` flag and its config uses
+`queue_name` — we call the *concept* an "instance queue" because everything runs on
+one already-selected instance, not on a pool of workers waiting for jobs (which is
+what "batch queue" usually implies elsewhere). The flag name is unchanged.
+:::
+
+## Sequential, not parallel
+
+Jobs run **strictly one at a time**, in a topological order derived from
+`depends_on`. `depends_on` therefore controls *ordering* (and validates there are
+no cycles); it does **not** enable concurrency — two jobs never run at the same
+time on the instance, even if their dependencies would allow it. If you need stages
+to run concurrently on different machines, use a [pipeline](/guides/pipelines).
+
+## When to use an instance queue
 
 - Jobs that share large local datasets (avoid re-staging between instances)
 - Sequential steps where each step depends on the previous one's output
 - Workflows where spinning up a new instance per step is too slow or costly
 
-For jobs that can run in parallel or need different instance types per step, use [pipelines](/guides/pipelines) or [parameter sweeps](/guides/parameter-sweeps) instead.
+For stages that can run in parallel or need different instance types per step, use [pipelines](/guides/pipelines) or [parameter sweeps](/guides/parameter-sweeps) instead. Not sure? See [Which execution tool?](/guides/choosing-execution).
 
 ## Queue file format
 
@@ -54,9 +73,30 @@ Create a JSON file describing your jobs:
 | `job_id` | yes | Unique identifier for this job |
 | `command` | yes | Shell command to run |
 | `timeout` | no | Per-job timeout (e.g. `30m`, `4h`) |
-| `depends_on` | no | List of `job_id`s that must complete first |
+| `depends_on` | no | List of `job_id`s that must complete first (ordering only) |
+| `env` | no | Per-job environment variables (map) |
+| `retry` | no | Per-job retry policy (see below) |
+| `result_paths` | no | Files/globs to upload to S3 after the job succeeds |
 | `global_timeout` | no | Total timeout for the entire queue |
 | `on_failure` | no | `stop` (default) or `continue` on job failure |
+| `result_s3_bucket` / `result_s3_prefix` | no | Where per-job outputs and logs are uploaded |
+
+**Per-job `retry`:**
+
+```json
+"retry": {
+  "max_attempts": 3,
+  "backoff": "exponential-jitter",
+  "base_delay": "2s",
+  "max_delay": "5m",
+  "retry_on_codes": [1, 137],
+  "dont_retry_on_codes": [2]
+}
+```
+
+`backoff` is `fixed`, `exponential`, or `exponential-jitter`. Use `retry_on_codes`
+to retry only specific exit codes, or `dont_retry_on_codes` to never retry certain
+ones.
 
 ## Launch
 
@@ -67,19 +107,36 @@ spawn launch my-job \
   --ttl 8h
 ```
 
-spawn uploads the queue config to S3, launches the instance, and the spored daemon picks up and executes the jobs sequentially according to the dependency graph.
+spawn uploads the queue config to S3, launches the instance, and the spored daemon picks up and runs the jobs one at a time in dependency order.
 
-## Monitoring
+## Monitoring, logs, and recovery
+
+Each job's stdout and stderr are captured **per job** on the instance and uploaded
+to S3 alongside the queue's results:
 
 ```sh
-# Check instance status
-spawn status my-job
+spawn status my-job                                    # instance state
+spawn connect my-job -- tail -f /var/log/spored.log    # overall daemon log
 
-# Connect and watch logs
-spawn connect my-job -- tail -f /var/log/spored.log
-
-# The instance auto-terminates (or stops) when the queue completes
+# On the instance, per-job logs live at:
+#   /var/log/spored/jobs/<job_id>-stdout.log
+#   /var/log/spored/jobs/<job_id>-stderr.log
+# and (with result_s3_prefix set) upload to <prefix>/jobs/<job_id>/stdout.log
 ```
+
+The queue tracks per-job completion state, so a queue that was interrupted resumes
+from where it left off — **already-completed jobs are skipped** rather than re-run.
+On a job failure, `on_failure: stop` halts the queue (default) while `continue`
+moves on to the next job. The instance auto-terminates (or stops) when the queue
+completes.
+
+::: warning Spot interruption mid-queue
+On a Spot instance, an interruption ends the *machine* mid-queue. Because the whole
+queue runs on one instance, in-progress local state is lost unless a
+[`--pre-stop`](/guides/plugins#data-movement-patterns) hook or per-job
+`result_paths` has already synced it out. For work that must survive interruption,
+either run on-demand or checkpoint each job's outputs to S3 via `result_paths`.
+:::
 
 ## Example: ML training pipeline
 
