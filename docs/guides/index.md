@@ -10,6 +10,12 @@ into the deeper guides. New to spore.host? Do [Your first
 instance](/guides/first-instance) first; it's the 15-minute backbone the stories
 below build on.
 
+::: tip Running more than one thing?
+spore.host has several ways to run work at scale — instance plugins, sweeps,
+arrays, instance queues, pipelines, MPI, and workflow-engine adapters. If you're
+not sure which fits, start with **[Which execution tool?](/guides/choosing-execution)**.
+:::
+
 ## Story A — Interactive research workstation
 
 *"I need a big machine for a few hours to explore some data, then it should go

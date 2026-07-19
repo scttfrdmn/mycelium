@@ -41,7 +41,9 @@ Add `--estimate-only` to see the instance count and cost estimate without launch
 
 ## Every combination of several lists
 
-List each parameter's values under `defaults` isn't how it works — instead enumerate the combinations you want in `params`. To sweep the full grid of several lists, generate the `params` list with a few lines of your own script (any language) and write it to the YAML/JSON file:
+You enumerate the combinations you want in `params` — spawn does not expand a grid
+for you. To sweep the full grid of several lists, generate the `params` list with a
+few lines of your own script (any language) and write it to the YAML/JSON file:
 
 ```python
 # gen-sweep.py — write every learning_rate × batch_size combination
@@ -58,7 +60,7 @@ python gen-sweep.py && spawn launch grid-search --param-file sweep.yaml   # 9 in
 ```
 
 ::: info Inline `--params` / auto-expanded ranges
-Passing parameters inline (`--params …`) and auto-generating ranges/cartesian products from the CLI are not yet available — the CLI returns *"inline --params not yet implemented, use --param-file for now."* Generate the `params` list into a file as shown above.
+Passing parameters inline (`--params …`) and auto-generating ranges/cartesian products from the CLI are not yet available — the CLI returns *"inline --params not yet implemented, use --param-file for now."* Generate the `params` list into a file as shown above. Native `grid:`/matrix expansion is tracked in [spawn#390](https://github.com/spore-host/spawn/issues/390).
 :::
 
 ## Heterogeneous sweeps — vary the instance type per entry
@@ -104,6 +106,44 @@ spawn sweep cancel <sweep-id>         # terminate all remaining instances
 ```
 
 With Slack connected, you'll get a DM when the sweep finishes (all instances have terminated).
+
+## Controlling concurrency and cost
+
+A large sweep does not have to launch every instance at once. Two launch flags cap
+how wide and how expensive it gets:
+
+```sh
+spawn launch hp-search --param-file sweep.yaml \
+  --max-concurrent 8 \      # at most 8 instances running at a time (0 = unlimited)
+  --budget 200 \            # stop launching once projected spend hits $200 (0 = no limit)
+  --ttl 4h
+```
+
+`--max-concurrent` (or `--max-concurrent-per-region`) queues the remaining entries
+and starts them as running ones finish — useful for staying under an instance-family
+quota. `--budget` is a spend ceiling for the whole sweep.
+
+## Resuming an interrupted sweep
+
+Sweeps checkpoint their progress, so a sweep that was cancelled or partially
+launched can be resumed without re-running the entries that already completed:
+
+```sh
+spawn sweep resume <sweep-id>                     # continue from checkpoint
+spawn sweep resume <sweep-id> --max-concurrent 5  # optionally re-cap concurrency
+```
+
+Gather the results of a finished sweep into one place with:
+
+```sh
+spawn sweep collect <sweep-id> --output results.json
+```
+
+::: info Re-running only the failed entries
+There isn't yet a one-flag "retry only the failed entries" for sweeps; `resume`
+continues incomplete work from the checkpoint. First-class failed-subset rerun is
+part of the array/sweep reporting work in [spawn#389](https://github.com/spore-host/spawn/issues/389).
+:::
 
 ## Alerts on completion, failure, or cost
 

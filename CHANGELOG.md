@@ -14,6 +14,48 @@ own changelogs for CLI releases.
 ## [Unreleased]
 
 ### Added
+- **Docs: execution-fabric restructure (plugins & workflow adapters).** Following a
+  second review of the extension subsystem, regrouped the docs so spawn reads as an
+  execution substrate with four extension layers — **Extend an instance** (instance
+  plugins), **Run many jobs** (sweeps, arrays), **Coordinate multiple steps**
+  (instance queues, pipelines, MPI), and **Workflow adapters** — instead of a flat
+  "Advanced" list. New page **[Which execution tool?](https://docs.spore.host/guides/choosing-execution)**
+  with two decision matrices (layer→question, need→tool) plus per-task-EC2 fit
+  guidance. Renamed "Plugins"→"Instance plugins" and "Workflow Engines"→"Workflow
+  adapters" (CLI flags unchanged).
+- **Docs: parameter-sweeps now document existing concurrency/recovery controls** —
+  `--max-concurrent`, `--budget`, `spawn sweep resume` (checkpoint), and
+  `spawn sweep collect`, which the guide previously omitted.
+- **Docs: instance-queue operational detail** — per-job `retry`/`env`/`result_paths`
+  fields, per-job log paths, resume-skips-completed behavior, and Spot-interruption
+  guidance, all verified against the spored queue runner.
+
+### Changed
+- **Docs: corrected workflow-adapter maturity.** The overview no longer calls the
+  five engine integrations "first-class"; it now leads with a **status &
+  compatibility matrix** (nf-spawn = experimental prototype; miniwdl = early,
+  validation in progress; CWL/Snakemake/Airflow = v0.1.0 initial releases) and
+  distinguishes "native adapter" from "production-ready." Experimental badges added
+  to the Nextflow guide.
+- **Docs: job-array `--min-viable` semantics clarified** — `{total}`/`JOB_ARRAY_SIZE`
+  is the *requested* count and partial launches leave *sparse* indexes; shard
+  schemes must not assume a dense range.
+
+### Fixed
+- **Docs: pipeline manual example was misleading** — clarified that `--on-complete`
+  does not launch the next stage and that running `spawn launch` commands by hand
+  is not a pipeline (the Lambda orchestrator chains stages from the DAG definition).
+  Scoped `spawn pipeline` to coarse DAGs (not a scientific workflow engine) and
+  marked stream mode (tcp/grpc/zmq) Experimental with its operational caveats.
+- **Docs: instance-queue (batch-queue) sequencing contradiction** — stated plainly
+  that jobs run strictly one at a time in topological order and `depends_on` is
+  ordering only, not concurrency.
+- **Docs: added a plugin Trust & permissions section** — installing a plugin runs
+  its author's code locally and as root on the instance; documents what `github:`
+  refs resolve to, the minimal-env/`env_passthrough` limit, `spawn plugin validate`,
+  and links the tracked inspect/permissions gaps.
+
+### Added
 - **Docs: researcher-facing information-architecture overhaul.** Restructured the
   docs site around user intent instead of product structure, following an external
   review. New top-level nav: Introduction → Start Here → Common Workflows → Tools →

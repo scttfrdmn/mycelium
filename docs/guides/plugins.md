@@ -1,13 +1,20 @@
 ---
-description: "Plugins install and manage software on a running instance — connecting to a private network, mounting data transfer tooling, running a dev server."
+description: "Instance plugins install and manage software on a running instance — connecting to a private network, mounting data transfer tooling, running a dev server."
 ---
 
-# Plugins
+# Instance plugins
 
-Plugins install and manage software on a running instance — connecting to a
-private network, mounting data transfer tooling, running a dev server. A plugin
-is a declarative `plugin.yaml` spec describing lifecycle steps (install,
-configure, start, health-check, stop) that spawn runs on the instance.
+**Instance plugins** install and manage software on a running instance —
+connecting to a private network, mounting data transfer tooling, running a dev
+server. A plugin is a declarative `plugin.yaml` spec describing lifecycle steps
+(install, configure, start, health-check, stop) that spawn runs on the instance.
+
+::: tip Not the same as a workflow-engine plugin
+An *instance* plugin (this page) adds software to a machine. A *workflow-engine*
+plugin — like the Nextflow `nf-spawn` executor — is a
+[workflow adapter](/guides/workflow-engines) that plugs into an engine, not into an
+instance. Different systems, despite both being called "plugins."
+:::
 
 ## Available plugins
 
@@ -20,6 +27,43 @@ The official registry lives at
 | `rstudio-server` | Browser-based R development environment |
 | `globus-personal-endpoint` | High-speed data transfer via Globus Connect Personal |
 | `spore-sync` | Live bidirectional directory sync |
+
+## Trust & permissions
+
+::: warning Installing a plugin runs its author's code
+A plugin can run commands **on your local machine** (the controller) and, on the
+EC2 instance, **as root**. Installing one is equivalent to running code from its
+author in both places. Review a third-party `plugin.yaml` before installing it,
+and **pin production use to a version or commit** rather than a moving reference.
+:::
+
+What the install sources resolve to:
+
+- `name` / `name@version` — the official [registry](https://github.com/spore-host/spore-plugins); a version is a published registry release.
+- `github:org/repo/path[@ref]` — a plugin from any GitHub repo. The `@ref` is a git ref (tag, branch, or commit); pin to a **tag or commit** so the definition can't change under you. A bare `github:` ref (no `@`) tracks the default branch and can move.
+- `./path.yaml` — a local file, for development.
+
+Two things limit what a plugin can reach:
+
+- **Local steps run with a minimal environment.** A plugin's controller-side steps
+  see only `PATH` + `HOME` unless the plugin explicitly allowlists variables via
+  `env_passthrough` (see the [field reference](#plugin-yaml-field-reference)). So a
+  plugin can't silently scoop up your AWS or other credentials — it must name each
+  variable it needs (e.g. Tailscale's `TS_API_CLIENT_SECRET`), and you can see that
+  list in the spec before installing.
+- **`spawn plugin validate`** statically checks a spec offline (schema, semver,
+  step/condition types, undeclared template refs) without contacting AWS or an
+  instance — run it on any third-party spec before installing.
+
+::: info Known limitation: no pre-install inspection yet
+There is not yet a `spawn plugin inspect` / `install --dry-run` that renders a
+plugin's resolved source, local vs. remote commands, requested env, opened ports,
+and root usage before you run it — today the pre-install check is reading the
+`plugin.yaml` plus `spawn plugin validate`. Tracked in
+[spawn#387](https://github.com/spore-host/spawn/issues/387) (inspection) and
+[spawn#388](https://github.com/spore-host/spawn/issues/388) (an explicit
+`permissions:` block).
+:::
 
 ## Installing a plugin
 
@@ -183,6 +227,33 @@ Tailscale's `TS_API_CLIENT_SECRET`) lists it here and spawn injects only those.
 
 **`outputs.<name>.source`** is `local_capture` (captured by a `local` step) or
 `pushed` (delivered via the push API).
+
+#### Surfacing outputs
+
+A plugin declares the values worth reporting in its `outputs:` block — for a
+service, typically its URL and login user:
+
+```yaml
+outputs:
+  url:
+    description: "Service endpoint"
+    source: local_capture
+  username:
+    description: "Login user"
+    source: pushed
+```
+
+After the plugin provisions, those values are reported for the instance:
+
+```sh
+spawn plugin status rstudio-server --instance analysis
+```
+
+```
+Plugin rstudio-server — healthy
+  url:      https://analysis.abc123.spore.host
+  username: ec2-user
+```
 
 ### Validate before you ship
 

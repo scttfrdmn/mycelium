@@ -42,17 +42,47 @@ const sidebar = {
       collapsed: false,
       items: [
         { text: 'Overview', link: '/guides/' },
+        { text: 'Which execution tool?', link: '/guides/choosing-execution' },
         { text: 'Finding the right instance', link: '/guides/finding-instances' },
         { text: 'Interactive workstation', link: '/guides/jupyter' },
         { text: 'GPU training jobs', link: '/guides/gpu-training' },
         { text: 'Spot instances', link: '/guides/spot-instances' },
         { text: 'Managing instances & data', link: '/guides/managing-instances' },
+        { text: 'Waiting for scarce capacity', link: '/guides/waiting-for-capacity' },
+      ]
+    },
+    // The extension/execution-fabric layers, in the order a user climbs them:
+    // customize one instance → run many → coordinate steps → hand off to an engine.
+    {
+      text: 'Extend an instance',
+      collapsed: false,
+      items: [
+        { text: 'Instance plugins', link: '/guides/plugins' },
+      ]
+    },
+    {
+      text: 'Run many jobs',
+      collapsed: false,
+      items: [
         { text: 'Parameter sweeps', link: '/guides/parameter-sweeps' },
         { text: 'Job arrays', link: '/guides/job-arrays' },
-        { text: 'Batch queues', link: '/guides/batch-queue' },
+      ]
+    },
+    {
+      text: 'Coordinate multiple steps',
+      collapsed: false,
+      items: [
+        { text: 'Instance queues', link: '/guides/batch-queue' },
+        { text: 'Spawn pipelines', link: '/guides/pipelines' },
         { text: 'MPI clusters', link: '/guides/mpi' },
-        { text: 'Pipelines', link: '/guides/pipelines' },
-        { text: 'Waiting for scarce capacity', link: '/guides/waiting-for-capacity' },
+      ]
+    },
+    {
+      text: 'Workflow adapters',
+      collapsed: false,
+      items: [
+        { text: 'Overview & maturity', link: '/guides/workflow-engines' },
+        { text: 'Nextflow (nf-spawn)', link: '/guides/nextflow' },
       ]
     },
     {
@@ -77,9 +107,6 @@ const sidebar = {
       items: [
         { text: 'Python SDK', link: '/guides/python-sdk' },
         { text: 'Go libraries', link: '/guides/go-library' },
-        { text: 'Workflow engines', link: '/guides/workflow-engines' },
-        { text: 'Nextflow (nf-spawn)', link: '/guides/nextflow' },
-        { text: 'Plugins', link: '/guides/plugins' },
         { text: 'Events & webhooks', link: '/reference/event-schemas' },
       ]
     },
