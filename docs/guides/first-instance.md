@@ -52,7 +52,7 @@ Expected output:
 }
 ```
 
-If this fails, run `aws configure` and enter your Access Key ID, Secret Access Key, and preferred region. spore.host uses the same credentials as the AWS CLI — nothing extra to configure.
+If this fails, sign in with **`aws login`** (AWS CLI v2.34+; static `aws configure` keys also work). spore.host uses the same credentials as the AWS CLI — nothing extra to configure. See [AWS Authentication](/guides/aws-auth) for profiles and how auth relates to permissions.
 
 ---
 

@@ -73,24 +73,21 @@ Then add to `~/.claude/claude_desktop_config.json`:
 
 ## AWS credentials
 
-spore.host uses whichever credentials are active in your shell — the same ones the AWS CLI uses. No additional configuration is required if you've already run `aws configure`.
+spore.host uses whichever credentials are active in your shell — the same ones the AWS CLI uses. The recommended way to obtain them is **`aws login`** (AWS CLI v2.34+), which manages short-lived credentials for you; static `aws configure` keys also work.
 
 ```sh
-# Verify credentials are working
-aws sts get-caller-identity
+aws login                       # sign in
+aws sts get-caller-identity     # verify
 ```
 
-If you use multiple AWS profiles, you can set the active profile per-command:
+If you use multiple AWS profiles, set the active profile per-command or for the session:
 
 ```sh
-AWS_PROFILE=my-research-account spawn launch --name experiment --instance-type g5.xlarge --ttl 8h
-```
-
-Or set it as a default for your shell session:
-
-```sh
+AWS_PROFILE=my-research-account spawn launch experiment --instance-type g5.xlarge --ttl 8h
 export AWS_PROFILE=my-research-account
 ```
+
+See [AWS Authentication](/guides/aws-auth) for the full model (profiles, `SPORE_*` config, and how authentication relates to permissions).
 
 ## IAM permissions
 

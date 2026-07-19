@@ -28,9 +28,8 @@ truffle spot g5.xlarge --regions us-east-1,us-west-2,eu-west-1 --show-savings
 `--show-savings` adds On-Demand and Savings columns so you can see the real discount per AZ (on-demand rates are pulled live from the AWS Price List API).
 
 ::: tip Finding the right instance type
-Not sure which instance to use? See [Finding the Right Instance](/guides/finding-instances) for a step-by-step walkthrough: `truffle find` → `truffle search` → `truffle spot` → `truffle quotas`.
+Not sure which instance to use? See [Finding the Right Instance](/guides/finding-instances) for a step-by-step walkthrough: `truffle find` → `truffle spot` → `truffle quotas`.
 :::
-```
 
 Spot prices vary by region and AZ — sometimes significantly. Running in `us-west-2` instead of `us-east-1` can save an additional 20–30% on the already-discounted Spot price.
 
@@ -91,7 +90,9 @@ spawn launch \
 Some instance types have much more stable Spot availability than others. Use truffle to compare:
 
 ```sh
-truffle find "nvidia gpu" --spot --sort-by-price --region us-east-1
+truffle spot "g5.xlarge" --sort-by-price --region us-east-1
 ```
+
+`truffle spot` reports live Spot prices and per-AZ availability; `--sort-by-price` orders cheapest-first (add `--show-savings` for the discount vs On-Demand). These Spot flags live on `truffle spot`, not `truffle find`.
 
 Types with high availability tend to be larger families (more AZs, more capacity pool) and slightly older generations.
