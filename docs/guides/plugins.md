@@ -119,6 +119,67 @@ braces) are substituted at run time. See
 for the full spec, including controller-side `local` steps and the `push` API for
 moving captured values to the instance.
 
+### `plugin.yaml` field reference
+
+**Top level:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Plugin id, kebab-case; must match the directory name. |
+| `version` | string | SemVer (e.g. `v1.0.0`). |
+| `description` | string | One-line summary. |
+| `config` | map | User-supplied parameters, keyed by name (see below). |
+| `conditions` | block | `local` / `remote` lists of preconditions checked before running. |
+| `local` | block | Steps that run on **your machine** (the controller). |
+| `remote` | block | Steps that run on **the instance**. |
+| `outputs` | map | Values surfaced after provisioning, keyed by name. |
+
+**`config.<name>` (a parameter):**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `type` | string | `string`, `int`, or `bool`. |
+| `required` | bool | Fail if the user didn't supply it. |
+| `default` | any | Value used when unset. |
+| `description` | string | Shown in help/validation. |
+
+**`conditions.local[]` / `conditions.remote[]`:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `type` | string | `command` (a probe command must succeed) or `platform`. |
+| `run` | string | Command to run for `type: command`. |
+| `os` | string | Required OS for `type: platform` (e.g. `linux`). |
+| `message` | string | Shown when the condition fails. |
+
+**`remote` phases:** `install`, `configure`, `start`, `stop`, each a list of
+[steps](#step-fields); plus `health` (`interval` + `steps`) for the recurring
+health-check loop.
+
+**`local` block:** `provision`, `deprovision`, and `reconcile` (re-run when the
+instance's IP changes after a stop/start) step lists, plus `env_passthrough` — the
+allowlist of controller env vars a local step may read. Local steps otherwise run
+with a minimal environment (`PATH`+`HOME` only) so plugin scripts can't scoop up
+your AWS/other credentials; a plugin that needs a controller-side secret (e.g.
+Tailscale's `TS_API_CLIENT_SECRET`) lists it here and spawn injects only those.
+
+#### Step fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `type` | string | `run`, `fetch`, `extract`, or `push`. |
+| `run` | string | Shell command (`type: run`). |
+| `url` / `dest` | string | Download source / destination (`type: fetch`). |
+| `src` / `dest` | string | Archive path / target dir (`type: extract`). |
+| `key` / `value` | string | Value to push to the instance (`type: push`). |
+| `background` | bool | Run without waiting (e.g. a long-lived server). |
+| `capture` | map | `varname` → JMESPath into the step's stdout JSON, for later template use. |
+| `env` | map | Extra environment for this step. |
+| `as_user` | bool | Run a remote `run` step as the instance's login user, not root (for tools that refuse root, e.g. Globus Connect Personal). |
+
+**`outputs.<name>.source`** is `local_capture` (captured by a `local` step) or
+`pushed` (delivered via the push API).
+
 ### Validate before you ship
 
 Lint a spec offline (no instance, no AWS) with `spawn plugin validate`:
