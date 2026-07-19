@@ -270,8 +270,8 @@ All spore.host components read from environment variables and config file (`~/.s
 | Variable | Purpose | Default |
 |----------|---------|---------|
 | `SPORE_ENV` | Deployment environment: `integ` or `prod` | `prod` |
-| `SPORE_API_URL` | REST API Lambda URL | hosted spore.host |
-| `SPORE_API_KEY` | API key for REST API | — |
+| `SPORE_API_URL` | HTTP API Lambda URL (beta; used by the Python SDK) | hosted spore.host |
+| `SPORE_API_KEY` | API key for the HTTP API | — |
 | `SPORE_NOTIFY_URL` | Notification Lambda callback URL | hosted spore.host |
 | `SPORE_DNS_URL` | DNS updater Lambda URL | hosted spore.host |
 | `SPORE_BOT_LAMBDA_ROLE_ARN` | Cross-account trust target for bot | hosted spore.host |

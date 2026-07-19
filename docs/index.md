@@ -4,7 +4,7 @@ layout: home
 hero:
   name: spore.host
   text: Ephemeral compute for researchers
-  tagline: Find the right EC2 instance, launch it in minutes, and let it manage itself. Auto-termination, idle detection, Slack and Teams control, and AI-assistant integration — so you can focus on your work, not your infrastructure.
+  tagline: An open-source toolkit for temporary AWS compute. Find the right EC2 instance, launch it with a hard time limit and idle shutdown, and let it manage itself — on your own AWS account. There's no new provider to sign up for, and you pay AWS only for what you use.
   actions:
     - theme: brand
       text: Quick Start

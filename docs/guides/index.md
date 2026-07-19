@@ -1,48 +1,104 @@
 ---
-description: "Task-oriented guides for common workflows."
+description: "Complete, end-to-end workflows for the things researchers actually do — start with a story that matches your goal."
 ---
 
-# Guides
+# Common Workflows
 
-Task-oriented guides for common workflows. If you're new, start with **Getting Started**. If you know what you want to do, jump directly to the relevant guide.
+You usually arrive with a goal, not a tool in mind. Start with the story closest to
+what you're trying to do — each is a complete, end-to-end walkthrough — then branch
+into the deeper guides. New to spore.host? Do [Your first
+instance](/guides/first-instance) first; it's the 15-minute backbone the stories
+below build on.
 
-## Getting Started
+## Story A — Interactive research workstation
 
-| Guide | What you'll learn |
-|-------|------------------|
-| [Installation](/guides/installation) | Install truffle, spawn, and optional tools |
-| [Your First Instance](/guides/first-instance) | End-to-end: find, launch, connect, terminate |
+*"I need a big machine for a few hours to explore some data, then it should go
+away."*
 
-## Compute
+```sh
+truffle find "amd genoa 64gb" --region us-east-1     # 1. find a fit
+spawn launch analysis \                              # 2. launch with guards
+  --instance-type m8a.4xlarge \
+  --ttl 8h \
+  --idle-timeout 30m
+spawn connect analysis                               # 3. work on it
+spawn terminate analysis                             # 4. done — tear it down
+```
 
-| Guide | What you'll learn |
-|-------|------------------|
-| [GPU Training Jobs](/guides/gpu-training) | Launch a GPU instance, run a training job, terminate on completion |
-| [Jupyter Notebooks](/guides/jupyter) | RStudio or Jupyter with process-aware idle detection |
-| [Spot Instances](/guides/spot-instances) | Use Spot for up to 90% cost savings, handle interruptions gracefully |
+- **`--ttl 8h`** is the hard deadline — the instance terminates then no matter
+  what, so a forgotten session can't run all weekend.
+- **`--idle-timeout 30m`** stops it early if you wander off; any activity resets
+  the timer. Idle *stops*, TTL *terminates* — see [Costs & safety
+  guarantees](/safety).
+- **Cost:** capped at 8 × the hourly rate; usually far less because idle stops it.
+  Check the rate with `truffle spot m8a.4xlarge` before you launch.
 
-## Automation & Control
+→ Deeper: [Finding the right instance](/guides/finding-instances) ·
+[Jupyter/RStudio](/guides/jupyter) · [Managing instances &
+data](/guides/managing-instances)
 
-| Guide | What you'll learn |
-|-------|------------------|
-| [Slack Setup](/guides/slack-setup) | Connect Slack, use `/spore` commands, get lifecycle DMs |
-| [Teams Setup](/guides/teams-setup) | Connect Microsoft Teams |
-| [AI Assistant (MCP)](/guides/mcp-setup) | Control compute from Claude Desktop or Cursor |
-| [Lifecycle Notifications](/guides/notifications) | Configure what events trigger notifications and where they go |
+## Story B — Unattended batch computation
 
-## Advanced
+*"Run this script on a big box; when it finishes, terminate — I'm not watching."*
 
-| Guide | What you'll learn |
-|-------|------------------|
-| [Parameter Sweeps](/guides/parameter-sweeps) | Run the same job across many parameter combinations in parallel |
-| [MPI Clusters](/guides/mpi) | Launch multi-node clusters for distributed workloads |
-| [Pipelines](/guides/pipelines) | Chain jobs so each stage launches the next |
-| [Plugins](/guides/plugins) | Extend instances with pre-built or custom plugins at launch time |
-| [Job Arrays](/guides/job-arrays) | Launch and manage groups of related instances |
+```sh
+spawn launch simulation \
+  --instance-type c8a.12xlarge \
+  --ttl 12h \
+  --command "./run-model.sh && spored complete --status success" \
+  --on-complete terminate
+```
 
-## Workflow Engines
+What happens in each case:
 
-| Guide | What you'll learn |
-|-------|------------------|
-| [Workflow Engines](/guides/workflow-engines) | Run Nextflow, WDL, CWL, Snakemake, or Airflow with spawn as the execution backend — each task on an ephemeral instance |
-| [Nextflow (nf-spawn)](/guides/nextflow) | Dispatch each Nextflow process to its own ephemeral EC2 instance |
+- **Succeeds** → the `&&` reaches `spored complete`, the completion sentinel
+  appears, and `--on-complete terminate` tears the instance down.
+- **Fails** → `run-model.sh` exits non-zero, `spored complete` never runs, so the
+  instance stays up (for you to debug) until the **TTL** terminates it at 12h.
+- **Hangs** → idle detection won't fire (a running process is activity), but the
+  **TTL** still terminates at 12h. TTL is the backstop that always wins.
+
+The distinction that trips people up: it's the **completion sentinel appearing**
+that triggers `on-complete`, not your command merely exiting — which is why the
+script calls `spored complete` explicitly. See
+[Troubleshooting](/reference/troubleshooting#a-command-finishing-vs-the-completion-sentinel-appearing).
+
+→ Deeper: [GPU training jobs](/guides/gpu-training) · [Parameter
+sweeps](/guides/parameter-sweeps) · [Batch queues](/guides/batch-queue)
+
+## Story C — Scarce GPU capacity
+
+*"I need a p5.48xlarge, but there's never one available when I try."*
+
+1. **[Truffle](/tools/truffle)** confirms the type exists and you have quota.
+2. **[Spawn](/tools/spawn)** tries to launch — and gets
+   `InsufficientInstanceCapacity`.
+3. **[Lagotto](/tools/lagotto)** watches three regions every five minutes.
+4. A notification arrives the moment capacity appears.
+5. Lagotto launches it automatically with a 6-hour TTL — no one awake required.
+
+This is the one workflow the "find → launch" path can't do alone, because *quota*
+and *capacity* are different things. Full walkthrough: [Waiting for scarce
+capacity](/guides/waiting-for-capacity).
+
+---
+
+## Choose what to learn next
+
+| I want to… | Go to |
+|------------|-------|
+| Find the right instance type & compare prices | [Finding the right instance](/guides/finding-instances) |
+| Run Jupyter or RStudio in the browser | [Interactive workstation](/guides/jupyter) |
+| Train a model on a GPU | [GPU training jobs](/guides/gpu-training) |
+| Save up to 90% with Spot | [Spot instances](/guides/spot-instances) |
+| Move data on and off instances | [Managing instances & data](/guides/managing-instances) |
+| Run one job across many parameters | [Parameter sweeps](/guides/parameter-sweeps) |
+| Manage a group of related instances | [Job arrays](/guides/job-arrays) |
+| Queue more work than fits at once | [Batch queues](/guides/batch-queue) |
+| Run tightly-coupled multi-node jobs | [MPI clusters](/guides/mpi) |
+| Chain jobs so each stage launches the next | [Pipelines](/guides/pipelines) |
+| Wait for a hard-to-find GPU | [Waiting for scarce capacity](/guides/waiting-for-capacity) |
+| Control instances from Slack/Teams | [Slack Setup](/guides/slack-setup) |
+| Drive compute from an AI assistant | [AI Assistant (MCP)](/guides/mcp-setup) |
+| Automate from Python | [Python SDK](/guides/python-sdk) |
+| Run Nextflow / WDL / CWL / Snakemake / Airflow | [Workflow engines](/guides/workflow-engines) |

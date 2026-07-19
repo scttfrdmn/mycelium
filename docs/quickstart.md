@@ -123,6 +123,8 @@ spawn stop my-first-instance       # stopped, can be restarted with spawn start
 ## Next steps
 
 - **[How It Works](/how-it-works)** — understand the full lifecycle and how the tools connect
+- **[Security, credentials & data flow](/architecture)** — what runs where, and why spore.host never holds your keys
+- **[Costs & safety guarantees](/safety)** — the auto-terminate promise, its limits, and estimating cost up front
+- **[Common Workflows](/guides/)** — end-to-end stories for real research tasks
 - **[GPU Training](/guides/gpu-training)** — launch a GPU instance for a training job
-- **[Slack Setup](/guides/slack-setup)** — control instances from Slack, get notifications when jobs finish
 - **[spawn launch reference](/tools/reference/spawn)** — every flag explained
