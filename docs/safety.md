@@ -16,7 +16,7 @@ Three independent rules can end an instance's life, in strict priority:
 | Rule | What it is | Can it be reset? |
 |------|-----------|------------------|
 | **TTL** | An absolute deadline set once at launch. | **No.** It never moves across stop/wake cycles. Only `spawn extend` changes it, and only forward. |
-| **Cost limit** | Terminate when accumulated spend crosses a ceiling. | Set at launch; advisory guard. |
+| **Cost limit** | Terminate when accumulated **compute** spend crosses a ceiling. | Set at launch; tracks total compute across stop/resume (doesn't reset). |
 | **Idle timeout** | Stop or hibernate after a period of no activity. | Yes — any activity resets the timer. Idle **never terminates**; it only stops/hibernates. |
 
 The key invariant: **TTL always wins.** Idle detection is a soft, early
@@ -97,7 +97,11 @@ spawn cost analysis        # compute + storage + network, effective rate, budget
 ```
 
 Set a hard money ceiling with `--cost-limit` at launch if you want spend, not just
-time, to be the terminating rule.
+time, to be the terminating rule. It's measured on **compute cost only**
+(instance rate × total compute time, accumulated across stop/resume — it doesn't
+reset when you restart), warns at 90%, and **terminates** the instance when
+crossed. It fires independently of the TTL — whichever ceiling is reached first
+ends the instance.
 
 ## Next steps
 

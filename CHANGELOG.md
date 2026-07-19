@@ -13,6 +13,13 @@ own changelogs for CLI releases.
 
 ## [Unreleased]
 
+### Fixed
+- **Docs: corrected `--cost-limit` description** (safety, glossary, spored, EC2
+  tags). It's a **compute-only** ceiling (excludes EBS/storage), accumulates
+  across stop/resume rather than resetting, **terminates** the instance, and fires
+  independently of the TTL (first ceiling to fire wins). Matches the spored fix in
+  spawn PR #400 (enforcement was resetting the cost clock on each restart).
+
 ### Added
 - **Docs: execution-fabric restructure (plugins & workflow adapters).** Following a
   second review of the extension subsystem, regrouped the docs so spawn reads as an
