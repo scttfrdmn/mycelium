@@ -32,18 +32,18 @@ truffle --version
 spawn --version
 ```
 
-## Configure AWS credentials
+## Authenticate with AWS
 
-spore.host uses your existing AWS credentials — the same ones you use for the AWS CLI. If you've already run `aws configure`, you're set.
+spore.host uses whatever AWS credentials your shell already has. The recommended way to get them is **`aws login`** (AWS CLI v2.34+), which signs you in and refreshes short-lived credentials automatically:
 
 ```sh
-# Check that credentials work
-aws sts get-caller-identity
+aws login                       # sign in (opens your browser)
+aws sts get-caller-identity     # confirm you're authenticated
 ```
 
-::: tip Don't have AWS CLI configured yet?
-Run `aws configure` and provide your Access Key ID, Secret Access Key, and preferred region. spore.host requires permissions to describe and launch EC2 instances — see [IAM Permissions](/reference/iam-permissions) for the minimal policy.
-:::
+If your organization issues static keys instead, `aws configure` (Access Key ID / Secret Access Key / region) also works — `aws login` is preferred because the credentials are short-lived.
+
+Your credentials need permission to launch and manage EC2 instances; see the [minimal IAM policy](/reference/iam-permissions). For the full picture — profiles, `SPORE_*` config, and how your auth relates to what spore.host does on your behalf — see [AWS Authentication](/guides/aws-auth).
 
 ## Find an instance
 

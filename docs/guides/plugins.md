@@ -22,8 +22,11 @@ The official registry lives at
 Install onto a running instance with `spawn plugin install <ref>`:
 
 ```sh
-# From the official registry, by name
-spawn plugin install tailscale --instance my-job --config auth_key=tskey-auth-...
+# From the official registry, by name.
+# tailscale mints a short-lived key from your OAuth client, so you pass the ACL
+# tag as config and the OAuth client via env — not a raw auth key.
+export TS_API_CLIENT_ID=...  TS_API_CLIENT_SECRET=...
+spawn plugin install tailscale --instance my-job --config tag=tag:spore
 
 # Pin to a specific version
 spawn plugin install rstudio-server@v1.0.0 --instance my-job
@@ -63,7 +66,7 @@ ttl: 8h
 plugins:
   - ref: tailscale
     config:
-      auth_key: tskey-auth-...
+      tag: tag:spore   # OAuth client via TS_API_CLIENT_ID/SECRET env (see above)
 ```
 
 ```sh

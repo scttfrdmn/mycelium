@@ -4,15 +4,25 @@ spore.host tools read configuration from environment variables and `~/.spawn/con
 
 ## AWS credentials
 
-spore.host uses the standard AWS credential chain — no custom variables required.
+spore.host uses the standard AWS credential chain — no custom variables required. The recommended way to populate it is [`aws login`](/guides/aws-auth) (AWS CLI v2.34+); the variables below are for profile selection or the static-key fallback.
 
 | Variable | Description |
 |----------|-------------|
 | `AWS_PROFILE` | AWS CLI profile to use (recommended over static keys) |
 | `AWS_REGION` | Default AWS region |
-| `AWS_ACCESS_KEY_ID` | Static access key (prefer profiles or IAM roles) |
-| `AWS_SECRET_ACCESS_KEY` | Static secret key |
+| `AWS_ACCESS_KEY_ID` | Static access key — fallback only; prefer `aws login` / profiles |
+| `AWS_SECRET_ACCESS_KEY` | Static secret key (fallback) |
 | `AWS_SESSION_TOKEN` | Temporary session token (for assumed roles) |
+
+## spore.host config
+
+The suite-wide [`sporeconfig`](/guides/aws-auth) layer (all CLIs), resolved flag > env > `~/.config/spore/config.toml` > default:
+
+| Variable | Description |
+|----------|-------------|
+| `SPORE_PROFILE` | AWS profile for spore.host tools (overrides `AWS_PROFILE` for them) |
+| `SPORE_REGION` | Default region for spore.host tools |
+| `SPORE_ACCOUNT` | Expected AWS account ID (guards against launching in the wrong account) |
 
 ```sh
 # Use a named profile

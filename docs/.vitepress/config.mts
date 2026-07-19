@@ -41,6 +41,7 @@ export default defineConfig({
           collapsed: false,
           items: [
             { text: 'Installation', link: '/guides/installation' },
+            { text: 'AWS Authentication', link: '/guides/aws-auth' },
             { text: 'Your First Instance', link: '/guides/first-instance' },
             { text: 'Python SDK', link: '/guides/python-sdk' },
             { text: 'Go Library', link: '/guides/go-library' },

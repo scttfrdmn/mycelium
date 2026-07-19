@@ -54,7 +54,7 @@ spawn launch \
 ## Monitoring the cluster
 
 ```sh
-spawn list --job-array climate-sim     # all nodes in the cluster
+spawn list --job-array-name climate-sim   # all nodes in the cluster
 spawn status climate-sim-0             # status of the head node
 spawn status climate-sim-1             # status of worker node 1
 ```
@@ -83,11 +83,14 @@ Write the completion file only from the head node (rank 0). MPI programs run on 
 For large datasets that all cluster nodes need to read, attach an FSx Lustre filesystem:
 
 ```sh
-# Create a new FSx filesystem backed by S3
+# Create a new FSx filesystem backed by S3.
+# --fsx-create REQUIRES --fsx-lifecycle: 'ephemeral' (reaped when this cluster
+# terminates) or 'durable' (persists; add --fsx-ttl, e.g. 7d).
 spawn launch sim \
   --count 8 --mpi --efa \
   --instance-type hpc6a.48xlarge \
   --fsx-create \
+  --fsx-lifecycle ephemeral \
   --fsx-s3-bucket my-data-bucket \
   --fsx-import-path s3://my-data-bucket/inputs/ \
   --fsx-export-path s3://my-data-bucket/outputs/ \
