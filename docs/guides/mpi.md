@@ -16,6 +16,12 @@ spawn launch \
 
 `--count 8` launches 8 instances. `--mpi` sets up passwordless SSH between all nodes, installs OpenMPI if not present, and configures the hostfile. The `--command` runs on node 0 after all nodes are ready.
 
+MPI clusters launch **all-or-nothing**: spore.host waits for every node to come up and pass an MPI-readiness check (`mpirun` present, and the EFA fabric when `--efa` is set), then distributes the peer list to all nodes before the cluster is considered ready. If any node can't be placed, the whole launch fails and every already-launched node is cleaned up — so you never pay for a half-formed cluster.
+
+## Availability Zone fallback
+
+A cluster placement group lives in a single Availability Zone, and capacity for large HPC/GPU instance types is often available in one AZ but not another. If the primary AZ is out of capacity, spore.host automatically moves the **entire cluster** to the next AZ in the region — as a unit, so all nodes stay co-located in one placement group. This happens transparently; you'll see it noted in the launch output. No configuration is needed. (Pinning an explicit `--placement-group` fixes the cluster to that group's AZ and disables fallback.)
+
 ## EFA for high-performance networking
 
 For workloads that saturate standard networking, enable Elastic Fabric Adapter:
@@ -35,7 +41,7 @@ spawn launch \
 
 ## Instance placement
 
-By default, MPI clusters are placed in a cluster placement group named `spawn-mpi-<job-array-name>` for minimum latency. spawn creates it automatically and waits a few seconds for it to become available before launching instances. If you have an existing placement group:
+By default, MPI clusters are placed in a cluster placement group named `spawn-mpi-<job-array-name>-<az>` for minimum latency. spawn creates it on demand in whichever AZ the cluster lands in (so [AZ fallback](#availability-zone-fallback) can pick a zone with capacity), and cleans up the groups for any AZs it tried and moved on from. If you have an existing placement group:
 
 ```sh
 spawn launch \
