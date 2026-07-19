@@ -1,6 +1,7 @@
 cff-version: 1.2.0
 message: "If you use spore.host in your research, please cite it as below."
 title: "spore.host: ephemeral AWS compute for researchers"
+doi: "10.5281/zenodo.21439339"
 abstract: >-
   spore.host is a suite of tools for ephemeral cloud compute on AWS EC2:
   truffle (instance-type discovery, spot pricing, quotas), spawn (launching and

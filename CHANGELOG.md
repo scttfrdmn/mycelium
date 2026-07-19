@@ -14,6 +14,10 @@ own changelogs for CLI releases.
 ## [Unreleased]
 
 ### Added
+- **Zenodo DOI**: spore.host is now archived on Zenodo with a citable DOI
+  (concept DOI [10.5281/zenodo.21439339](https://doi.org/10.5281/zenodo.21439339),
+  always latest). Wired into `CITATION.cff`, `codemeta.json`, and a README badge +
+  Citation section.
 - **`codemeta.json`** — CodeMeta (JSON-LD / schema.org) software metadata, for
   software registries and citation tooling; complements `CITATION.cff`.
 - **`CITATION.cff`** — machine-readable citation metadata (GitHub renders a
