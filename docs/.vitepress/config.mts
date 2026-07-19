@@ -62,8 +62,8 @@ export default defineConfig({
           collapsed: false,
           items: [
             { text: 'Slack Setup', link: '/guides/slack-setup' },
-            { text: 'Self-Hosting', link: '/guides/self-hosting' },
             { text: 'Teams Setup', link: '/guides/teams-setup' },
+            { text: 'Discord Setup', link: '/guides/discord-setup' },
             { text: 'AI Assistant (MCP)', link: '/guides/mcp-setup' },
             { text: 'Lifecycle Notifications', link: '/guides/notifications' },
           ]
@@ -86,6 +86,7 @@ export default defineConfig({
           text: 'Self-Hosting',
           collapsed: true,
           items: [
+            { text: 'Overview', link: '/guides/self-hosting' },
             { text: 'Self-Hosting spore-bot', link: '/spore-bot-self-hosting' },
           ]
         },
