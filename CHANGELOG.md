@@ -14,6 +14,8 @@ own changelogs for CLI releases.
 ## [Unreleased]
 
 ### Added
+- **`CITATION.cff`** — machine-readable citation metadata (GitHub renders a
+  "Cite this repository" button). Foundation for the Zenodo DOI integration.
 - **Docs AI-readiness: `llms.txt` manifest** (#424) — a curated
   [llmstxt.org](https://llmstxt.org) entry map, generated at build time from the
   sidebar (a `buildEnd` hook) so it can't drift from the nav.
