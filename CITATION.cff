@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+message: "If you use spore.host in your research, please cite it as below."
+title: "spore.host: ephemeral AWS compute for researchers"
+abstract: >-
+  spore.host is a suite of tools for ephemeral cloud compute on AWS EC2:
+  truffle (instance-type discovery, spot pricing, quotas), spawn (launching and
+  lifecycle management with the spored in-instance daemon), and lagotto (a
+  capacity watcher). Instances self-terminate via TTL and idle detection, so
+  researchers can find the right instance, launch it in minutes, and let it
+  clean itself up.
+type: software
+authors:
+  - given-names: Scott
+    family-names: Friedman
+    orcid: "https://orcid.org/0000-0003-1480-765X"
+    affiliation: "Amazon Web Services"
+repository-code: "https://github.com/spore-host/spore-host"
+url: "https://spore.host"
+license: Apache-2.0
+keywords:
+  - cloud computing
+  - AWS
+  - EC2
+  - research computing
+  - ephemeral compute
+  - high-performance computing
