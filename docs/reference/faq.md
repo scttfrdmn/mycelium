@@ -74,22 +74,43 @@ Spored receives the two-minute warning via the EC2 metadata service. It runs you
 ### How do I connect?
 
 ```sh
-spawn connect my-instance   # prints the SSH command
+spawn connect my-instance   # finds your key and connects; falls back to SSM
 ```
 
-Or directly: `ssh ec2-user@<public-ip>`
+`spawn connect` logs you in as **your own username** — the instance creates a
+Linux user matching your local login name and installs your SSH public key into
+its `authorized_keys`, so you connect as you (not a generic `ec2-user`). It finds
+your key automatically; if SSH isn't reachable it falls back to AWS Session
+Manager. Aliased as `spawn ssh`.
 
-### How do I find the key?
+### Which SSH key does spawn use?
 
-Spawn creates a key pair named `spawn-default` on first use and saves the private key to `~/.spawn/keys/spawn-default.pem`. Use it with `-i ~/.spawn/keys/spawn-default.pem` if needed.
+If you have a default key — `~/.ssh/id_ed25519` (or `~/.ssh/id_rsa`) — spawn
+imports **that** public key, so you connect with the key you already use. Only if
+you have no default key does it generate and use a managed key under
+`~/.spawn/keys/`. Point `spawn connect` at a specific key with `--key <path>`.
 
 ### Why does SSH fail right after launch?
 
-The instance takes 30–90 seconds to boot and start sshd. Wait and retry.
+The instance takes 30–90 seconds to boot and start sshd. Wait and retry, or use
+`spawn connect` which handles the retry (and falls back to SSM).
 
-### Can I use my existing SSH key?
+### `spawn connect` can't reach the instance — what now?
 
-Yes: `spawn launch --key-name my-existing-keypair`
+- **No public IP / private subnet:** use SSM instead —
+  `spawn connect my-instance --session-manager` (no inbound SSH needed).
+- **Security group:** if you're connecting over SSH, port 22 must allow your IP.
+  spawn opens it for you at launch; a later network change can break it.
+- **Wrong user or key:** override with `--user <name>` / `--key <path>`. By
+  default the user is your local username and the key is your default/managed key.
+- **Instance stopped:** `spawn connect` auto-starts a stopped/hibernated instance
+  unless you pass `--no-start`.
+
+### Can I use my own EC2 key pair?
+
+Yes — `spawn launch --key-name my-existing-keypair` uses an existing EC2 key pair
+by name. Most users don't need this: spawn imports your local `~/.ssh` public key
+automatically (see above).
 
 ---
 

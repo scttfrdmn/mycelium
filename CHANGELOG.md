@@ -14,6 +14,11 @@ own changelogs for CLI releases.
 ## [Unreleased]
 
 ### Fixed
+- **Docs: corrected the SSH/connectivity FAQ** — `spawn connect` logs you in as
+  your own username (the instance matches your local user) and reuses your
+  `~/.ssh/id_ed25519`/`id_rsa` key when present; added SSM/private-subnet and
+  common-failure troubleshooting. Replaces the stale `ec2-user`/`spawn-default`
+  and `--key-name` guidance.
 - **Docs: corrected the Pipelines guide** — `spawn pipeline launch` takes a JSON
   definition file (not the fictional YAML + `--slack-workspace`/`--efs-id`
   flags), stages form a DAG via `depends_on`, and data is handed off with
@@ -27,6 +32,13 @@ own changelogs for CLI releases.
   and de-duplicated the two "Self-Hosting" entries into one group.
 
 ### Added
+- **Docs: new "Managing Instances & Data" guide** covering the operational spawn
+  commands that had no prose — `stage` (cross-region S3 staging), `snapshot` +
+  `launch --attach-volume` (large reference data as an EBS volume),
+  `upgrade-spored`, and `resources`/`orphans` (inventory + cost hygiene).
+- **Docs: complete `plugin.yaml` field reference** in the Plugins guide (top-level,
+  config params, conditions, local/remote phases, step fields, outputs) derived
+  from the loader schema.
 - **Docs: truffle overview now documents the shared `--profile`/`--account`
   config** and links the AWS auth guide.
 - **Docs: the CLI command/flag reference is now generated + drift-gated.** Each

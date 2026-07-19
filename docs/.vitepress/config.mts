@@ -55,6 +55,7 @@ export default defineConfig({
             { text: 'GPU Training Jobs', link: '/guides/gpu-training' },
             { text: 'Jupyter Notebooks', link: '/guides/jupyter' },
             { text: 'Spot Instances', link: '/guides/spot-instances' },
+            { text: 'Managing Instances & Data', link: '/guides/managing-instances' },
           ]
         },
         {
