@@ -14,6 +14,20 @@ own changelogs for CLI releases.
 ## [Unreleased]
 
 ### Added
+- **Docs: researcher-facing information-architecture overhaul.** Restructured the
+  docs site around user intent instead of product structure, following an external
+  review. New top-level nav: Introduction → Start Here → Common Workflows → Tools →
+  Automation → Chat & AI Control → Administration → Reference (one global sidebar).
+  New pages: **Security, credentials & data flow** (`/architecture`, "what runs
+  where" trust/data-flow model), **Costs & safety guarantees** (`/safety`,
+  auto-terminate failure boundaries + pre-launch cost estimation), **Waiting for
+  scarce capacity** (a Lagotto first-use tutorial), **Glossary**,
+  **Troubleshooting & common mistakes**, and **Event schemas**. The Guides landing
+  is now three narrative user stories. Each tool page opens with a consistent
+  *What it is / When to use / First commands* trio; Truffle gains a find-vs-search
+  decision box, Spawn a three-tier progressive-disclosure map and a spawn-vs-spored
+  "what runs where" diagram. Added audience/maturity badges (Beginner / Advanced /
+  HPC / Automation / Stable / Beta …) with WCAG-AA colours in light and dark mode.
 - **Docs: heterogeneous parameter sweeps** (spawn#372) — the sweeps guide now
   shows varying `instance_type`/`ami`/`spot` per entry (price-performance
   benchmark example), with the per-entry AMI auto-detection, the one-OS-per-sweep
@@ -35,6 +49,17 @@ own changelogs for CLI releases.
   better AI/search snippets); added default OG/Twitter card `head` tags.
 
 ### Fixed
+- **Site: resolved the "five vs six tools" inconsistency.** The marketing site
+  now says "Six tools" and includes a **Spored** card (it was omitted); the docs
+  already said six. `web/README.md`'s stale tool list updated to match.
+- **Site: consistent HTTP API status.** The API is now labelled **beta / used by
+  the SDK** everywhere — removed "coming soon"/"on the roadmap" framing on
+  `web/library.html` (added an inline **Beta** badge to the endpoint block so it
+  doesn't read as a live public contract) and reconciled the `guides/python-sdk`
+  and `guides/self-hosting` wording.
+- **Copy: clarified spore.host is not itself the host** — the hero, docs home,
+  and How It Works now state up front that it runs on your own AWS account with
+  your own credentials, with no new provider to sign up for.
 - **Docs accessibility: WCAG AA contrast** (#423) — tool badges are small
   (0.7rem) bold text, so they need 4.5:1: several failed in light and/or dark
   mode. Badge text now uses per-mode colors that all clear 4.5:1, and dark-mode

@@ -30,6 +30,8 @@
   --bot-bg:       #f5f3ff;
   --mcp:          #4264F5;   /* brand blue variant               */
   --mcp-bg:       #eef0ff;
+  --spored:       #059669;   /* emerald — lifecycle / self-healing */
+  --spored-bg:    #ecfdf5;
 
   --code-bg:      #f3f4f6;
   --terminal-bg:  #f3f4f6;
@@ -65,6 +67,7 @@
   --lagotto-bg:   #082030;
   --bot-bg:       #1a0d30;
   --mcp-bg:       #12103a;
+  --spored-bg:    #052e22;
 
   --code-bg:      #1a0e28;
   --terminal-bg:  #1a0e28;
@@ -328,6 +331,8 @@ h2.section-title {
 .tool-bot     .tool-link { color: var(--bot); }
 .tool-mcp     .tool-tag { background: var(--mcp-bg);     color: var(--mcp);     }
 .tool-mcp     .tool-link { color: var(--mcp); }
+.tool-spored  .tool-tag { background: var(--spored-bg); color: var(--spored); }
+.tool-spored  .tool-link { color: var(--spored); }
 
 /* ── Demo ── */
 #demo-player { border-radius: var(--radius); overflow: hidden; max-width: 900px; margin-top: 0.5rem; margin-bottom: 0; }
@@ -369,8 +374,17 @@ code { font-size: 0.875em; }
   align-items: start;
 }
 .dev-block { display: flex; flex-direction: column; gap: 1rem; }
-.dev-block h3 { font-size: 1.05rem; font-weight: 700; }
+.dev-block h3 { font-size: 1.05rem; font-weight: 700; display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
 .dev-block p { font-size: 0.9rem; color: var(--text-muted); line-height: 1.6; }
+
+/* Status badge for dev-block headings (e.g. Beta on the HTTP API). Amber tint
+   distinguishes not-yet-public surfaces from the "Available now" library/SDK. */
+.dev-badge {
+  display: inline-block; font-size: 0.65rem; font-weight: 700;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 0.15rem 0.45rem; border-radius: 4px; white-space: nowrap;
+}
+.dev-badge.beta { background: var(--truffle-bg); color: var(--truffle); }
 
 .coming-soon-card {
   border: 1px dashed var(--border-strong);

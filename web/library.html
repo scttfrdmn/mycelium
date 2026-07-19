@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>For Developers — spore.host</title>
-  <meta name="description" content="Use spore.host as a Go library, the Python SDK (pip install spore-host), or via the MCP server. Hosted REST API coming soon.">
+  <meta name="description" content="Use spore.host as a Go library, the Python SDK (pip install spore-host), or via the MCP server. The HTTP API is in beta and used by the SDK.">
   <script>(function(){var t=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);}());</script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -45,7 +45,7 @@
           The truffle and spawn packages are clean, importable Go libraries. Use them in your own tools,
           scripts, or services — no CLI subprocess calls required.
           The MCP server ships as a ready-to-use integration for AI assistants.
-          The Python SDK is available now (<code>pip install spore-host</code>); the hosted REST API is on the roadmap.
+          The Python SDK is available now (<code>pip install spore-host</code>) and talks to spore.host's HTTP API, which is currently in beta — the SDK is the supported entry point; direct HTTP access is not yet a supported public interface.
         </p>
       </div>
     </div>
@@ -228,8 +228,8 @@ inst.wait("terminated", on_status=lambda i: print(i.state))</code></pre>
           </div>
 
           <div class="dev-block">
-            <h3>REST API</h3>
-            <p>A language-agnostic HTTP API over truffle and spawn — the foundation for the Python SDK and future R/Julia bindings.</p>
+            <h3>HTTP API <span class="dev-badge beta">Beta</span></h3>
+            <p>A language-agnostic HTTP API over truffle and spawn — the foundation the Python SDK builds on, and the basis for future R/Julia bindings. It's in beta and used through the SDK; the endpoints below are shown for orientation, not as a stable public contract yet. Use the <a href="https://docs.spore.host/guides/python-sdk">Python SDK</a> for supported programmatic access today.</p>
 <pre><code>GET  /v1/instances              # list
 POST /v1/instances              # launch
 GET  /v1/instances/{id}         # status

@@ -7,37 +7,85 @@ const SITE_URL = 'https://docs.spore.host'
 // Sidebar is a top-level const so the llms.txt generator (buildEnd, below) can
 // walk the exact same structure the site renders — the manifest can't drift from
 // the nav.
+// One global sidebar (keyed on '/') applied to every page, so the whole site
+// reads as a single path: Introduction → Start Here → Common Workflows → Tools →
+// Automation → Administration → Reference. This is deliberate — the docs used to
+// show a different sidebar per top-level section, which fragmented the mental
+// model the reviewer flagged. Every link below points to a page that exists.
 const sidebar = {
   '/': [
-    { text: 'Quick Start', link: '/quickstart' },
-    { text: 'How It Works', link: '/how-it-works' },
-  ],
-  '/guides/': [
     {
-      text: 'Getting Started',
+      text: 'Introduction',
       collapsed: false,
       items: [
-        { text: 'Installation', link: '/guides/installation' },
+        { text: 'What is spore.host?', link: '/' },
+        { text: 'How the pieces fit together', link: '/how-it-works' },
+        { text: 'Security, credentials & data flow', link: '/architecture' },
+        { text: 'Costs & safety guarantees', link: '/safety' },
+      ]
+    },
+    {
+      text: 'Start Here',
+      collapsed: false,
+      items: [
+        { text: 'Quick Start', link: '/quickstart' },
+        { text: 'Install', link: '/guides/installation' },
         { text: 'AWS Authentication', link: '/guides/aws-auth' },
-        { text: 'Your First Instance', link: '/guides/first-instance' },
-        { text: 'Python SDK', link: '/guides/python-sdk' },
-        { text: 'Go Library', link: '/guides/go-library' },
+        { text: 'Required permissions', link: '/reference/iam-permissions' },
+        { text: 'Your first instance', link: '/guides/first-instance' },
+        { text: 'Verify lifecycle protection', link: '/guides/first-instance#verify-lifecycle-protection' },
+        { text: 'Clean up everything', link: '/guides/first-instance#clean-up' },
       ]
     },
     {
-      text: 'Compute',
+      text: 'Common Workflows',
       collapsed: false,
       items: [
-        { text: 'Finding the Right Instance', link: '/guides/finding-instances' },
-        { text: 'GPU Training Jobs', link: '/guides/gpu-training' },
-        { text: 'Jupyter Notebooks', link: '/guides/jupyter' },
-        { text: 'Spot Instances', link: '/guides/spot-instances' },
-        { text: 'Managing Instances & Data', link: '/guides/managing-instances' },
+        { text: 'Overview', link: '/guides/' },
+        { text: 'Finding the right instance', link: '/guides/finding-instances' },
+        { text: 'Interactive workstation', link: '/guides/jupyter' },
+        { text: 'GPU training jobs', link: '/guides/gpu-training' },
+        { text: 'Spot instances', link: '/guides/spot-instances' },
+        { text: 'Managing instances & data', link: '/guides/managing-instances' },
+        { text: 'Parameter sweeps', link: '/guides/parameter-sweeps' },
+        { text: 'Job arrays', link: '/guides/job-arrays' },
+        { text: 'Batch queues', link: '/guides/batch-queue' },
+        { text: 'MPI clusters', link: '/guides/mpi' },
+        { text: 'Pipelines', link: '/guides/pipelines' },
+        { text: 'Waiting for scarce capacity', link: '/guides/waiting-for-capacity' },
       ]
     },
     {
-      text: 'Automation & Control',
+      text: 'Tools',
       collapsed: false,
+      items: [
+        { text: 'Overview', link: '/tools/' },
+        { text: 'Truffle', link: '/tools/truffle' },
+        { text: 'Spawn', link: '/tools/spawn' },
+        { text: 'Spored', link: '/tools/spored' },
+        { text: 'Lagotto', link: '/tools/lagotto' },
+        { text: 'Spore-bot', link: '/tools/spore-bot' },
+        { text: 'MCP Server', link: '/tools/mcp-server' },
+        { text: 'Command reference: truffle', link: '/tools/reference/truffle' },
+        { text: 'Command reference: spawn', link: '/tools/reference/spawn' },
+        { text: 'Command reference: lagotto', link: '/tools/reference/lagotto' },
+      ]
+    },
+    {
+      text: 'Automation',
+      collapsed: true,
+      items: [
+        { text: 'Python SDK', link: '/guides/python-sdk' },
+        { text: 'Go libraries', link: '/guides/go-library' },
+        { text: 'Workflow engines', link: '/guides/workflow-engines' },
+        { text: 'Nextflow (nf-spawn)', link: '/guides/nextflow' },
+        { text: 'Plugins', link: '/guides/plugins' },
+        { text: 'Events & webhooks', link: '/reference/event-schemas' },
+      ]
+    },
+    {
+      text: 'Chat & AI Control',
+      collapsed: true,
       items: [
         { text: 'Slack Setup', link: '/guides/slack-setup' },
         { text: 'Teams Setup', link: '/guides/teams-setup' },
@@ -47,59 +95,25 @@ const sidebar = {
       ]
     },
     {
-      text: 'Advanced',
-      collapsed: false,
-      items: [
-        { text: 'Parameter Sweeps', link: '/guides/parameter-sweeps' },
-        { text: 'Job Arrays', link: '/guides/job-arrays' },
-        { text: 'Batch Queues', link: '/guides/batch-queue' },
-        { text: 'MPI Clusters', link: '/guides/mpi' },
-        { text: 'Pipelines', link: '/guides/pipelines' },
-        { text: 'Plugins', link: '/guides/plugins' },
-        { text: 'Workflow Engines', link: '/guides/workflow-engines' },
-        { text: 'Nextflow (nf-spawn)', link: '/guides/nextflow' },
-      ]
-    },
-    {
-      text: 'Self-Hosting',
+      text: 'Administration',
       collapsed: true,
       items: [
-        { text: 'Overview', link: '/guides/self-hosting' },
+        { text: 'IAM Permissions', link: '/reference/iam-permissions' },
+        { text: 'Self-Hosting', link: '/guides/self-hosting' },
         { text: 'Self-Hosting spore-bot', link: '/spore-bot-self-hosting' },
       ]
     },
-  ],
-  '/tools/': [
-    {
-      text: 'Tools',
-      items: [
-        { text: 'Overview', link: '/tools/' },
-        { text: 'Truffle', link: '/tools/truffle' },
-        { text: 'Spawn', link: '/tools/spawn' },
-        { text: 'Spored', link: '/tools/spored' },
-        { text: 'Lagotto', link: '/tools/lagotto' },
-        { text: 'Spore-bot', link: '/tools/spore-bot' },
-        { text: 'MCP Server', link: '/tools/mcp-server' },
-      ]
-    },
-    {
-      text: 'Command Reference',
-      items: [
-        { text: 'truffle', link: '/tools/reference/truffle' },
-        { text: 'spawn', link: '/tools/reference/spawn' },
-        { text: 'lagotto', link: '/tools/reference/lagotto' },
-      ]
-    },
-  ],
-  '/reference/': [
     {
       text: 'Reference',
+      collapsed: true,
       items: [
         { text: 'Configuration', link: '/reference/configuration' },
         { text: 'EC2 Tags', link: '/reference/ec2-tags' },
-        { text: 'IAM Permissions', link: '/reference/iam-permissions' },
-        { text: 'Lifecycle Events', link: '/reference/lifecycle-events' },
         { text: 'Environment Variables', link: '/reference/environment-variables' },
+        { text: 'Lifecycle Events', link: '/reference/lifecycle-events' },
+        { text: 'Event schemas', link: '/reference/event-schemas' },
+        { text: 'Troubleshooting & common mistakes', link: '/reference/troubleshooting' },
+        { text: 'Glossary', link: '/reference/glossary' },
         { text: 'FAQ', link: '/reference/faq' },
         { text: 'Cheat Sheet', link: '/reference/cheatsheet' },
       ]
@@ -114,31 +128,21 @@ function writeLlmsTxt(outDir: string) {
   const lines: string[] = []
   lines.push('# spore.host documentation')
   lines.push('')
-  lines.push('> Ephemeral compute for researchers and data scientists: find the right EC2 instance (truffle), launch and manage it (spawn), and watch for capacity (lagotto). Instances self-terminate via TTL and idle detection.')
+  lines.push('> Ephemeral compute for researchers and data scientists: find the right EC2 instance (truffle), launch and manage it (spawn), and watch for capacity (lagotto). Instances self-terminate via TTL and idle detection. Runs on your own AWS account.')
   lines.push('')
-  const sections: Array<[string, any[]]> = [
-    ['Start here', sidebar['/']],
-    ['Guides', sidebar['/guides/']],
-    ['Tools & command reference', sidebar['/tools/']],
-    ['Reference', sidebar['/reference/']],
-  ]
+  // Walk the single global sidebar: each top-level entry is a titled group with
+  // an items[] list. One llms.txt section per group keeps the manifest in
+  // lockstep with the rendered nav (only anchor-only, non-root links are skipped).
   const link = (item: any) =>
-    item.link && item.link.startsWith('/')
+    item.link && item.link.startsWith('/') && !item.link.includes('#')
       ? `- [${item.text}](${SITE_URL}${item.link})`
       : null
-  for (const [heading, groups] of sections) {
-    lines.push(`## ${heading}`)
+  for (const group of sidebar['/']) {
+    lines.push(`## ${group.text}`)
     lines.push('')
-    for (const entry of groups) {
-      if (entry.items) {
-        for (const item of entry.items) {
-          const l = link(item)
-          if (l) lines.push(l)
-        }
-      } else {
-        const l = link(entry)
-        if (l) lines.push(l)
-      }
+    for (const item of group.items ?? []) {
+      const l = link(item)
+      if (l) lines.push(l)
     }
     lines.push('')
   }
@@ -182,8 +186,8 @@ export default defineConfig({
     logo: null,
 
     nav: [
-      { text: 'Quick Start', link: '/quickstart' },
-      { text: 'Guides', link: '/guides/' },
+      { text: 'Start Here', link: '/quickstart' },
+      { text: 'Workflows', link: '/guides/' },
       { text: 'Tools', link: '/tools/' },
       { text: 'Reference', link: '/reference/' },
       { text: 'spore.host', link: 'https://spore.host', target: '_blank' },

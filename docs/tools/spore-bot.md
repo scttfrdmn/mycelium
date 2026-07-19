@@ -2,9 +2,19 @@
 description: "Spore-bot connects your Slack or Microsoft Teams workspace to your running instances."
 ---
 
-# Spore-bot
+# Spore-bot <span class="doc-badge automation">Automation</span> <span class="doc-badge stable">Stable</span>
 
-Spore-bot connects your Slack or Microsoft Teams workspace to your running instances. Any team member you've authorised can control instances from chat — without a terminal, without AWS credentials, from any device.
+**What it is.** Spore-bot connects your Slack or Microsoft Teams workspace to your
+running instances.
+
+**When to use it.** When you (or a collaborator) want to check on or control an
+instance without opening a terminal or holding AWS credentials — from a phone, a
+shared channel, or mid-meeting. Also how lifecycle notifications reach you as DMs.
+
+Any team member you've authorised can control instances from chat — without a
+terminal, without AWS credentials, from any device. Setup lives in the [Slack Setup
+guide](/guides/slack-setup); the trust model (cross-account role, per-user access)
+is in [Security, credentials & data flow](/architecture).
 
 ## What it does
 

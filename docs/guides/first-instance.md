@@ -130,7 +130,27 @@ This shows state, IP, type, uptime, and time remaining before auto-termination.
 
 ---
 
-## 7. Clean up
+## Verify lifecycle protection
+
+Before you rely on auto-termination, confirm the instance is actually protecting itself. Two quick checks:
+
+```sh
+spawn status my-first-instance        # from your laptop
+```
+
+The output shows **time remaining before auto-termination** — if you see a TTL countdown, spawn tagged the instance correctly and the deadline is live. On the instance itself:
+
+```sh
+sudo systemctl status spored          # over SSH
+```
+
+`active (running)` means the daemon that enforces the deadline is up. spored reads its rules from the instance's EC2 tags every minute, so the TTL holds even if you close your laptop.
+
+For what happens if any of this *fails* — a missing instance profile, a crashed daemon, changed tags — and the out-of-band backstop that catches it, see [Costs & safety guarantees](/safety).
+
+---
+
+## Clean up
 
 When you're done, permanently terminate it (destroys the instance and its EBS volume):
 

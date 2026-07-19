@@ -1,0 +1,101 @@
+---
+description: "The distinctions that trip people up — find vs search, TTL vs idle, quota vs capacity — and how to get them right."
+---
+
+# Troubleshooting & common mistakes
+
+Most spore.host surprises come from a handful of pairs that look interchangeable
+but aren't. Each entry below is a mistake, why it happens, and the fix.
+
+## `truffle find` vs `truffle search`
+
+**Mistake:** expecting `--min-vcpu`/`--min-memory` to work on `find`, or expecting
+`find` and `search` to be synonyms.
+
+- **`find`** is *natural-language discovery* — put specs **in the query string**:
+  `truffle find "epyc genoa 16 cores"`. It does **not** accept `--min-vcpu` etc.
+- **`search`** is *exact filtering* over a pattern — flags work here:
+  `truffle search "m8a.*" --min-vcpu 16 --min-memory 64`.
+
+Use `find` when you know what you need in human terms; use `search` when you know
+the exact technical filters. See [Truffle](/tools/truffle).
+
+## Region vs Availability Zone
+
+**Mistake:** treating a region and an AZ as the same scope. Capacity, and some
+launches (Capacity Blocks), are **AZ-specific**. A type available in `us-east-1`
+generally may still be unplaceable in `us-east-1a`. Use `truffle az` to inspect
+per-AZ offerings and pass `--az` when placement must be pinned.
+
+## Quota vs actual capacity
+
+**Mistake:** assuming that because `truffle quotas` shows headroom, AWS will place
+the instance. Quota is *permission* to launch; capacity is *availability right
+now*. They're independent — you can be within quota and still get
+`InsufficientInstanceCapacity`. That's exactly the gap [Lagotto](/tools/lagotto)
+fills. See [Waiting for scarce capacity](/guides/waiting-for-capacity).
+
+## stop vs hibernate vs terminate
+
+| Action | Compute billing | EBS kept | RAM preserved | Reversible |
+|--------|-----------------|----------|---------------|-----------|
+| **stop** | stops | yes | no | `spawn start` |
+| **hibernate** | stops | yes | yes (restored on start) | `spawn start` |
+| **terminate** | stops | **no** — volume destroyed | no | no |
+
+**Mistake:** `terminate` to "pause" a job — it destroys the EBS volume and its
+data. Use `stop`/`hibernate` to pause; `terminate` only when you're done.
+
+## TTL vs idle timeout
+
+**Mistake:** thinking either one alone will save you. **TTL** is the absolute,
+non-resettable deadline (the hard guarantee). **Idle timeout** is a soft early
+stop that any activity resets, and it never *terminates* — only stops/hibernates.
+You typically want both. See [Costs & safety guarantees](/safety).
+
+## Spot interruption vs idle shutdown
+
+**Mistake:** conflating the two. A **Spot interruption** is AWS reclaiming the
+instance (a 2-minute notice, outside your control); **idle shutdown** is spored
+stopping an instance *you* left inactive. Different triggers, different handling —
+set a `pre-stop` hook to save work for both.
+
+## Restarting a stopped instance whose TTL already passed
+
+**Mistake:** stopping an instance to "bank" its remaining time. The TTL is an
+*absolute* deadline — if it elapsed while the instance was stopped, starting it
+again will terminate it shortly after. Run `spawn extend` **before** starting if
+you need more time.
+
+## A command finishing vs the completion sentinel appearing
+
+**Mistake:** expecting `on-complete` to fire because your script exited. spored
+acts on the **completion sentinel** (`/tmp/SPAWN_COMPLETE` or `spored complete`) —
+*not* on your process exiting. Your job script must create it explicitly:
+
+```sh
+./run-job.sh && spored complete --status success
+```
+
+## Instance role vs your user credentials
+
+**Mistake:** assuming a launched instance inherits your laptop's AWS permissions.
+It doesn't — it uses its **instance profile** (IAM role). If spored can't manage
+the instance (e.g. call `ec2:TerminateInstances` on itself) or your job can't
+reach S3, the instance profile is usually the missing piece. See
+[IAM Permissions](/reference/iam-permissions).
+
+## Local CLI vs remote spored timing
+
+**Mistake:** expecting a tag or config change to take effect instantly. Some
+actions are immediate API calls from spawn; others (idle, TTL, completion) are
+enforced by **spored, which re-reads the instance's tags about once a minute**. A
+`spawn instance-config` change can take up to a minute to be observed on the
+instance. Use `spored reload` on the instance to force an immediate re-read.
+
+## Still stuck?
+
+- **[FAQ](/reference/faq)** — higher-level questions
+- **[Glossary](/reference/glossary)** — precise definitions
+- **[Lifecycle Events](/reference/lifecycle-events)** — what warnings fire and when
+- Logs on the instance: `journalctl -u spored -f`

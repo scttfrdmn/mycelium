@@ -97,6 +97,41 @@
 .dark .tool-badge.bot     { background: #160d2e; }
 .dark .tool-badge.mcp     { background: #0f0d2e; }
 
+/* ── Audience / maturity badges (page headers) ──
+   Small pills that signal who a page is for and how mature a feature is.
+   Colours reuse the palette and clear WCAG AA (4.5:1) on their tinted
+   backgrounds, matching the .tool-badge contrast approach above. */
+.doc-badge {
+  display: inline-block;
+  font-size: 0.7rem; font-weight: 700;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  padding: 0.15rem 0.45rem; border-radius: 4px;
+  vertical-align: middle; margin-right: 0.35rem;
+}
+/* Audience */
+.doc-badge.beginner  { background: #ecfdf5; color: #047857; }
+.doc-badge.admin     { background: #fef2f2; color: #b91c1c; }
+.doc-badge.advanced  { background: #eff6ff; color: #4059E5; }
+.doc-badge.hpc       { background: #eef2ff; color: #3730a3; }
+.doc-badge.automation{ background: #f5f3ff; color: #6d28d9; }
+.doc-badge.windows   { background: #ecfeff; color: #0e7490; }
+/* Maturity */
+.doc-badge.stable    { background: #ecfdf5; color: #047857; }
+.doc-badge.beta      { background: #fffbeb; color: #b45309; }
+.doc-badge.experimental { background: #fffbeb; color: #b45309; }
+.doc-badge.planned   { background: #f3f4f6; color: #4b5563; }
+.doc-badge.deprecated{ background: #fef2f2; color: #b91c1c; }
+
+/* Dark-mode badge backgrounds (lighten text where needed to keep AA). */
+.dark .doc-badge.beginner,  .dark .doc-badge.stable { background: #0a1f16; color: #34d399; }
+.dark .doc-badge.admin,     .dark .doc-badge.deprecated { background: #2a0a0a; color: #f87171; }
+.dark .doc-badge.advanced   { background: #0d1b2e; color: #93b0ff; }
+.dark .doc-badge.hpc        { background: #0f0d2e; color: #a5b4fc; }
+.dark .doc-badge.automation { background: #160d2e; color: #c4b5fd; }
+.dark .doc-badge.windows    { background: #082030; color: #22d3ee; }
+.dark .doc-badge.beta,      .dark .doc-badge.experimental { background: #1a1200; color: #fbbf24; }
+.dark .doc-badge.planned    { background: #1f2430; color: #9ca3af; }
+
 /* ── Param tables (reference pages) ── */
 .vp-doc table { font-size: 0.875rem; }
 .vp-doc table th { font-weight: 700; }

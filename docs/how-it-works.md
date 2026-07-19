@@ -4,7 +4,11 @@ description: "spore.host is a collection of six tools that cover the full lifecy
 
 # How It Works
 
-spore.host is a collection of six tools that cover the full lifecycle of ephemeral compute — from finding the right instance to cleaning it up when the work is done. This page explains how they fit together.
+spore.host is an open-source toolkit for temporary AWS compute. Use **truffle** to find an EC2 instance that fits your workload and budget, use **spawn** to launch it with a hard time limit, idle shutdown, and completion rules, and let **spored** — a small agent on the instance — keep enforcing those rules after you disconnect. When scarce capacity is unavailable, **lagotto** can keep checking and notify you or launch automatically when it appears.
+
+The tools use your existing AWS account and credentials. There's no new compute provider to sign up for, and you pay AWS only for the resources you use. spore.host is not itself the host — despite the name, it never holds your credentials or runs your compute for you. See [Security, credentials & data flow](/architecture) for exactly what runs where.
+
+This page explains how the six tools fit together.
 
 ## The core idea
 

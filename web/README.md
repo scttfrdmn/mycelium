@@ -20,7 +20,7 @@ web/
 ### Landing Page
 - Hero section with adaptive logo
 - Installation instructions (Homebrew, Scoop, Manual)
-- Feature showcase for Truffle, Spawn, Spored
+- Feature showcase for all six tools: Truffle, Spawn, Spored, Lagotto, Spore-bot, and the MCP server
 - Key features grid
 - Usage examples
 - Coming Soon section for web dashboard

@@ -2,9 +2,33 @@
 description: "Truffle finds and compares EC2 instance types."
 ---
 
-# Truffle
+# Truffle <span class="doc-badge beginner">Beginner</span> <span class="doc-badge stable">Stable</span>
 
-Truffle finds and compares EC2 instance types. It's read-only — it never launches anything. Use it to research what's available before committing to a launch.
+**What it is.** Truffle finds and compares EC2 instance types. It's read-only — it
+never launches anything.
+
+**When to use it.** Any time *before* a launch, to answer "what should I run and
+what will it cost?" — discover a family, filter by exact specs, compare Spot
+prices, and confirm your quota so a launch doesn't fail after you've waited.
+
+**First commands:**
+
+```sh
+truffle find "amd genoa 64gb"          # discover a family in plain language
+truffle search "m8a.*" --min-vcpu 16   # filter by exact specs
+truffle spot m8a.4xlarge               # compare Spot prices across regions
+truffle quotas --regions us-east-1 --family M   # confirm you can launch it
+truffle az p5.48xlarge                 # check per-AZ availability
+```
+
+::: tip Which command? find vs search vs spot vs quotas
+- **`find`** — you know what you need *in human terms* ("amd genoa 64gb"). Put specs in the query string; filter flags like `--min-vcpu` don't apply here.
+- **`search`** — you know the *exact technical filters*: `search "m8a.*" --min-vcpu 16 --min-memory 64`.
+- **`spot`** — you've picked a type and want to compare purchase options / regions.
+- **`quotas`** — run immediately before launch, so you don't wait for capacity you're not allowed to use.
+
+`find` and `search` are **not** synonyms — see [Common mistakes](#common-mistakes).
+:::
 
 ## Install
 
@@ -161,6 +185,21 @@ lagotto launch --at <block-start> --az <block-az> --spawn-config block.yaml
 ```
 
 Truffle stays read-only throughout — the purchase (a real-money, non-refundable write) lives in spawn behind its confirmation gates.
+
+## Common mistakes
+
+- **Treating `find` and `search` as synonyms.** `find` is natural-language (specs go *in the query*); `search` is pattern + flags (`--min-vcpu`). Filter flags don't exist on `find`.
+- **Confusing region and AZ.** A type available in a region generally can still be unplaceable in a specific AZ — use `truffle az` and pin with `--az` when it matters.
+- **Assuming quota means capacity.** `truffle quotas` shows *permission* to launch, not *availability right now*. You can be within quota and still get `InsufficientInstanceCapacity` — that's what [Lagotto](/tools/lagotto) is for.
+
+See [Troubleshooting & common mistakes](/reference/troubleshooting) for the full list.
+
+## How it connects
+
+Truffle is the read-only front of the workflow: it tells you *what to run*.
+[Spawn](/tools/spawn) takes that and launches it (pipe with `--pick-first`, above).
+When the type you want has no capacity right now, [Lagotto](/tools/lagotto) waits
+for it. Truffle never launches or spends money.
 
 ## Full command reference
 

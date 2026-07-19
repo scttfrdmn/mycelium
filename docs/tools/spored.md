@@ -2,9 +2,22 @@
 description: "Spored is the lifecycle daemon that runs on every instance launched by spawn."
 ---
 
-# Spored
+# Spored <span class="doc-badge stable">Stable</span>
 
-Spored is the lifecycle daemon that runs on every instance launched by spawn. It's a small binary provisioned automatically at launch — you never install it manually. Its job is to enforce the instance's lifecycle: terminate on TTL, stop or hibernate on idle, act when your workload signals completion, and clean up DNS and notifications before the instance disappears.
+**What it is.** Spored is the lifecycle daemon that runs on every instance launched
+by spawn. It's a small binary provisioned automatically at launch — **you never
+install or run it manually**.
+
+**When you meet it.** You don't invoke spored from your laptop; spawn provisions it
+and it works on its own. You only interact with it directly when debugging *on* an
+instance (`sudo systemctl status spored`, `spored status`, `spored complete`).
+
+**Why it matters.** It's the reason auto-termination survives your laptop closing:
+spored enforces the lifecycle from *inside* the instance — terminate on TTL, stop
+or hibernate on idle, act on a completion signal, and clean up DNS/notifications
+before the instance disappears. Its rules come from the instance's EC2 tags, which
+it re-reads about once a minute. See [Costs & safety guarantees](/safety) for what
+happens if spored itself fails.
 
 ## What spored does
 

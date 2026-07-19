@@ -2,9 +2,63 @@
 description: "Spawn launches EC2 instances and manages their full lifecycle."
 ---
 
-# Spawn
+# Spawn <span class="doc-badge beginner">Beginner</span> <span class="doc-badge stable">Stable</span>
 
-Spawn launches EC2 instances and manages their full lifecycle. It provisions the spored daemon on each instance, which handles auto-termination, idle detection, DNS, and lifecycle notifications independently of your laptop.
+**What it is.** Spawn launches EC2 instances and manages their full lifecycle. It
+provisions the [spored](/tools/spored) daemon onto each instance, which then
+enforces auto-termination, idle detection, DNS, and notifications **independently
+of your laptop**.
+
+**When to use it.** Whenever you want to actually *run* something — from a single
+scratch box to a production-scale sweep. Start with one machine; the same tool
+scales up when you need it.
+
+**First commands:**
+
+```sh
+spawn                                  # interactive wizard (no flags needed)
+spawn launch analysis --instance-type m8a.4xlarge --ttl 8h
+spawn connect analysis                 # SSH in
+spawn status analysis                  # state, cost, TTL countdown
+spawn terminate analysis               # tear it down
+```
+
+## Spawn vs spored — what runs where
+
+Spawn is the **client** on your laptop; spored is the **agent** on the instance.
+Some actions are immediate API calls from spawn; others happen later because
+spored re-reads the instance's EC2 tags about once a minute.
+
+```
+Your computer                     AWS EC2 instance
+  spawn  ── launch/provision ──▶   spored (reads spawn:* tags every ~1 min)
+         ── extend / config ──▶      ├─ TTL, idle, completion, cost
+                                     └─ stop / hibernate / terminate + notify
+```
+
+So `spawn extend` changes the deadline *immediately* (an API/tag write), but an
+idle-timeout or completion action is enforced by spored on its next check. Full
+picture: [Security, credentials & data flow](/architecture).
+
+## The three tiers of spawn
+
+Spawn is far more capable than "launch one instance." Learn it in tiers — you only
+need Tier 1 to be productive:
+
+**Tier 1 — One machine** <span class="doc-badge beginner">Beginner</span>
+: `launch` → `connect` → run → `status` → `extend` → `stop`/`terminate`. Start at
+[Your first instance](/guides/first-instance).
+
+**Tier 2 — Managed workload** <span class="doc-badge automation">Automation</span>
+: add `--command`, a completion signal, `--idle-timeout`, `--cost-limit`, and
+lifecycle notifications so a job runs and cleans up unattended (Story B in [Common
+Workflows](/guides/)).
+
+**Tier 3 — Parallel & production scale** <span class="doc-badge advanced">Advanced</span> <span class="doc-badge hpc">HPC</span>
+: [job arrays](/guides/job-arrays), [parameter sweeps](/guides/parameter-sweeps),
+[MPI clusters](/guides/mpi), autoscaling, [workflow engines](/guides/workflow-engines),
+images/snapshots, and Capacity Blocks. The [command reference](/tools/reference/spawn)
+is the exhaustive map of this tier.
 
 ## Install
 
@@ -229,6 +283,22 @@ single instance and, via `spawn sweep status --check-complete`, for sweeps):
 # Exit 0=complete, 1=failed, 2=running, 3=error
 while spawn status my-job --check-complete; [ $? -eq 2 ]; do sleep 30; done
 ```
+
+## Common mistakes
+
+- **`terminate` to "pause" a job.** Terminate destroys the EBS volume and its data — use `stop`/`hibernate` to pause. See [stop vs hibernate vs terminate](/reference/troubleshooting#stop-vs-hibernate-vs-terminate).
+- **Expecting `--on-complete` to fire when your command exits.** spored acts on the *completion sentinel*, not on your process exiting — call `spored complete` (or `touch /tmp/SPAWN_COMPLETE`) explicitly.
+- **Restarting a stopped instance whose TTL already passed.** The TTL is absolute; `spawn extend` first if you need more time.
+- **`--region` vs `--regions`.** spawn takes one `--region`; truffle takes plural `--regions` (see above).
+
+Full list: [Troubleshooting & common mistakes](/reference/troubleshooting).
+
+## How it connects
+
+[Truffle](/tools/truffle) tells spawn *what* to launch; spawn launches it and
+provisions [spored](/tools/spored), which enforces the lifecycle from the instance.
+[Lagotto](/tools/lagotto) can drive `spawn` when it's waiting on capacity, and
+[spore-bot](/tools/spore-bot) lets you control spawn-launched instances from chat.
 
 ## Full command reference
 

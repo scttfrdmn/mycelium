@@ -12,7 +12,7 @@ description: "The spore-host Python package lets you discover EC2 instances, che
 
 The `spore-host` Python package lets you discover EC2 instances, check Spot prices, and manage running instances from Python scripts, Jupyter notebooks, and reactive notebooks like marimo.
 
-The SDK talks to the spore.host REST API. AWS credentials are used for authentication — no separate login is required.
+The SDK talks to the spore.host HTTP API on your behalf, authenticating with your existing AWS credentials — no separate login is required. The HTTP API itself is currently in beta and the SDK is its supported entry point; you don't call the endpoints directly.
 
 ```sh
 pip install spore-host

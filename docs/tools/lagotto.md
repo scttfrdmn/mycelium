@@ -2,9 +2,26 @@
 description: "Lagotto watches for EC2 instance capacity and acts when it appears."
 ---
 
-# Lagotto
+# Lagotto <span class="doc-badge advanced">Advanced</span> <span class="doc-badge stable">Stable</span>
 
-Lagotto watches for EC2 instance capacity and acts when it appears. It runs as a serverless Lambda function — no always-on server required. Configure a watch, deploy, and Lagotto polls on a schedule until it can launch what you asked for.
+**What it is.** Lagotto watches for EC2 instance capacity and acts when it appears.
+It runs as a serverless Lambda in **your own account** — no always-on server.
+
+**When to use it.** When the type you want is within quota but has no capacity
+*right now* (scarce GPU families like `p5.48xlarge`), or when you need a launch to
+fire at a future clock time (e.g. into a Capacity Block). Answers the question
+truffle and a one-shot spawn can't: *"should I keep checking until it's placeable?"*
+
+**First commands:**
+
+```sh
+lagotto deploy                                   # stand up the watcher (once)
+lagotto watch "p5.48xlarge" --regions us-east-1,us-west-2 --action notify --ttl 7d
+lagotto list                                     # see active watches
+lagotto status <watch-id>
+```
+
+New to it? Walk through [Waiting for scarce capacity](/guides/waiting-for-capacity).
 
 There is no AWS API that reports "capacity is available right now" — the only true test is an actual launch. So for `spawn` watches **the launch attempt is the capacity test**: Lagotto tries to launch, and if AWS returns `InsufficientInstanceCapacity` it simply keeps the watch active and tries again on the next poll. It does the tedious retrying for you instead of you sitting there re-running a launch by hand, until it succeeds or the watch's TTL expires.
 

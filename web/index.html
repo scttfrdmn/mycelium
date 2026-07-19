@@ -49,6 +49,7 @@
         <p class="hero-sub">
           Find the right EC2 instance. Launch it in minutes. Auto-terminate when your job is done.
           Built for researchers and data scientists, not ops engineers.
+          It runs on <strong>your own AWS account</strong> — there's no new compute provider to sign up for, and you pay AWS only for what you use.
         </p>
         <div class="hero-props">
           <span>Avoid surprise bills</span>
@@ -73,7 +74,7 @@
     <section id="tools">
       <div class="container">
         <p class="section-label">The tool suite</p>
-        <h2 class="section-title">Five tools. One workflow.</h2>
+        <h2 class="section-title">Six tools. One workflow.</h2>
         <p class="section-sub">Each tool has exactly one job. Together they cover the full lifecycle of ephemeral compute.</p>
 
         <div class="tool-grid">
@@ -102,6 +103,19 @@
               <li>Spot, GPU, MPI clusters, parameter sweeps</li>
             </ul>
             <a href="https://github.com/spore-host/spawn" class="tool-link" target="_blank" rel="noopener">spawn docs</a>
+          </div>
+
+          <div class="tool-card tool-spored">
+            <span class="tool-tag">Lifecycle daemon</span>
+            <h3>Spored</h3>
+            <p>The small agent that runs on every launched instance and enforces its lifecycle from the inside — so nothing depends on your laptop staying open. You never install it: spawn provisions it automatically.</p>
+            <ul class="tool-features">
+              <li>Enforces the TTL hard deadline</li>
+              <li>Idle detection — CPU, network, processes, sessions</li>
+              <li>Fires completion, TTL-warning, and idle events</li>
+              <li>Runs pre-stop hooks to save work before shutdown</li>
+            </ul>
+            <a href="https://docs.spore.host/tools/spored" class="tool-link" target="_blank" rel="noopener">spored docs</a>
           </div>
 
           <div class="tool-card tool-lagotto">
