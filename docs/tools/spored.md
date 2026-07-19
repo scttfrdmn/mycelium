@@ -25,7 +25,7 @@ Once started, spored runs a check every minute:
 
 1. **TTL** — if the absolute deadline (`spawn:ttl-deadline` tag) has passed, terminate.
 2. **Completion signal** — if the sentinel file (`/tmp/SPAWN_COMPLETE` by default) exists, take the configured action.
-3. **Cost limit** — if accumulated spend has exceeded `spawn:cost-limit`, terminate.
+3. **Cost limit** — if accumulated **compute** spend (rate × total compute time, carried across stop/resume) has exceeded `spawn:cost-limit`, terminate.
 4. **Idle detection** — if all activity signals have been quiet for `spawn:idle-timeout`, stop (or hibernate).
 
 Spot interruption notices are polled separately every 5 seconds and acted on immediately.
@@ -72,7 +72,7 @@ Shows the current lifecycle state of the instance:
   Storage cost:     $0.18  (1h 30m × $0.1200/hr EBS)
   Cumulative cost:  $1.62
   Effective rate:   $0.2496/hr  (4% lower than continuous on-demand)
-  Cost limit:       $50.00  ($1.62 used, 3% — $48.38 remaining)
+  Cost limit:       $50.00  ($1.44 compute used, 3% — $48.56 remaining; compute-only)
 
   CPU:              2.5%
   Network:          45 B/min
@@ -145,7 +145,7 @@ All spored configuration is stored as EC2 tags. Spawn writes them at launch; you
 | `spawn:price-per-hour` | float | On-demand hourly rate — written at launch for cost display. |
 | `spawn:ebs-hourly-cost` | float | EBS volume cost/hr — looked up once by spored on first start and cached here. |
 | `spawn:compute-seconds` | int | Cumulative compute seconds — updated by spored every few minutes. |
-| `spawn:cost-limit` | float | Terminate when total spend reaches this amount (USD). |
+| `spawn:cost-limit` | float | Terminate when total **compute** spend reaches this amount (USD). Compute-only (excludes EBS/storage); accumulates across stop/resume. |
 
 ### Notifications and DNS
 
