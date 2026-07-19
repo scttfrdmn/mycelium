@@ -13,7 +13,22 @@ own changelogs for CLI releases.
 
 ## [Unreleased]
 
+### Fixed
+- **Docs: corrected the Pipelines guide** — `spawn pipeline launch` takes a JSON
+  definition file (not the fictional YAML + `--slack-workspace`/`--efs-id`
+  flags), stages form a DAG via `depends_on`, and data is handed off with
+  `data_input`/`data_output`. Also fixed `status`/`cancel`/`collect` (take a
+  pipeline id) vs `graph` (takes the file).
+- **Docs: rewrote the lagotto SageMaker section** — `--service sagemaker` now
+  **submits your training job** (`--sagemaker-config`) when the EC2-family proxy
+  fires; it is no longer notify-only. `--action notify` (alert only) and `spawn`
+  (submit) are both valid; `hold` is rejected.
+- **Docs: fixed the sidebar** — wired the orphaned Discord setup guide into nav
+  and de-duplicated the two "Self-Hosting" entries into one group.
+
 ### Added
+- **Docs: truffle overview now documents the shared `--profile`/`--account`
+  config** and links the AWS auth guide.
 - **Docs: the CLI command/flag reference is now generated + drift-gated.** Each
   CLI (spawn/truffle/lagotto) emits its exhaustive reference from the binary
   (`libs/docgen`); the umbrella vendors those fragments into `docs/gen/<cli>/`,

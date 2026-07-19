@@ -8,6 +8,10 @@ Truffle finds and compares EC2 instance types. It's read-only — it never launc
 brew install spore-host/tap/truffle
 ```
 
+## AWS profile & account
+
+Like the rest of the suite, truffle honors the shared spore.host config: a global `--profile` (and `--account` guard), the `SPORE_PROFILE`/`AWS_PROFILE` env vars, and the `[spore]` table of `~/.config/spore/config.toml`, resolved **flag > env > file > default**. An unset profile uses the ambient AWS credential chain. Region is per-request via `--regions`/`--region`. See [AWS Authentication](/guides/aws-auth) for the full model, and the [command reference](/tools/reference/truffle#global-flags) for every global flag.
+
 ## Sub-commands
 
 Truffle has distinct sub-commands for different tasks. They are **not interchangeable** — flags available on one command may not exist on another.

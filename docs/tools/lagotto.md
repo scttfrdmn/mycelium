@@ -40,8 +40,13 @@ lagotto watch "g5.xlarge" --action spawn \
 # Watch for Spot capacity under a price ceiling
 lagotto watch "p4d.24xlarge" --spot --max-price 10.00
 
-# Watch for SageMaker ml.* capacity (EC2-family proxy — see below)
+# Watch for SageMaker ml.* capacity and submit your training job when it appears
 lagotto watch "ml.g5.2xlarge" --service sagemaker \
+  --sagemaker-config train-job.json \
+  --notify email:you@example.com
+
+# …or only be notified, and submit the job yourself
+lagotto watch "ml.g5.2xlarge" --service sagemaker --action notify \
   --notify email:you@example.com
 ```
 
@@ -54,11 +59,18 @@ quota is sufficient. AWS exposes **no** read-only SageMaker capacity API, so
 SageMaker `ml.g5` capacity is likely available — but SageMaker is a separate
 managed pool, so it is not a guarantee.
 
-Because Lagotto cannot submit your SageMaker job for you, SageMaker watches are
-**notify-only** (`--action spawn`/`hold` are rejected). When the proxy fires, the
-notification tells you it's worth **retrying your SageMaker job** — and to leave
-the watch running and retry again on the next notification if the job still hits
-`CapacityError`.
+When the proxy fires, lagotto can **submit your SageMaker job for you**: pass the
+job definition with `--sagemaker-config <file.json>` (the `CreateTrainingJobInput`
+document, validated server-side at submit). lagotto submits it, then polls the
+job — a `Completed`/running job records a match, a `CapacityError` leaves the
+watch active to retry on the next cycle. This makes a capacity-blocked SageMaker
+job fire-and-forget.
+
+If you'd rather submit the job yourself, use `--action notify` (no
+`--sagemaker-config`): the notification tells you it's worth retrying, and the
+watch keeps running so you're alerted again if the job still hits `CapacityError`.
+`--action hold` is rejected for SageMaker — there is no capacity-reservation
+equivalent.
 
 ### `lagotto list`
 
@@ -139,7 +151,10 @@ When a watch matches, Lagotto can:
 | `spawn` | Launches an instance using the config file given in `--spawn-config` |
 | `hold` | Creates a short-lived On-Demand Capacity Reservation to hold the capacity |
 
-SageMaker watches (`--service sagemaker`) support `notify` only.
+SageMaker watches (`--service sagemaker`) support `notify` (alert only) or `spawn`
+— for SageMaker, `spawn` **submits your training job** via
+`--sagemaker-config` rather than launching an EC2 instance. `hold` is not
+supported (no capacity-reservation equivalent).
 
 ## Watch lifecycle
 
