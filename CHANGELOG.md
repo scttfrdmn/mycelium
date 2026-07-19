@@ -13,6 +13,22 @@ own changelogs for CLI releases.
 
 ## [Unreleased]
 
+### Added
+- **Docs: the CLI command/flag reference is now generated + drift-gated.** Each
+  CLI (spawn/truffle/lagotto) emits its exhaustive reference from the binary
+  (`libs/docgen`); the umbrella vendors those fragments into `docs/gen/<cli>/`,
+  and `docs/tools/reference/<cli>.md` collapsed to a thin prose shell that
+  `@include`s them (spawn's reference dropped from ~1056 hand-maintained lines to
+  a short shell). A new `sync-cli-docs.yaml` workflow re-vendors each CLI's
+  reference from its latest release tag (fired by the CLI release, on demand, or
+  weekly) and opens a PR, so the site's reference tracks the shipped binaries
+  automatically. A `docs-build` CI job now gates the docs (VitePress build +
+  `@include`/link check) — the site previously had no PR gate. (2026-07 docs audit.)
+
+### Changed
+- **Docs: code/command text now renders in Atkinson Hyperlegible Mono**, matching
+  the body's Atkinson Hyperlegible for a consistent, high-legibility monospace.
+
 ### Security
 - **spore-bot: removed the static `BOT_EXTERNAL_ID` cross-account fallback (fail
   closed).** Assuming a registration's cross-account role now requires that

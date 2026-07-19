@@ -1,0 +1,86 @@
+name: Sync CLI reference docs
+
+# Pulls the generated command/flag reference (docs-gen/) from each CLI at its
+# latest release tag into docs/gen/<cli>/ and opens a PR. Merging the PR triggers
+# the continuous docs deploy (docs.yaml). The reference is generated + drift-gated
+# in each CLI repo, so this workflow only vendors it — it never edits the tables.
+#
+# Triggered three ways:
+#   - repository_dispatch (type: cli-docs-updated) fired by a CLI's release.yaml
+#     after it cuts a tag, so a release flows to the docs automatically;
+#   - workflow_dispatch, to resync on demand (optionally one CLI via `cli`);
+#   - weekly schedule, as a backstop in case a dispatch is missed.
+
+on:
+  repository_dispatch:
+    types: [cli-docs-updated]
+  workflow_dispatch:
+    inputs:
+      cli:
+        description: 'Which CLI to sync (spawn, truffle, lagotto, or "all")'
+        required: false
+        default: 'all'
+  schedule:
+    - cron: '17 8 * * 1' # Mondays 08:17 UTC
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Determine which CLIs to sync
+        id: which
+        env:
+          # repository_dispatch payload carries the source CLI; manual run uses
+          # the input; schedule syncs all.
+          DISPATCH_CLI: ${{ github.event.client_payload.cli }}
+          INPUT_CLI: ${{ github.event.inputs.cli }}
+        run: |
+          sel="${DISPATCH_CLI:-${INPUT_CLI:-all}}"
+          if [ "$sel" = "all" ] || [ -z "$sel" ]; then
+            echo "clis=spawn truffle lagotto" >> "$GITHUB_OUTPUT"
+          else
+            echo "clis=$sel" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Vendor docs-gen from each CLI's latest tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          for cli in ${{ steps.which.outputs.clis }}; do
+            repo="spore-host/$cli"
+            tag=$(gh release view --repo "$repo" --json tagName -q .tagName)
+            echo "Syncing $repo @ $tag"
+            tmp=$(mktemp -d)
+            # docs-gen/ is committed in each CLI repo; fetch it at the release tag.
+            gh api "repos/$repo/contents/docs-gen?ref=$tag" \
+              --jq '.[] | select(.name | endswith(".md")) | .name + " " + .download_url' \
+              > "$tmp/manifest"
+            dest="docs/gen/$cli"
+            rm -rf "$dest"; mkdir -p "$dest"
+            while read -r name url; do
+              curl -fsSL "$url" -o "$dest/$name"
+            done < "$tmp/manifest"
+            echo "$tag" > "$dest/.source-tag"
+          done
+
+      - name: Open sync PR
+        uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e # v7
+        with:
+          branch: sync/cli-docs
+          title: 'docs: sync generated CLI reference'
+          commit-message: 'docs: sync generated CLI reference from latest tags'
+          body: |
+            Automated vendoring of each CLI's generated command/flag reference
+            (`docs-gen/`) into `docs/gen/<cli>/`. Source tags are recorded in each
+            `docs/gen/<cli>/.source-tag`.
+
+            The reference is generated + drift-gated in the CLI repos; this PR only
+            updates the vendored copy. Merging deploys via `docs.yaml`.
+          delete-branch: true
