@@ -1,3 +1,7 @@
+---
+description: "Task-oriented guides for common workflows."
+---
+
 # Guides
 
 Task-oriented guides for common workflows. If you're new, start with **Getting Started**. If you know what you want to do, jump directly to the relevant guide.

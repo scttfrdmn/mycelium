@@ -1,3 +1,7 @@
+---
+description: "A parameter sweep runs the same job across many combinations of input parameters, each on its own instance, in parallel."
+---
+
 # Parameter Sweeps
 
 A parameter sweep runs the same job across many combinations of input parameters, each on its own instance, in parallel. It's useful for hyperparameter search, sensitivity analysis, and any scenario where you want to explore a parameter space without waiting for jobs to run sequentially.

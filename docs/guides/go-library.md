@@ -1,3 +1,7 @@
+---
+description: "The truffle and spawn packages are clean, importable Go libraries."
+---
+
 # Go Library
 
 The truffle and spawn packages are clean, importable Go libraries. Use them in your own tools, services, or orchestration code without calling CLI subprocesses.

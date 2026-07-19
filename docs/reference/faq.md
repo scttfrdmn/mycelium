@@ -1,3 +1,7 @@
+---
+description: "spore.host is a set of free, open-source tools for launching ephemeral EC2 instances that manage their own lifecycle."
+---
+
 # Frequently Asked Questions
 
 ## General

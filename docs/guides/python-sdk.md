@@ -1,3 +1,7 @@
+---
+description: "The spore-host Python package lets you discover EC2 instances, check Spot prices, and manage running instances from Python scripts, Jupyter notebooks, and re…"
+---
+
 # Python SDK
 
 ::: tip Two SDKs are available

@@ -1,3 +1,7 @@
+---
+description: "A pipeline chains stages together: when one stage completes, it automatically launches the next."
+---
+
 # Pipelines
 
 A pipeline chains stages together: when one stage completes, it automatically launches the next. This is useful for multi-step workflows — data preparation, training, evaluation, post-processing — where each stage has different compute requirements.

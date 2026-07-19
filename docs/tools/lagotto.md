@@ -1,3 +1,7 @@
+---
+description: "Lagotto watches for EC2 instance capacity and acts when it appears."
+---
+
 # Lagotto
 
 Lagotto watches for EC2 instance capacity and acts when it appears. It runs as a serverless Lambda function — no always-on server required. Configure a watch, deploy, and Lagotto polls on a schedule until it can launch what you asked for.

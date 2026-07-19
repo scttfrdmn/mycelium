@@ -1,3 +1,7 @@
+---
+description: "Interactive compute environments like Jupyter and RStudio have a specific challenge with idle detection: the browser tab maintains a TCP connection to the se…"
+---
+
 # Jupyter Notebooks and RStudio
 
 Interactive compute environments like Jupyter and RStudio have a specific challenge with idle detection: the browser tab maintains a TCP connection to the server even when you haven't touched it in hours. Without careful configuration, the instance would never consider itself idle.

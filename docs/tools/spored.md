@@ -1,3 +1,7 @@
+---
+description: "Spored is the lifecycle daemon that runs on every instance launched by spawn."
+---
+
 # Spored
 
 Spored is the lifecycle daemon that runs on every instance launched by spawn. It's a small binary provisioned automatically at launch — you never install it manually. Its job is to enforce the instance's lifecycle: terminate on TTL, stop or hibernate on idle, act when your workload signals completion, and clean up DNS and notifications before the instance disappears.

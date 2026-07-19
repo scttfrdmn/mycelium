@@ -1,3 +1,7 @@
+---
+description: "spore.host sends notifications when significant things happen to your instances — so you don't have to watch a terminal or poll for status."
+---
+
 # Lifecycle Notifications
 
 spore.host sends notifications when significant things happen to your instances — so you don't have to watch a terminal or poll for status. This guide explains how notifications work and how to configure them.

@@ -1,3 +1,7 @@
+---
+description: "Spawn launches EC2 instances and manages their full lifecycle."
+---
+
 # Spawn
 
 Spawn launches EC2 instances and manages their full lifecycle. It provisions the spored daemon on each instance, which handles auto-termination, idle detection, DNS, and lifecycle notifications independently of your laptop.

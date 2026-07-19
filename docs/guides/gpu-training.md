@@ -1,3 +1,7 @@
+---
+description: "This guide walks through the full workflow for running a GPU training job: finding the right instance, launching it with a TTL and idle timeout, running the…"
+---
+
 # GPU Training Jobs
 
 This guide walks through the full workflow for running a GPU training job: finding the right instance, launching it with a TTL and idle timeout, running the job in tmux so it survives your disconnect, and letting the instance manage its own lifecycle.

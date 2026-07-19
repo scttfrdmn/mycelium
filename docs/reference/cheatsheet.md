@@ -1,3 +1,7 @@
+---
+description: "Quick reference for common commands."
+---
+
 # Cheat Sheet
 
 Quick reference for common commands.

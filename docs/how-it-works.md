@@ -1,3 +1,7 @@
+---
+description: "spore.host is a collection of six tools that cover the full lifecycle of ephemeral compute — from finding the right instance to cleaning it up when the work…"
+---
+
 # How It Works
 
 spore.host is a collection of six tools that cover the full lifecycle of ephemeral compute — from finding the right instance to cleaning it up when the work is done. This page explains how they fit together.

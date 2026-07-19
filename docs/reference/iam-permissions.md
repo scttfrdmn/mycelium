@@ -1,3 +1,7 @@
+---
+description: "spore.host tools act on EC2 with your AWS credentials (see AWS Authentication for how those are obtained)."
+---
+
 # IAM Permissions
 
 spore.host tools act on EC2 with **your** AWS credentials (see [AWS Authentication](../guides/aws-auth.md) for how those are obtained). This page is the least-privilege IAM policy those credentials need. Attach it to the IAM role/user you authenticate as, and expand only as your usage grows (Spot, DNS, FSx below).

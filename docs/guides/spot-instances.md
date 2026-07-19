@@ -1,3 +1,7 @@
+---
+description: "EC2 Spot instances run on AWS's spare capacity at 60–90% below on-demand price."
+---
+
 # Spot Instances
 
 EC2 Spot instances run on AWS's spare capacity at 60–90% below on-demand price. In exchange, AWS can reclaim them with two minutes' notice. For batch workloads, training jobs, and anything that can checkpoint progress, Spot is the right default.

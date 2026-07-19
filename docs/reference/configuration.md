@@ -1,3 +1,7 @@
+---
+description: "spore.host reads configuration from three sources, in order of precedence (highest first):"
+---
+
 # Configuration
 
 spore.host reads configuration from three sources, in order of precedence (highest first):

@@ -1,3 +1,7 @@
+---
+description: "The spore.host MCP server lets you manage compute through AI assistants that support the Model Context Protocol — including Claude Desktop and Cursor."
+---
+
 # AI Assistant Integration (MCP)
 
 The spore.host MCP server lets you manage compute through AI assistants that support the Model Context Protocol — including Claude Desktop and Cursor. Instead of running CLI commands, you describe what you need in plain language.

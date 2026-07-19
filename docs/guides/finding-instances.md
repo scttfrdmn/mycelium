@@ -1,3 +1,7 @@
+---
+description: "This tutorial walks through the complete workflow for discovering and evaluating EC2 instance types before launching — using truffle find, truffle search, tr…"
+---
+
 # Finding the Right Instance
 
 This tutorial walks through the complete workflow for discovering and evaluating EC2 instance types before launching — using `truffle find`, `truffle search`, `truffle spot`, and `truffle quotas` in sequence.

@@ -14,6 +14,21 @@ own changelogs for CLI releases.
 ## [Unreleased]
 
 ### Added
+- **Docs AI-readiness: `llms.txt` manifest** (#424) — a curated
+  [llmstxt.org](https://llmstxt.org) entry map, generated at build time from the
+  sidebar (a `buildEnd` hook) so it can't drift from the nav.
+- **Docs discoverability: `sitemap.xml`, per-page descriptions, OpenGraph** (#425)
+  — set the VitePress `sitemap.hostname` (`docs.spore.host`); added a
+  `description:` to ~40 content pages (→ real `<meta name="description">` and
+  better AI/search snippets); added default OG/Twitter card `head` tags.
+
+### Fixed
+- **Docs accessibility: WCAG AA contrast** (#423) — tool badges are small
+  (0.7rem) bold text, so they need 4.5:1: several failed in light and/or dark
+  mode. Badge text now uses per-mode colors that all clear 4.5:1, and dark-mode
+  link text uses a lightened brand blue (the `#4059E5` override dropped to 3.09:1
+  on the dark background); the hero brand button keeps its solid blue + white.
+
 - **Docs: job arrays now document `--min-viable`** (spot partial-success floor)
   and parameter sweeps document `spawn alerts` (completion/failure/cost-threshold
   notifications via email/Slack/SNS/webhook) — both features the reference listed
