@@ -61,6 +61,40 @@ python gen-sweep.py && spawn launch grid-search --param-file sweep.yaml   # 9 in
 Passing parameters inline (`--params …`) and auto-generating ranges/cartesian products from the CLI are not yet available — the CLI returns *"inline --params not yet implemented, use --param-file for now."* Generate the `params` list into a file as shown above.
 :::
 
+## Heterogeneous sweeps — vary the instance type per entry
+
+A sweep entry can set its own `instance_type` (and `ami`, `spot`, `region`, `az`), so a single sweep can run the **same workload across different instance families** — the natural shape of a price-performance benchmark. Any field an entry sets overrides the top-level `--instance-type` / `defaults` for that entry only; entries that omit `instance_type` fall back to the CLI `--instance-type`.
+
+```yaml
+# gromacs-bench.yaml — one workload, many instance types, compare ns/$
+defaults:
+  ttl: 2h
+  on_complete: terminate
+  spot: true
+  command: "gmx mdrun -s bench.tpr && aws s3 cp md.log s3://my-bucket/bench/{instance_type}/"
+
+params:
+  - instance_type: c8i.24xlarge   # Intel
+  - instance_type: c8a.24xlarge   # AMD
+  - instance_type: c8g.24xlarge   # Graviton (arm64)
+  - instance_type: g6.2xlarge     # NVIDIA L4 GPU
+  - instance_type: g6e.2xlarge    # NVIDIA L40S GPU
+```
+
+```sh
+spawn launch gromacs-bench --param-file gromacs-bench.yaml
+```
+
+spawn detects the right AMI **per entry** from its instance type — an arm64 AMI for `c8g`, a GPU AMI for `g6`/`g6e`, an x86 AMI for `c8i`/`c8a` — so you don't hand-pick an AMI per family (entries sharing an architecture reuse one AMI lookup). Set an explicit `ami:` on an entry to override. Each instance uploads its result keyed by `{instance_type}`, so the comparison falls out of the S3 layout.
+
+::: warning One OS per sweep
+A sweep must be all-Linux or all-Windows — a single `command`/lifecycle model can't span both. Mixing an entry that resolves to Windows with Linux entries is rejected before launch.
+:::
+
+::: info Detached (Lambda) sweeps
+`--detach` sweeps run through the Lambda orchestrator, which uses each entry's explicit `ami:` but does **not** auto-detect one. For a heterogeneous `--detach` sweep, set `ami:` on every entry.
+:::
+
 ## Monitoring a sweep
 
 ```sh
