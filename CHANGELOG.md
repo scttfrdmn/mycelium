@@ -14,6 +14,10 @@ own changelogs for CLI releases.
 ## [Unreleased]
 
 ### Added
+- **Docs: heterogeneous parameter sweeps** (spawn#372) — the sweeps guide now
+  shows varying `instance_type`/`ami`/`spot` per entry (price-performance
+  benchmark example), with the per-entry AMI auto-detection, the one-OS-per-sweep
+  rule, and the detached-sweep `ami:` caveat.
 - **Zenodo DOI**: spore.host is now archived on Zenodo with a citable DOI
   (concept DOI [10.5281/zenodo.21439339](https://doi.org/10.5281/zenodo.21439339),
   always latest). Wired into `CITATION.cff`, `codemeta.json`, and a README badge +
