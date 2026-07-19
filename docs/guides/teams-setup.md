@@ -1,3 +1,7 @@
+---
+description: "Connecting spore.host to Microsoft Teams gives you /spore commands in any channel and direct message notifications when your instances change state — useful…"
+---
+
 # Teams Setup
 
 Connecting spore.host to Microsoft Teams gives you `/spore` commands in any channel and direct message notifications when your instances change state — useful whenever you're away from the terminal.

@@ -1,3 +1,7 @@
+---
+description: "Truffle finds and compares EC2 instance types."
+---
+
 # Truffle
 
 Truffle finds and compares EC2 instance types. It's read-only — it never launches anything. Use it to research what's available before committing to a launch.

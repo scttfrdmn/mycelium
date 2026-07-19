@@ -1,3 +1,7 @@
+---
+description: "This guide covers deploying your own spore.host infrastructure — useful for universities, research institutes, or organizations that want to use their own DN…"
+---
+
 # Self-Hosting spore.host
 
 This guide covers deploying your own spore.host infrastructure — useful for universities, research institutes, or organizations that want to use their own DNS domain, keep data within their own AWS account, and operate independently of the hosted spore.host service.

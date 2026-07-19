@@ -1,3 +1,7 @@
+---
+description: "Reference material for spore.host: configuration, EC2 tags, IAM permissions, lifecycle events, environment variables, FAQ, and a command cheat sheet."
+---
+
 # Reference
 
 | Page | Contents |

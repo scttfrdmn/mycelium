@@ -1,3 +1,7 @@
+---
+description: "A batch queue runs a sequence of dependent jobs on a single instance, automatically chaining them in order."
+---
+
 # Batch Job Queues
 
 A batch queue runs a sequence of dependent jobs on a single instance, automatically chaining them in order. Unlike [pipelines](/guides/pipelines), which chain stages across separate instances, a batch queue runs all jobs on the same instance — useful when jobs need to share local data or a common environment.

@@ -1,3 +1,7 @@
+---
+description: "Beyond launching and connecting, spawn has a set of operational commands for moving large data onto instances, keeping the spored agent current, and finding…"
+---
+
 # Managing instances & data
 
 Beyond launching and connecting, spawn has a set of operational commands for

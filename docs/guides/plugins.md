@@ -1,3 +1,7 @@
+---
+description: "Plugins install and manage software on a running instance — connecting to a private network, mounting data transfer tooling, running a dev server."
+---
+
 # Plugins
 
 Plugins install and manage software on a running instance — connecting to a

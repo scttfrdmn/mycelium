@@ -1,3 +1,7 @@
+---
+description: "Connecting spore.host to Discord posts instance lifecycle notifications — TTL warnings, idle stops, spot interruptions, completion — to a channel of your cho…"
+---
+
 # Discord Setup
 
 Connecting spore.host to Discord posts instance lifecycle notifications —

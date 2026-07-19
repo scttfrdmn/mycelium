@@ -1,3 +1,7 @@
+---
+description: "Spored emits lifecycle events when significant things happen to a running instance."
+---
+
 # Lifecycle Events
 
 Spored emits lifecycle events when significant things happen to a running instance. Events are routed through the spore-bot Lambda to Slack DMs or Teams messages.

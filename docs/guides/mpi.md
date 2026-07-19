@@ -1,3 +1,7 @@
+---
+description: "For workloads that need to communicate across multiple nodes — large-scale simulations, distributed training, or parallel data processing — spore.host can la…"
+---
+
 # MPI Clusters
 
 For workloads that need to communicate across multiple nodes — large-scale simulations, distributed training, or parallel data processing — spore.host can launch a multi-node MPI cluster as a single command.

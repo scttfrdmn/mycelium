@@ -1,3 +1,7 @@
+---
+description: "spore.host tools (spawn, truffle, lagotto) act on AWS with your own AWS credentials."
+---
+
 # AWS Authentication
 
 spore.host tools (`spawn`, `truffle`, `lagotto`) act on AWS with **your own AWS credentials**. There is no separate spore.host login — if the AWS CLI can reach your account, so can spore.host. This page is the one place that explains how to authenticate, how profiles work, and how your authentication relates to permissions and to what spore.host does on your behalf.

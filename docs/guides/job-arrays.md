@@ -1,3 +1,7 @@
+---
+description: "A job array launches a fixed number of identical instances as a named group."
+---
+
 # Job Arrays
 
 A job array launches a fixed number of identical instances as a named group. Unlike [parameter sweeps](/guides/parameter-sweeps), which vary inputs across instances, job arrays run the same workload on every instance — useful for distributed processing, redundant jobs, or fan-out patterns where each instance handles a chunk of work determined by its own index.

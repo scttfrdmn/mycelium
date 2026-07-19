@@ -1,3 +1,7 @@
+---
+description: "The spore.host MCP server exposes truffle and spawn as tools for AI assistants that support the Model Context Protocol — including Claude Desktop and Cursor."
+---
+
 # MCP Server
 
 The spore.host MCP server exposes truffle and spawn as tools for AI assistants that support the [Model Context Protocol](https://modelcontextprotocol.io) — including Claude Desktop and Cursor.

@@ -1,3 +1,7 @@
+---
+description: "A complete walkthrough from a fresh install to a running EC2 instance and back."
+---
+
 # Your First Instance
 
 A complete walkthrough from a fresh install to a running EC2 instance and back. Allow 15–20 minutes.

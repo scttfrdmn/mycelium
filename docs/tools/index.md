@@ -1,3 +1,7 @@
+---
+description: "spore.host is six tools that work together."
+---
+
 # Tools
 
 spore.host is six tools that work together. Each has exactly one job.

@@ -1,3 +1,7 @@
+---
+description: "nf-spawn is a Nextflow executor plugin that dispatches each pipeline process step to its own ephemeral EC2 instance — purpose-sized and auto-terminated when…"
+---
+
 # Nextflow Integration (nf-spawn)
 
 [nf-spawn](https://github.com/spore-host/nf-spawn) is a Nextflow executor plugin that dispatches each pipeline process step to its own ephemeral EC2 instance — purpose-sized and auto-terminated when the task completes.

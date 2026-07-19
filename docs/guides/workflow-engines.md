@@ -1,3 +1,7 @@
+---
+description: "spore.host is a first-class execution backend for five workflow engines."
+---
+
 # Workflow Engines
 
 spore.host is a first-class execution backend for **five workflow engines**. In

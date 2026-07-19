@@ -1,3 +1,7 @@
+---
+description: "spore.host tools read configuration from environment variables and ~/.spawn/config.yaml."
+---
+
 # Environment Variables
 
 spore.host tools read configuration from environment variables and `~/.spawn/config.yaml`. Environment variables take precedence over config file values.

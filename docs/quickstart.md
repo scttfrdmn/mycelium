@@ -1,3 +1,7 @@
+---
+description: "This guide gets you from zero to a running EC2 instance in about five minutes."
+---
+
 # Quick Start
 
 This guide gets you from zero to a running EC2 instance in about five minutes. You'll need an AWS account with credentials configured — everything else is handled for you.

@@ -1,3 +1,7 @@
+---
+description: "Spore-bot connects your Slack or Microsoft Teams workspace to your running instances."
+---
+
 # Spore-bot
 
 Spore-bot connects your Slack or Microsoft Teams workspace to your running instances. Any team member you've authorised can control instances from chat — without a terminal, without AWS credentials, from any device.

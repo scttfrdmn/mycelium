@@ -1,3 +1,7 @@
+---
+description: "spore.host tags every instance it launches with spawn: tags."
+---
+
 # EC2 Tags
 
 spore.host tags every instance it launches with `spawn:*` tags. These tags drive lifecycle management, filtering, and cost tracking.
