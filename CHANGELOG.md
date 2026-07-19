@@ -14,6 +14,8 @@ own changelogs for CLI releases.
 ## [Unreleased]
 
 ### Added
+- **`codemeta.json`** — CodeMeta (JSON-LD / schema.org) software metadata, for
+  software registries and citation tooling; complements `CITATION.cff`.
 - **`CITATION.cff`** — machine-readable citation metadata (GitHub renders a
   "Cite this repository" button). Foundation for the Zenodo DOI integration.
 - **Docs AI-readiness: `llms.txt` manifest** (#424) — a curated

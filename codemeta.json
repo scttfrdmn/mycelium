@@ -1,0 +1,40 @@
+{
+  "@context": "https://doi.org/10.5063/schema/codemeta-2.0",
+  "@type": "SoftwareSourceCode",
+  "name": "spore.host",
+  "description": "A suite of tools for ephemeral cloud compute on AWS EC2: truffle (instance-type discovery, spot pricing, quotas), spawn (launching and lifecycle management with the spored in-instance daemon), and lagotto (a capacity watcher). Instances self-terminate via TTL and idle detection, so researchers can find the right instance, launch it in minutes, and let it clean itself up.",
+  "codeRepository": "https://github.com/spore-host/spore-host",
+  "url": "https://spore.host",
+  "issueTracker": "https://github.com/spore-host/spore-host/issues",
+  "license": "https://spdx.org/licenses/Apache-2.0",
+  "programmingLanguage": [
+    "Go",
+    "TypeScript"
+  ],
+  "operatingSystem": [
+    "Linux",
+    "macOS",
+    "Windows"
+  ],
+  "keywords": [
+    "cloud computing",
+    "AWS",
+    "EC2",
+    "research computing",
+    "ephemeral compute",
+    "high-performance computing",
+    "spot instances"
+  ],
+  "author": [
+    {
+      "@type": "Person",
+      "givenName": "Scott",
+      "familyName": "Friedman",
+      "@id": "https://orcid.org/0000-0003-1480-765X",
+      "affiliation": {
+        "@type": "Organization",
+        "name": "Amazon Web Services"
+      }
+    }
+  ]
+}
