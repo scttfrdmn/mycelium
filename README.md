@@ -5,6 +5,7 @@
   <a href="https://codecov.io/gh/spore-host/spore-host"><img src="https://codecov.io/gh/spore-host/spore-host/branch/main/graph/badge.svg" alt="codecov"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License: Apache 2.0"></a>
   <a href="https://spore.host"><img src="https://img.shields.io/badge/docs-spore.host-blue" alt="Documentation"></a>
+  <a href="https://doi.org/10.5281/zenodo.21439339"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.21439339.svg" alt="DOI"></a>
 </p>
 
 **spore.host** is a suite of tools for launching and managing AWS EC2 instances (Linux **and Windows**) — with automatic lifecycle management so instances clean up after themselves.
@@ -123,6 +124,14 @@ Full documentation at **[spore.host](https://spore.host)** or in the `docs/` dir
 - [IAM Permissions](docs/reference/iam-permissions.md)
 
 ---
+
+## Citation
+
+If you use spore.host in your research, please cite it. The concept DOI below
+always resolves to the latest release; see [`CITATION.cff`](CITATION.cff) for
+full metadata (GitHub's "Cite this repository" renders it for you).
+
+> Friedman, S. spore.host: ephemeral AWS compute for researchers. https://doi.org/10.5281/zenodo.21439339
 
 ## License
 
