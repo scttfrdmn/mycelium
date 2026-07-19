@@ -67,6 +67,26 @@ spawn sweep cancel <sweep-id>         # terminate all remaining instances
 
 With Slack connected, you'll get a DM when the sweep finishes (all instances have terminated).
 
+## Alerts on completion, failure, or cost
+
+For explicit, per-sweep notifications — beyond the default Slack DM — attach an
+**alert** to a sweep with `spawn alerts`. Alerts can fire on completion, on
+failure, or when the sweep's running cost crosses a threshold, and deliver via
+email, Slack, SNS, or a webhook:
+
+```sh
+spawn alerts create <sweep-id> --on-complete --email me@example.com
+spawn alerts create <sweep-id> --on-failure  --slack https://hooks.slack.com/services/...
+spawn alerts create <sweep-id> --cost-threshold 100 --email me@example.com
+
+spawn alerts list                 # all alerts
+spawn alerts history              # what has fired
+spawn alerts delete <alert-id>
+```
+
+The cost-threshold alert is the cheap insurance for a large sweep: get pinged the
+moment spend crosses your ceiling, then `spawn sweep cancel` if it's running away.
+
 ## Collecting results
 
 Each instance writes its results to a path you control — typically S3. The convention is to include the sweep index or parameters in the path:
