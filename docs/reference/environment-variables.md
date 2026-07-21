@@ -8,7 +8,7 @@ spore.host tools read configuration from environment variables and `~/.spawn/con
 
 ## AWS credentials
 
-spore.host uses the standard AWS credential chain — no custom variables required. The recommended way to populate it is [`aws login`](/guides/aws-auth) (AWS CLI v2.34+); the variables below are for profile selection or the static-key fallback.
+spore.host uses the standard AWS credential chain — no custom variables required. The recommended way to populate it is [`aws login`](/guides/aws-auth) (AWS CLI v2.32.0+); the variables below are for profile selection or the static-key fallback.
 
 | Variable | Description |
 |----------|-------------|

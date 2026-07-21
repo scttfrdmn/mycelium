@@ -38,7 +38,7 @@ Yes. Use `AWS_PROFILE=my-profile spawn launch ...` or `spawn launch --profile my
 
 ### What AWS permissions does spore.host need?
 
-The minimum policy is documented at [IAM Permissions](/reference/iam-permissions). In brief: EC2 describe, run, stop, terminate, tag, and create tags; IAM pass-role for the spored instance profile; Route53 for DNS registration.
+The baseline policy is documented at [IAM Permissions](/reference/iam-permissions). In brief the **core** permissions are: EC2 describe, run, stop, terminate, tag, and create tags; and IAM pass-role for the spored instance profile. **Optional features** add their own permissions only when you use them — e.g. Route 53 is needed only with `--dns` (subdomain assignment), not for a normal launch.
 
 ---
 
@@ -53,7 +53,7 @@ All EC2 instance types. Common choices for research:
 - **Memory-intensive**: r7i.2xlarge, r6i.8xlarge
 - **GPU (training)**: p4d.24xlarge, g5.2xlarge
 - **GPU (inference)**: g5.xlarge, g4dn.xlarge
-- **Free tier**: t3.micro, t2.micro
+- **Smallest / cheapest**: t3.micro, t2.micro (often Free Tier eligible, but eligibility varies by account — check the price Truffle shows)
 
 ### Can I use a custom AMI?
 

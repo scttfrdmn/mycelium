@@ -6,9 +6,12 @@ description: "spore.host tools act on EC2 with your AWS credentials (see AWS Aut
 
 spore.host tools act on EC2 with **your** AWS credentials (see [AWS Authentication](../guides/aws-auth.md) for how those are obtained). This page is the least-privilege IAM policy those credentials need. Attach it to the IAM role/user you authenticate as, and expand only as your usage grows (Spot, DNS, FSx below).
 
-## Minimal policy
+## Recommended least-privilege baseline
 
-This is the complete set required for the core flow — **`spawn launch` → connect → manage → terminate**. It is verified against the actual AWS API calls spawn makes; a smaller policy will fail at launch (see the callout below).
+This is the recommended least-privilege policy for the core flow — **`spawn launch`
+→ connect → manage → terminate**. It's verified against the actual AWS API calls
+spawn makes; dropping a core action will fail at launch (see the callout below).
+Optional features (Spot, DNS, FSx) add their own permissions, listed further down.
 
 ```json
 {
@@ -102,6 +105,14 @@ A launch does more than `RunInstances`. spawn **imports your SSH public key** (`
 
 ::: tip Scope on tags
 `EC2Manage` is conditioned on `spawn:managed=true`, so you can only start/stop/terminate instances spawn created — never unrelated ones. The read (`Describe*`) and launch statements can't be tag-scoped (the resources don't exist yet at describe/launch time).
+:::
+
+::: tip Note on `sts:GetCallerIdentity`
+The `Identity` statement is included for completeness because spawn calls
+`sts:GetCallerIdentity` to confirm which account/identity you're operating as. AWS
+returns identity from this call even without an explicit `Allow` (and even under an
+explicit `Deny`), so you can omit this statement with no functional change — it's
+listed so the policy mirrors every call spawn makes.
 :::
 
 ## Spot instances

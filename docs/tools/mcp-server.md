@@ -9,9 +9,19 @@ assistants that support the [Model Context Protocol](https://modelcontextprotoco
 — including Claude Desktop and Cursor.
 
 **When to use it.** When you'd rather describe what you need in plain language —
-*"find the cheapest A100 in us-east-1 and launch one with a 4-hour limit"* — and
-let the assistant run the commands, instead of typing them yourself. It runs
-locally with your AWS credentials, the same trust model as the CLIs.
+*"find the cheapest A100 in us-east-1, then give me the spawn command to launch it
+with a 4-hour limit"* — and let the assistant do the search and manage running
+instances, instead of typing every command yourself. It runs locally with your
+AWS credentials, the same trust model as the CLIs.
+
+::: warning The MCP server cannot launch instances — by design
+The exposed tools are **read + manage-existing** only: search / spot prices /
+quotas (truffle) and list / status / stop / terminate / extend (spawn). There is
+**no `launch` tool**, deliberately: creating billable infrastructure from an AI
+assistant is a boundary we don't cross automatically. The assistant helps you find
+the right instance and *construct* the `spawn launch` command; you run it. See the
+full tool list below.
+:::
 
 ## Install
 

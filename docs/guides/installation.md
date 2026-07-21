@@ -77,7 +77,7 @@ Then add to `~/.claude/claude_desktop_config.json`:
 
 ## AWS credentials
 
-spore.host uses whichever credentials are active in your shell — the same ones the AWS CLI uses. The recommended way to obtain them is **`aws login`** (AWS CLI v2.34+), which manages short-lived credentials for you; static `aws configure` keys also work.
+spore.host uses whichever credentials are active in your shell — the same ones the AWS CLI uses. The recommended way to obtain them is **`aws login`** (AWS CLI v2.32.0+), which manages short-lived credentials for you; static `aws configure` keys also work.
 
 ```sh
 aws login                       # sign in
