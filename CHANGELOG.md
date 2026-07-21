@@ -14,6 +14,13 @@ own changelogs for CLI releases.
 ## [Unreleased]
 
 ### Added
+- **Docs: new suite-wide Maturity & Support Policy page** (`/reference/maturity`).
+  States in one place how mature each component is (six core tools Stable; HTTP
+  API/SDK beta; workflow adapters experimental; streaming experimental), what
+  compatibility to rely on (all tools pre-1.0 → **breaking changes bump MINOR**, so
+  pin to a minor series), the platform support matrix (CLI OS/arch; what spawn can
+  launch; GPU/EFA), and how deprecations/support work. Linked from the Reference
+  index and sidebar; links to (does not duplicate) the workflow-adapter matrix.
 - **Docs deploy is now a verifiable release artifact.** The rendered site footer
   carries a **build stamp** — the commit short-SHA (linked) and build date — so you
   can tell from the live site exactly which commit is deployed. The deploy workflow
