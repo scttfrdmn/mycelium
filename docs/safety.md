@@ -49,6 +49,27 @@ spored is healthy. This is why lifecycle enforcement doesn't depend on a single
 point of failure: the instance enforces its own deadline *and* an external sweep
 enforces it too.
 
+## What the guarantee is by deployment mode
+
+Whether you get one enforcement layer or two depends on which mode you deploy. The
+reaper is **not enabled by default** — the plain CLI gives you in-instance
+enforcement only, and the backstop is something you opt into.
+
+| Mode | spored (in-instance) | Out-of-band reaper | Workload data leaves your account | Failure guarantee |
+|------|:---:|:---:|:---:|---|
+| **CLI only** (default) | Yes | No | No | spored terminates at TTL from inside the instance. If spored is disabled or killed, only your AWS-side controls (Budgets / SCPs) remain. |
+| **Self-hosted backstop** | Yes | Yes (in your account) | No | Dual enforcement — the reaper terminates past-deadline instances even if spored fails. |
+| **Hosted integrations** | Yes | Yes / optional | Selected metadata only (never credentials or workload data) | Dual enforcement when the reaper is enabled. |
+
+The reaper (see
+[spawn/lambda/ttl-reaper](https://github.com/spore-host/spawn/tree/main/lambda/ttl-reaper))
+ships in **dry-run** — it logs "would reap" and notifies but does not terminate —
+until an operator flips it to enforce mode after verification. It assumes a narrow
+per-account [cross-account role you grant](/architecture),
+scoped to terminating past-deadline `spawn:managed` instances, and never holds your
+credentials. The full guarantee-by-mode breakdown lives in
+[SECURITY.md](https://github.com/spore-host/spore-host/blob/main/SECURITY.md#lifecycle-guarantee-by-deployment-mode).
+
 ## Verify enforcement is healthy
 
 Don't take it on faith — confirm it, especially the first few times:

@@ -14,6 +14,16 @@ own changelogs for CLI releases.
 ## [Unreleased]
 
 ### Fixed
+- **Docs: MCP scope, SSH-key wording, and reaper guarantee-by-mode** (from a second
+  external review). Reworded the How It Works MCP section — it no longer says the
+  server "exposes all of the above"; it now states MCP does read/manage operations
+  (find, status, stop, terminate, extend) and **cannot launch** by design. Corrected
+  the SSH-key note in `how-it-works.md` and `architecture.md`: spawn imports your
+  existing default public key and only generates/manages one under `~/.spawn/keys/`
+  if you have none (never touches private keys) — matching the FAQ, aws-auth, and
+  quickstart pages. Added the **lifecycle guarantee-by-deployment-mode** table
+  (CLI-only / self-hosted backstop / hosted integrations, with the reaper's dry-run
+  default) to the Safety page, previously only in `SECURITY.md`.
 - **Docs: corrected `--cost-limit` description** (safety, glossary, spored, EC2
   tags). It's a **compute-only** ceiling (excludes EBS/storage), accumulates
   across stop/resume rather than resetting, **terminates** the instance, and fires
