@@ -1,0 +1,80 @@
+name: Manual installer matrix
+
+# Verifies the documented manual `curl`-a-tarball install path (docs/quickstart.md
+# "Manual" tab) actually works on every platform we publish CLIs for. It resolves
+# each tool's LATEST GitHub release, downloads the OS/arch asset, extracts it onto
+# PATH, and asserts the binary runs. The install logic here mirrors the documented
+# snippet — if the docs command breaks (e.g. asset-naming drift), this job goes red.
+#
+# Runs on demand and on a weekly backstop; CLI release workflows can also fire a
+# `repository_dispatch` (type: installer-check) to re-verify install after a release.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 9 * * 1'   # Mondays, after the weekly docs sync
+  repository_dispatch:
+    types: [installer-check]
+
+permissions:
+  contents: read
+
+jobs:
+  install:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: macOS Intel (amd64)
+            runner: macos-13
+          - label: macOS Apple Silicon (arm64)
+            runner: macos-14
+          - label: Linux amd64
+            runner: ubuntu-latest
+          - label: Linux arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - name: Install truffle + spawn from the latest release (manual path)
+        env:
+          # The documented snippet hits the unauthenticated GitHub API; in CI a
+          # token avoids the low anonymous rate limit. It's read-only.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Same normalization the docs snippet uses: assets are named with
+          # lowercase GOOS/GOARCH (darwin|linux, amd64|arm64).
+          OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+          case "$(uname -m)" in
+            x86_64|amd64) ARCH=amd64 ;;
+            arm64|aarch64) ARCH=arm64 ;;
+            *) echo "unsupported arch: $(uname -m)" >&2; exit 1 ;;
+          esac
+          echo "Resolving assets for ${OS}_${ARCH}"
+          for tool in spawn truffle; do
+            url=$(curl -fsSL \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              "https://api.github.com/repos/spore-host/${tool}/releases/latest" \
+              | grep -o "https://[^\"]*_${OS}_${ARCH}.tar.gz" | head -1)
+            if [ -z "$url" ]; then
+              echo "::error::No ${OS}_${ARCH} asset found for ${tool} in its latest release — the manual install would fail on this platform." >&2
+              exit 1
+            fi
+            echo "  ${tool}: ${url}"
+            curl -fsSL "$url" -o "${tool}.tar.gz"
+            tar -xzf "${tool}.tar.gz" "$tool"
+            sudo install "$tool" /usr/local/bin/
+          done
+
+      - name: Verify the installed binaries run
+        run: |
+          set -euo pipefail
+          for tool in spawn truffle; do
+            command -v "$tool" >/dev/null || { echo "::error::${tool} not on PATH after install" >&2; exit 1; }
+            # `version` must exit 0 and print something non-empty.
+            out=$("$tool" version)
+            [ -n "$out" ] || { echo "::error::${tool} version printed nothing" >&2; exit 1; }
+            echo "$tool -> $out"
+          done
+          echo "✅ Manual install path works on ${{ matrix.label }}"

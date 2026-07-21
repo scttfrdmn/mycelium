@@ -43,7 +43,14 @@ scoop install truffle spawn
 
 ```sh [Manual]
 # Download the latest release assets for your OS/arch, then extract onto PATH.
-OS=$(uname -s); ARCH=$(uname -m)
+# Assets are named like spawn_<version>_<os>_<arch>.tar.gz with lowercase
+# GOOS/GOARCH (darwin|linux, amd64|arm64), so normalize uname's output first.
+OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+case "$(uname -m)" in
+  x86_64|amd64) ARCH=amd64 ;;
+  arm64|aarch64) ARCH=arm64 ;;
+  *) echo "unsupported arch: $(uname -m)" >&2; exit 1 ;;
+esac
 for tool in spawn truffle; do
   url=$(curl -fsSL "https://api.github.com/repos/spore-host/${tool}/releases/latest" \
     | grep -o "https://[^\"]*_${OS}_${ARCH}.tar.gz" | head -1)
