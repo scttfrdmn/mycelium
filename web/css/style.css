@@ -320,6 +320,32 @@ h2.section-title {
 .tool-link { font-size: 0.85rem; font-weight: 600; margin-top: 0.25rem; }
 .tool-link::after { content: " →"; }
 
+/* Tool card link row: Docs · Source · Releases (no arrow, muted separators) */
+.tool-links { font-size: 0.85rem; margin-top: 0.5rem; color: var(--text-muted); }
+.tool-links a { font-weight: 600; text-decoration: none; }
+.tool-links .tool-link::after { content: ""; }
+
+/* Hero trust strip */
+.trust-strip {
+  margin: 1rem auto 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  max-width: 46rem;
+  line-height: 1.6;
+}
+
+/* Use-case entry table */
+#use-cases { padding-top: 2rem; }
+.usecase-table { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1rem; }
+.usecase-row {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 1rem;
+  padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 8px;
+  text-decoration: none; color: var(--text); transition: border-color 0.15s, background 0.15s;
+}
+.usecase-row:hover { border-color: var(--border-strong); background: var(--surface, rgba(127,127,127,0.06)); }
+.usecase-goal { font-weight: 600; }
+.usecase-path { font-size: 0.85rem; color: var(--text-muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; text-align: right; }
+
 /* Tool colour theming */
 .tool-truffle .tool-tag { background: var(--truffle-bg); color: var(--truffle); }
 .tool-truffle .tool-link { color: var(--truffle); }

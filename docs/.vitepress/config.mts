@@ -126,6 +126,7 @@ const sidebar = {
       collapsed: true,
       items: [
         { text: 'IAM Permissions', link: '/reference/iam-permissions' },
+        { text: 'Deployment packet (for admins)', link: '/reference/deployment-packet' },
         { text: 'Self-Hosting', link: '/guides/self-hosting' },
         { text: 'Self-Hosting spore-bot', link: '/spore-bot-self-hosting' },
       ]

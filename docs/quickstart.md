@@ -1,10 +1,31 @@
 ---
-description: "This guide gets you from zero to a running EC2 instance in about five minutes."
+description: "Install spore.host, confirm your AWS permissions, and launch your first self-terminating instance."
 ---
 
 # Quick Start
 
-This guide gets you from zero to a running EC2 instance in about five minutes. You'll need an AWS account with credentials configured — everything else is handled for you.
+Once your AWS access **and the required permissions** are in place, your first
+protected instance takes about five minutes to launch. The permissions are the
+one part that isn't automatic — so start by figuring out which situation you're in.
+
+## First: which AWS account are you using?
+
+::: tip Personal or admin-managed account
+You can create IAM roles yourself, so you can install the required policy and go.
+Follow this page top to bottom.
+:::
+
+::: warning Institution-managed account (most university / company accounts)
+You can probably authenticate and launch some EC2, but you likely **cannot create
+IAM roles or attach policies** — spawn needs both (once) for the spored instance
+profile. You'll need your cloud/security administrator to apply the policy. Send
+them the **[deployment packet](/reference/deployment-packet)** (the exact
+least-privilege policy, what spawn creates, what it audits, and how to remove it),
+then come back and continue from [Authenticate](#authenticate-with-aws).
+:::
+
+Not sure whether you have the permissions? After installing, run
+[`spawn doctor`](#preflight-spawn-doctor) — it tells you exactly what's missing.
 
 ## Install
 
@@ -56,7 +77,28 @@ Other paths work too — pick whichever matches your organization:
 
 `aws login` is preferred where available because the credentials are short-lived.
 
-Your credentials need permission to launch and manage EC2 instances; see the [minimal IAM policy](/reference/iam-permissions). For the full picture — profiles, `SPORE_*` config, and how your auth relates to what spore.host does on your behalf — see [AWS Authentication](/guides/aws-auth).
+Your credentials need permission to launch and manage EC2 instances; see the [recommended least-privilege baseline](/reference/iam-permissions). For the full picture — profiles, `SPORE_*` config, and how your auth relates to what spore.host does on your behalf — see [AWS Authentication](/guides/aws-auth).
+
+## Preflight: `spawn doctor`
+
+Before launching anything, confirm your environment is actually ready:
+
+```sh
+spawn doctor
+```
+
+It runs read-only checks — credentials, the resolved account and region, the EC2
+and IAM permissions spawn needs, a usable VPC/subnet, an SSH key, Session Manager —
+and reports **✓ / ⚠ / ✗** for each. It launches nothing.
+
+- **All ✓ (or only ⚠):** you're ready — continue below.
+- **Any ✗ on an IAM/permission check:** that's the permissions cliff. On a personal
+  account, apply the [IAM baseline](/reference/iam-permissions). On an
+  institution-managed account, send your admin the
+  [deployment packet](/reference/deployment-packet) — the failing checks are
+  exactly what they need to grant.
+
+If `spawn doctor` passes, the rest of this Quick Start should work as written.
 
 ## Find an instance
 

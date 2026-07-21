@@ -59,9 +59,12 @@
           <span>macOS, Linux, Windows</span>
         </div>
         <div class="hero-actions">
-          <a href="#install" class="btn btn-primary">Get started</a>
-          <a href="https://github.com/spore-host/spore-host" target="_blank" rel="noopener" class="btn btn-outline">View on GitHub</a>
+          <a href="https://docs.spore.host/guides/first-instance" class="btn btn-primary">Launch your first protected instance</a>
+          <a href="https://docs.spore.host/how-it-works" class="btn btn-outline">See how it works</a>
+          <a href="https://github.com/spore-host/spore-host" target="_blank" rel="noopener" class="btn btn-outline">Browse source</a>
         </div>
+
+        <p class="trust-strip">Runs in your AWS account · Credentials stay with you · Hard TTL on every protected instance · Open source · No standing cluster</p>
 
         <div id="demo-wrapper">
           <p class="demo-hint">AMD EPYC Genoa search · launch with TTL + idle timeout · run a job · check cost · watch it self-terminate</p>
@@ -69,6 +72,22 @@
         </div>
       </div>
     </div>
+
+    <!-- ── Use-case entry points ── -->
+    <section id="use-cases">
+      <div class="container">
+        <p class="section-label">Start from your goal</p>
+        <h2 class="section-title">What are you trying to do?</h2>
+        <div class="usecase-table">
+          <a class="usecase-row" href="https://docs.spore.host/guides/first-instance"><span class="usecase-goal">Start a temporary research workstation</span><span class="usecase-path">spawn → connect</span></a>
+          <a class="usecase-row" href="https://docs.spore.host/guides/"><span class="usecase-goal">Run a job and terminate when it's done</span><span class="usecase-path">spawn task / job</span></a>
+          <a class="usecase-row" href="https://docs.spore.host/tools/truffle"><span class="usecase-goal">Find the right CPU or GPU (and its price)</span><span class="usecase-path">truffle</span></a>
+          <a class="usecase-row" href="https://docs.spore.host/guides/"><span class="usecase-goal">Run many independent jobs at once</span><span class="usecase-path">arrays / sweeps</span></a>
+          <a class="usecase-row" href="https://docs.spore.host/tools/lagotto"><span class="usecase-goal">Wait for scarce GPU capacity to appear</span><span class="usecase-path">lagotto</span></a>
+          <a class="usecase-row" href="https://docs.spore.host/guides/workflow-engines"><span class="usecase-goal">Use an existing workflow engine</span><span class="usecase-path">Nextflow / Snakemake / CWL / WDL / Airflow</span></a>
+        </div>
+      </div>
+    </section>
 
     <!-- ── Tools ── -->
     <section id="tools">
@@ -89,7 +108,7 @@
               <li>Quota check before you launch</li>
               <li>On-Demand Capacity Reservations</li>
             </ul>
-            <a href="https://github.com/spore-host/truffle" class="tool-link" target="_blank" rel="noopener">truffle docs</a>
+            <p class="tool-links"><a href="https://docs.spore.host/tools/truffle" class="tool-link">Docs</a> · <a href="https://github.com/spore-host/truffle" target="_blank" rel="noopener">Source</a> · <a href="https://github.com/spore-host/truffle/releases" target="_blank" rel="noopener">Releases</a></p>
           </div>
 
           <div class="tool-card tool-spawn">
@@ -102,7 +121,7 @@
               <li>Hibernation support</li>
               <li>Spot, GPU, MPI clusters, parameter sweeps</li>
             </ul>
-            <a href="https://github.com/spore-host/spawn" class="tool-link" target="_blank" rel="noopener">spawn docs</a>
+            <p class="tool-links"><a href="https://docs.spore.host/tools/spawn" class="tool-link">Docs</a> · <a href="https://github.com/spore-host/spawn" target="_blank" rel="noopener">Source</a> · <a href="https://github.com/spore-host/spawn/releases" target="_blank" rel="noopener">Releases</a></p>
           </div>
 
           <div class="tool-card tool-spored">
@@ -115,7 +134,7 @@
               <li>Fires completion, TTL-warning, and idle events</li>
               <li>Runs pre-stop hooks to save work before shutdown</li>
             </ul>
-            <a href="https://docs.spore.host/tools/spored" class="tool-link" target="_blank" rel="noopener">spored docs</a>
+            <p class="tool-links"><a href="https://docs.spore.host/tools/spored" class="tool-link">Docs</a> · <a href="https://github.com/spore-host/spawn" target="_blank" rel="noopener">Source</a> · <a href="https://github.com/spore-host/spawn/releases" target="_blank" rel="noopener">Releases</a></p>
           </div>
 
           <div class="tool-card tool-lagotto">
@@ -128,7 +147,7 @@
               <li>Serverless — runs as a Lambda function</li>
               <li>Slack notifications when capacity appears</li>
             </ul>
-            <a href="https://github.com/spore-host/lagotto" class="tool-link" target="_blank" rel="noopener">lagotto docs</a>
+            <p class="tool-links"><a href="https://docs.spore.host/tools/lagotto" class="tool-link">Docs</a> · <a href="https://github.com/spore-host/lagotto" target="_blank" rel="noopener">Source</a> · <a href="https://github.com/spore-host/lagotto/releases" target="_blank" rel="noopener">Releases</a></p>
           </div>
 
           <div class="tool-card tool-bot">
@@ -141,7 +160,7 @@
               <li>OAuth — one-click workspace connection</li>
               <li>Works from any device, anywhere</li>
             </ul>
-            <a href="https://docs.spore.host/tools/spore-bot" class="tool-link" target="_blank" rel="noopener">spore-bot docs</a>
+            <p class="tool-links"><a href="https://docs.spore.host/tools/spore-bot" class="tool-link">Docs</a> · <a href="https://github.com/spore-host/spawn" target="_blank" rel="noopener">Source</a> · <a href="https://docs.spore.host/guides/slack-setup" target="_blank" rel="noopener">Setup</a></p>
           </div>
 
           <div class="tool-card tool-mcp">
@@ -154,7 +173,7 @@
               <li>Manage running instances via spawn (status, stop, terminate, extend — no launch, by design)</li>
               <li>Install via Homebrew — one config line</li>
             </ul>
-            <a href="https://github.com/spore-host/spore-host-mcp" class="tool-link" target="_blank" rel="noopener">MCP server docs</a>
+            <p class="tool-links"><a href="https://docs.spore.host/tools/mcp-server" class="tool-link">Docs</a> · <a href="https://github.com/spore-host/spore-host-mcp" target="_blank" rel="noopener">Source</a> · <a href="https://github.com/spore-host/spore-host-mcp/releases" target="_blank" rel="noopener">Releases</a></p>
           </div>
 
         </div>
