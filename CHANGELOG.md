@@ -13,6 +13,17 @@ own changelogs for CLI releases.
 
 ## [Unreleased]
 
+### Added
+- **Docs deploy is now a verifiable release artifact.** The rendered site footer
+  carries a **build stamp** — the commit short-SHA (linked) and build date — so you
+  can tell from the live site exactly which commit is deployed. The deploy workflow
+  now runs a **post-deploy smoke** that polls the live `docs.spore.host` and fails
+  the job if the just-built commit or canonical CLI strings (`spawn doctor`,
+  `spawn connect`, `terminate`) aren't served, turning a silent stale-serve into a
+  red build. HTML is now cached short (`max-age=60, must-revalidate`) while
+  fingerprinted JS/CSS assets are cached immutably for a year — so returning
+  visitors no longer see up-to-an-hour-stale pages.
+
 ### Fixed
 - **Docs: corrected `--cost-limit` description** (safety, glossary, spored, EC2
   tags). It's a **compute-only** ceiling (excludes EBS/storage), accumulates

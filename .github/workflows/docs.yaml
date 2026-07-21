@@ -28,9 +28,15 @@ jobs:
         working-directory: docs
         run: npm ci
 
+      # GITHUB_SHA is already in the environment; DOCS_BUILD_DATE stamps the build
+      # so the rendered footer self-identifies its commit + date (config.mts reads
+      # both). This is the source side of the release-integrity check the
+      # post-deploy smoke below asserts against the live site.
       - name: Build docs
         working-directory: docs
-        run: npm run build
+        run: |
+          export DOCS_BUILD_DATE="$(date -u +%Y-%m-%d)"
+          npm run build
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@517a711dbcd0e402f90c77e7e2f81e849156e31d # v6
@@ -38,14 +44,64 @@ jobs:
           role-to-assume: arn:aws:iam::966362334030:role/GitHubActionsDocsDeployRole
           aws-region: us-east-1
 
+      # Two-pass sync so caching matches asset lifetime. VitePress fingerprints
+      # JS/CSS filenames (content hash in the name), so those are safe to cache for
+      # a year — a changed asset gets a new URL. HTML filenames are stable, so a
+      # long cache there is exactly what made the site look "stale" to a returning
+      # visitor: the edge/browser served up-to-an-hour-old HTML. Sync the immutable
+      # hashed assets first with a long cache, then overlay the HTML (and other
+      # top-level files) with a short, must-revalidate cache.
       - name: Deploy to S3
         run: |
+          # Pass 1: fingerprinted assets — cache hard (immutable).
+          aws s3 sync docs/.vitepress/dist s3://spore-host-docs/ \
+            --cache-control "public, max-age=31536000, immutable" \
+            --exclude "*.html" \
+            --exclude "*.xml" \
+            --exclude "*.txt"
+          # Pass 2: HTML + sitemap/llms manifests — short cache, always revalidate,
+          # and --delete here so removed pages are pruned.
           aws s3 sync docs/.vitepress/dist s3://spore-host-docs/ \
             --delete \
-            --cache-control "max-age=3600"
+            --cache-control "public, max-age=60, must-revalidate" \
+            --exclude "*" \
+            --include "*.html" \
+            --include "*.xml" \
+            --include "*.txt"
 
       - name: Invalidate CloudFront
         run: |
           aws cloudfront create-invalidation \
             --distribution-id ${{ secrets.DOCS_CLOUDFRONT_ID }} \
             --paths "/*"
+
+      # Post-deploy smoke: prove the LIVE site serves this build, not a stale one.
+      # Poll the public URL (riding out invalidation propagation) and assert the
+      # canonical CLI strings AND this commit's short SHA appear in the footer. A
+      # stale serve — old HTML behind the CDN, a silently-failed deploy — makes the
+      # grep miss and fails the job loudly instead of looking green.
+      - name: Verify live site serves this build
+        run: |
+          set -euo pipefail
+          SHORT_SHA="${GITHUB_SHA:0:7}"
+          BASE="https://docs.spore.host"
+          check() {  # $1=path  $2=needle
+            curl -fsS "$BASE/$1" | grep -qF "$2"
+          }
+          ok=0
+          for attempt in 1 2 3 4 5 6; do
+            if check "quickstart.html" "spawn doctor" \
+               && check "quickstart.html" "spawn connect" \
+               && check "safety.html" "terminate" \
+               && check "index.html" "$SHORT_SHA"; then
+              ok=1
+              echo "✅ Live site serves build $SHORT_SHA with canonical strings present."
+              break
+            fi
+            echo "Attempt $attempt: live site not yet serving build $SHORT_SHA — waiting…"
+            sleep 20
+          done
+          if [ "$ok" -ne 1 ]; then
+            echo "::error::Live docs.spore.host did not serve build $SHORT_SHA (or a canonical string was missing) after retries. Deploy may be stale — check CloudFront invalidation and the S3 sync."
+            exit 1
+          fi
