@@ -13,6 +13,13 @@ own changelogs for CLI releases.
 
 ## [Unreleased]
 
+### Fixed
+- **Docs: the manual-install snippet was broken on every platform.** The Quick
+  Start "Manual" install commands matched release assets using `uname -s`/`uname -m`
+  (`Darwin`/`x86_64`), but GoReleaser names assets with lowercase GOOS/GOARCH
+  (`darwin`/`amd64`) — so the download URL resolved to nothing everywhere. The
+  snippet now lowercases the OS and maps `x86_64→amd64` / `aarch64→arm64`.
+
 ### Added
 - **Docs: new suite-wide Maturity & Support Policy page** (`/reference/maturity`).
   States in one place how mature each component is (six core tools Stable; HTTP
@@ -21,6 +28,11 @@ own changelogs for CLI releases.
   pin to a minor series), the platform support matrix (CLI OS/arch; what spawn can
   launch; GPU/EFA), and how deprecations/support work. Linked from the Reference
   index and sidebar; links to (does not duplicate) the workflow-adapter matrix.
+- **CI: manual-installer platform matrix** (`install-matrix.yml`). Runs the
+  documented manual `curl`-a-tarball install on macOS Intel/ARM and Linux
+  amd64/arm64, then asserts `spawn`/`truffle` land on PATH and run — so asset-naming
+  or install-doc drift turns into a red build instead of a broken first experience.
+  On-demand + weekly, and re-runnable via a `repository_dispatch` from CLI releases.
 - **Docs deploy is now a verifiable release artifact.** The rendered site footer
   carries a **build stamp** — the commit short-SHA (linked) and build date — so you
   can tell from the live site exactly which commit is deployed. The deploy workflow
