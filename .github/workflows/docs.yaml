@@ -85,8 +85,15 @@ jobs:
           set -euo pipefail
           SHORT_SHA="${GITHUB_SHA:0:7}"
           BASE="https://docs.spore.host"
+          # Fetch the page into a variable, THEN grep it — do NOT pipe curl into
+          # `grep -q`. Under `set -o pipefail`, `grep -q` exits on first match and
+          # closes the pipe, so curl aborts with a write error (exit 23) and
+          # pipefail reports the whole pipeline as failed even though the match
+          # succeeded. Separating the two steps avoids that false negative.
           check() {  # $1=path  $2=needle
-            curl -fsS "$BASE/$1" | grep -qF "$2"
+            local body
+            body="$(curl -fsS "$BASE/$1")" || return 1
+            printf '%s' "$body" | grep -qF "$2"
           }
           ok=0
           for attempt in 1 2 3 4 5 6; do
