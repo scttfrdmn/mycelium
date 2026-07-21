@@ -1,23 +1,45 @@
-# Security Overview for spore-host (truffle + spawn)
+# Security Overview for spore.host
 
 **Audience:** CISOs, Cloud Administrators, Security Engineers
 
-**Purpose:** Comprehensive security assessment and operational guidance for deploying spore-host tools in enterprise AWS environments.
+**Purpose:** Security assessment and operational guidance for deploying spore.host tools in AWS environments.
+
+> **The name is spore.host, but spore.host is not the host.** It never holds your
+> AWS credentials and never runs your compute. Everything runs in **your own AWS
+> account** with **your own credentials**. For the full trust/data-flow map, see
+> [Security, credentials & data flow](docs/architecture.md).
 
 ---
 
 ## Executive Summary
 
-**spore-host** is a command-line toolset for AWS EC2 instance discovery and ephemeral compute provisioning. It consists of two components:
+**spore.host** is a suite of command-line tools (plus one in-instance agent) for
+AWS EC2 instance discovery and ephemeral, self-terminating compute. Its
+components:
 
-- **truffle**: EC2 instance type search tool (read-only)
-- **spawn**: EC2 instance launcher with auto-termination (read/write)
+- **truffle** — EC2 instance-type / price / quota search (read-only).
+- **spawn** — EC2 instance launcher and lifecycle manager (read/write).
+- **spored** — the in-instance agent spawn installs on every instance; enforces
+  TTL, idle, completion, and cost rules from *inside* the instance.
+- **lagotto** — capacity watcher that waits for scarce instance types and launches
+  when they appear.
+- **spore-bot** — optional chat control (Slack/Teams) via a hosted Lambda.
+- **MCP server** — exposes a read-mostly subset of operations to AI assistants
+  (search, status, stop, terminate, extend — **no launch**).
+- **plugin registry** ([spore-plugins](https://github.com/spore-host/spore-plugins)) —
+  optional post-launch software installers; official plugins are **cosign-signed**
+  and verified by spawn before install (see §4).
 
-**Security Model:** Least-privilege IAM permissions, explicit resource tagging, and automatic cleanup of ephemeral resources.
+**Security Model:** your credentials never leave your machine; least-privilege
+IAM; explicit resource tagging; in-instance lifecycle enforcement with an
+out-of-band backstop; automatic cleanup of ephemeral resources.
 
-**Risk Profile:** Medium - requires EC2 launch permissions and limited IAM role creation
+**Risk Profile:** Medium — requires EC2 launch permissions and one-time IAM role
+creation for the spored instance profile.
 
-**Compliance:** Supports AWS best practices, CloudTrail auditing, and resource tagging for cost allocation
+**Compliance:** spore.host does not centrally receive or store workload data.
+Supports CloudTrail auditing and resource tagging; compliance obligations remain
+with the user's AWS environment, configuration, and controls (see §5).
 
 ---
 
@@ -235,7 +257,7 @@ All instances launched by spawn are tagged:
 spawn:managed = true
 spawn:root = true
 spawn:created-by = spawn
-spawn:version = 0.1.0
+spawn:version = <spawn version that launched it>
 spawn:ttl = <duration>           (if specified)
 spawn:idle-timeout = <duration>  (if specified)
 ```
@@ -250,35 +272,46 @@ spawn:idle-timeout = <duration>  (if specified)
 
 ### Binary Distribution Security
 
-**Problem:** How to securely distribute spored binary to instances?
+**How spored reaches an instance:** at boot, the instance's user-data downloads
+the spored binary and a `.sha256` checksum from a public, regional S3 bucket
+(`spawn-binaries-<region>`), verifies the checksum, then installs and runs it.
 
-**Solution:** Public S3 with SHA256 verification (industry standard)
+**What the SHA-256 check does — and does not — provide:**
 
-**Implementation:**
-1. spored binaries stored in public S3 buckets (one per region)
-2. Each binary has corresponding `.sha256` checksum file
-3. Instance user-data downloads both binary and checksum
-4. SHA256 verified before execution: `sha256sum --check spored-linux-amd64.sha256`
-5. Installation fails if checksum mismatch
+- ✅ **Corruption detection.** It catches an incomplete or corrupted download
+  (truncated transfer, storage bit-rot). If the bytes don't match, the install
+  fails and the instance does not run a damaged binary.
+- ❌ **It does NOT authenticate the publisher.** The checksum is served from the
+  **same bucket** (same trust domain) as the binary. An attacker who could modify
+  the binary in the bucket could also replace the `.sha256` — the check would then
+  pass. A same-origin checksum guards against accidental corruption, **not**
+  against compromise of the artifact-publishing account or bucket. HTTPS protects
+  the transport, not the origin.
 
-**Why Public S3?**
-- Same model as apt/yum/pip repositories
-- No AWS credentials in user-data (reduces attack surface)
-- Fast downloads (regional buckets, <20ms latency)
-- Tamper detection via cryptographic checksums
+**This is a known limitation with signing in progress.** Publisher
+authentication for spored binaries is tracked at
+[spore-host#440](https://github.com/spore-host/spore-host/issues/440): the target
+design signs each spored binary with a spore.host-held key, publishes the
+signature alongside the binary, and has the bootstrap verify that signature
+against a public key **compiled into spawn** (whose own release is independently
+trusted via Homebrew / GitHub Releases) — moving the trust root out of the S3
+bucket. Until that ships, treat the S3 SHA-256 as an integrity (not authenticity)
+control and rely on the S3 bucket policy + account controls below to limit who can
+write to the bucket.
 
-**Threat Model:**
-- ❌ **Compromised S3 Bucket:** Attacker cannot upload malicious binary without SHA256 key
-- ❌ **Man-in-the-Middle:** HTTPS + SHA256 verification prevents tampering
-- ✅ **Authorized Updates:** Only spawn maintainers can update binaries (S3 bucket policy)
+> **Note — this is distinct from plugin signing, which *is* shipped.** Official
+> **plugins** in the registry are cryptographically signed with cosign/sigstore
+> (keyless, via a GitHub Actions OIDC identity) and their signature is verified by
+> spawn before install (§4, *Plugin supply chain*). That covers plugin manifests,
+> not the spored/spawn release binaries, which are the subject of #440 above.
 
-**S3 Bucket Policy:**
+**S3 Bucket Policy (public read, restricted write):**
 ```json
 {
   "Version": "2012-10-17",
   "Statement": [
     {
-      "Sid": "PublicReadSpawndBinaries",
+      "Sid": "PublicReadSporedBinaries",
       "Effect": "Allow",
       "Principal": "*",
       "Action": "s3:GetObject",
@@ -287,6 +320,27 @@ spawn:idle-timeout = <duration>  (if specified)
   ]
 }
 ```
+Write access to the bucket is restricted to the release pipeline; public access
+is read-only for the binary objects.
+
+---
+
+### Plugin supply chain
+
+Optional plugins (post-launch software installers) are resolved and, for official
+plugins, cryptographically verified before anything runs:
+
+- Official plugin releases are **cosign-signed keyless** in CI (a GitHub Actions
+  OIDC identity → Fulcio certificate + Rekor transparency-log entry).
+- `spawn` verifies the signature by default for an official versioned reference,
+  pinning the signing identity to the spore-plugins release workflow. A missing or
+  invalid signature is a hard failure (`--insecure` bypasses it for local dev).
+- Each plugin also ships a checksum manifest verified against the fetched
+  `plugin.yaml`, and a plugin's declared `permissions:` block is enforced against
+  its steps at publish time.
+
+This closes the "who authored this code that runs on my instance" question for
+plugins. See the [registry supply-chain design](https://github.com/spore-host/spore-plugins).
 
 ---
 
@@ -397,20 +451,57 @@ aws budgets create-budget \
 
 ### Compliance Considerations
 
+**The key fact:** spore.host does **not** centrally receive, process, or store
+your workload data. Instances run in your VPC, under your account, with your
+credentials; any data on them is placed there by you. spore.host therefore cannot
+confer compliance — compliance obligations remain with your AWS environment, the
+services you enable, your configuration, your data handling, and your
+institutional controls. Do not assume a workload is compliant merely because the
+instance runs in your own VPC.
+
+What spore.host *does* provide that supports a compliance program:
+
 **GDPR / Data Residency:**
-- spawn respects regional boundaries (no cross-region data transfer)
-- Users control region via `--region` flag
-- AMI selection automatic per region
+- spawn respects the region you choose (`--region`); no cross-region movement of
+  your data by spore.host.
 
 **PCI-DSS / HIPAA:**
-- spawn does not handle sensitive data
-- Instances launched in user's VPC (user controls network security)
-- Encryption at rest supported (EBS encryption via instance type requirements)
+- No workload data flows to spore.host; instances run in your VPC under your
+  network controls. EBS encryption is supported. Meeting these frameworks depends
+  on *your* configuration and BAAs/controls, not on spore.host.
 
 **SOC 2 / ISO 27001:**
-- Audit trail via CloudTrail
-- Resource tagging for inventory management
-- Automatic cleanup reduces security surface area
+- CloudTrail captures all spawn operations; resource tagging supports inventory;
+  automatic cleanup reduces standing surface area. These are inputs to your
+  controls, not attestations by spore.host.
+
+---
+
+### Lifecycle guarantee by deployment mode
+
+The TTL guarantee ("every protected instance has a hard termination deadline") is
+enforced in two layers: **spored** inside the instance, and an optional
+**out-of-band reaper** that acts as a backstop if spored can't. What you get
+depends on which you deploy:
+
+| Mode | spored (in-instance) | Out-of-band reaper | Workload data leaves account | Failure guarantee |
+|------|:---:|:---:|:---:|---|
+| **CLI only** (default) | Yes | No | No | Instance-local enforcement: spored terminates at TTL. If spored itself is disabled/killed, only your AWS-side controls (Budgets/SCPs) remain. |
+| **Self-hosted backstop** | Yes | Yes (in your account) | No | Dual enforcement: the reaper terminates past-deadline instances even if spored fails. |
+| **Hosted integrations** | Yes | Yes / optional | Selected metadata only (never credentials or workload data) | Dual enforcement when the reaper is enabled. |
+
+Notes on the reaper (see
+[spawn/lambda/ttl-reaper](https://github.com/spore-host/spawn/tree/main/lambda/ttl-reaper)):
+
+- It is **not enabled by default** and ships in **dry-run** (logs "would reap" +
+  notifies; does not terminate) until an operator flips it to enforce mode after
+  verification.
+- It assumes a **narrow per-account cross-account role you grant** (scoped to
+  terminating past-deadline `spawn:managed` instances) — it never holds your
+  credentials.
+- With **no reaper configured**, the hard guarantee is provided by spored alone;
+  the reaper is the backstop for the case where spored can't act. Verify spored is
+  running and the deadline is set with `spawn status`.
 
 ---
 
@@ -422,7 +513,8 @@ aws budgets create-budget \
 |------|----------|------------|
 | Excessive instance launches | Medium | AWS Budgets, SCPs, `--ttl` requirement |
 | IAM role privilege escalation | Low | Role scoped to `spawn:managed=true` only |
-| Binary tampering | Low | SHA256 verification, HTTPS |
+| spored binary corruption | Low | SHA256 verification, HTTPS |
+| spored binary tampering (bucket compromise) | Medium | S3 bucket write-access controls today; publisher signing in progress (#440) — same-bucket SHA256 does **not** mitigate this |
 | Forgotten instances | Low | TTL enforcement, idle detection |
 | Insider threat (malicious user) | Medium | CloudTrail auditing, IAM least privilege |
 | Credential exposure | Medium | No credentials in user-data, IMDSv2 supported |
@@ -434,7 +526,9 @@ aws budgets create-budget \
 ✅ **Automatic Cleanup:** TTL/idle detection prevents resource leaks
 ✅ **Audit Trail:** CloudTrail captures all operations
 ✅ **Cost Controls:** Budgets, SCPs, Spot instances
-✅ **Binary Integrity:** SHA256 verification
+✅ **Binary Integrity (corruption):** SHA256 verification of spored downloads
+✅ **Plugin Authenticity:** official plugins cosign-signed + verified by spawn
+⏳ **spored Binary Authenticity:** publisher signing in progress (#440); today's same-bucket SHA256 detects corruption, not compromise
 ✅ **Network Security:** User controls VPC, security groups, subnets
 
 ---
@@ -580,7 +674,7 @@ aws cloudtrail lookup-events \
 
 ---
 
-## 10. Code-Level Security Hardening (v0.13.0)
+## 10. Code-Level Security Hardening
 
 ### Command Injection Protection
 
@@ -609,7 +703,8 @@ spawn implements comprehensive protection against shell command injection attack
    - Mount paths validated and escaped
    - Filesystem DNS names escaped in mount commands
 
-**Test Coverage**: 78.4% with attack pattern fuzzing
+**Test Coverage**: security-critical paths are covered by unit tests with
+attack-pattern fuzzing; current coverage is reported by CI on each repo.
 
 ---
 
@@ -694,7 +789,7 @@ logger := audit.NewLoggerFromContext(ctx)
 - Correlation IDs for distributed tracing
 - User attribution for compliance
 
-**Test Coverage**: 79.2%
+**Test Coverage**: audit paths are unit-tested; current coverage is reported by CI.
 
 ---
 
@@ -716,9 +811,8 @@ logger := audit.NewLoggerFromContext(ctx)
    - Context propagation
    - Error logging
 
-**Coverage Targets**:
-- Security package: 78.4% (target: 80%)
-- Audit package: 79.2% (target: 80%)
+**Coverage Targets**: security and audit packages target ≥80% coverage, enforced
+by a CI ratchet floor; current figures are shown by each repo's coverage badge.
 
 ---
 
@@ -769,7 +863,16 @@ It cannot access S3, RDS, DynamoDB, or any other AWS services.
 
 ### Q: What if someone modifies the spored binary on S3?
 
-**A:** The instance will fail to launch. User-data verifies SHA256 checksum before executing spored. If the binary is tampered, the checksum won't match and installation aborts.
+**A:** Be precise about the two cases. **Accidental corruption** (truncated
+download, bit-rot) is caught: user-data verifies the SHA-256 before executing, and
+a mismatch aborts installation. **Malicious replacement by an attacker who has
+write access to the bucket** is *not* caught today, because the `.sha256` is served
+from the same bucket — an attacker who can replace the binary can also replace its
+checksum. That gap is mitigated by restricting bucket write access to the release
+pipeline, and is being closed by publisher signing
+([#440](https://github.com/spore-host/spore-host/issues/440)), which verifies a
+signature against a key compiled into spawn rather than a checksum from the same
+bucket. See §4, *Binary Distribution Security*.
 
 ---
 
@@ -811,9 +914,13 @@ aws ce get-cost-and-usage \
 **Security Issues:** Report to project maintainers (see CONTRIBUTING.md)
 
 **Documentation:**
-- Full IAM policy: `spawn/IAM_PERMISSIONS.md`
-- User guide: `spawn/README.md`
-- Validation script: `scripts/validate-permissions.sh`
+- IAM permissions reference: [docs/reference/iam-permissions.md](docs/reference/iam-permissions.md)
+- Security, credentials & data flow: [docs/architecture.md](docs/architecture.md)
+- Costs & safety guarantees: [docs/safety.md](docs/safety.md)
+
+**Reporting a vulnerability:** please use the private
+[GitHub Security Advisory](https://github.com/spore-host/spore-host/security/advisories/new)
+rather than a public issue.
 
 **References:**
 - [AWS IAM Best Practices](https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html)
@@ -822,6 +929,5 @@ aws ce get-cost-and-usage \
 
 ---
 
-**Document Version:** 1.0
-**Last Updated:** December 21, 2025
-**Next Review:** January 21, 2026
+This document tracks the current design; it is not pinned to a specific release.
+Component behavior is versioned in each repo's `CHANGELOG.md`.
