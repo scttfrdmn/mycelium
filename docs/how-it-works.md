@@ -72,7 +72,7 @@ Lifecycle events from spored are routed through spore-bot to your Slack DMs:
 
 ### <span class="tool-badge mcp">MCP Server</span> — Control from AI assistants
 
-The spore.host MCP server exposes all of the above as tools for AI assistants that support the Model Context Protocol — Claude Desktop, Cursor, and others. Instead of running CLI commands, you describe what you need in plain language and the assistant handles it.
+The spore.host MCP server exposes spore.host's **read and manage** operations as tools for AI assistants that support the Model Context Protocol — Claude Desktop, Cursor, and others. It can discover instance types with truffle and inspect or manage instances you already have running (status, stop, terminate, extend) — but it deliberately **cannot launch** instances, so an assistant can never spin up billable compute on your behalf. Instead of running CLI commands, you describe what you need in plain language and the assistant handles it.
 
 > *"What instances do I have running and how long until they terminate?"*
 
@@ -106,7 +106,7 @@ This means you can set global defaults once and override per-launch without re-s
 
 ## What spore.host doesn't do
 
-- It doesn't manage your SSH keys beyond passing the one you specify at launch
+- It doesn't take over SSH-key management: spawn imports your existing default public key (`~/.ssh/id_ed25519` or `~/.ssh/id_rsa`) and only generates a managed key under `~/.spawn/keys/` if you have none — it never touches or uploads your private keys
 - It doesn't modify your AWS account structure, VPCs, or security groups (beyond what's needed to launch)
 - It doesn't store your AWS credentials — everything uses your existing credential chain
 - It doesn't require any always-on infrastructure in your account (spored runs on the instance; the Lambda functions run in the spore.host-infra account)

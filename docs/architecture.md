@@ -95,7 +95,11 @@ env vars that point the tools at hosted vs. self-hosted infrastructure in
 
 ## What spore.host doesn't do
 
-- It doesn't manage your SSH keys beyond passing the one you specify at launch.
+- It doesn't take over SSH-key management. spawn imports your existing default
+  public key (`~/.ssh/id_ed25519` or `~/.ssh/id_rsa`) into EC2 and connects you as
+  a user matching your local login; only if you have no default key does it
+  generate and manage one under `~/.spawn/keys/`. It never reads, moves, or uploads
+  your private keys.
 - It doesn't modify your AWS account structure, VPCs, or security groups beyond
   what's needed to launch.
 - It doesn't store your AWS credentials — everything uses your existing chain.
