@@ -1,0 +1,27 @@
+name: Security vulnerability
+description: PLEASE DON'T — report vulnerabilities privately (see below)
+labels: ["security"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 🔒 Do not report security vulnerabilities in a public issue
+
+        Please **stop** and report privately instead, so the issue isn't disclosed
+        before a fix is available:
+
+        **→ [Open a private security advisory](https://github.com/spore-host/spore-host/security/advisories/new)**
+
+        This reaches the maintainers privately. See [SECURITY.md](https://github.com/spore-host/spore-host/blob/main/SECURITY.md)
+        for scope and what to include.
+
+        If your report is **not** a vulnerability (e.g. a general hardening
+        suggestion or a docs clarification), use the Bug report or Documentation
+        issue template instead.
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Confirmation
+      options:
+        - label: I understand vulnerabilities should be reported via the private advisory link above, not here.
+          required: true
