@@ -16,7 +16,7 @@ A complete walkthrough from a fresh install to a running EC2 instance and back. 
 
 ## Prerequisites
 
-- An AWS account (free tier works fine)
+- An AWS account (a small instance costs a few cents for this walkthrough)
 - macOS, Linux, or Windows with WSL2
 - Basic comfort with the command line
 
@@ -56,7 +56,7 @@ Expected output:
 }
 ```
 
-If this fails, sign in with **`aws login`** (AWS CLI v2.34+; static `aws configure` keys also work). spore.host uses the same credentials as the AWS CLI — nothing extra to configure. See [AWS Authentication](/guides/aws-auth) for profiles and how auth relates to permissions.
+If this fails, sign in with **`aws login`** (AWS CLI v2.32.0+; static `aws configure` keys also work). spore.host uses the same credentials as the AWS CLI — nothing extra to configure. See [AWS Authentication](/guides/aws-auth) for profiles and how auth relates to permissions.
 
 ---
 
@@ -68,7 +68,7 @@ Before launching, see what's available and what it costs:
 truffle find "t3 medium" --region us-east-1
 ```
 
-You'll see a table with vCPUs, memory, and on-demand price. For this walkthrough we'll use a `t3.micro` — free tier eligible.
+You'll see a table with vCPUs, memory, and on-demand price. For this walkthrough we'll use a `t3.micro` — cheap, and marked Free Tier eligible in many accounts (eligibility and credits vary by account age/plan, so check the price Truffle shows before launching).
 
 ---
 
@@ -86,11 +86,11 @@ After about 60–90 seconds:
 ```
 ✓ Instance i-0a1b2c3d4e5f running
 ✓ my-first-instance.abc123.spore.host
-✓ SSH: ssh ec2-user@54.123.45.67
+✓ Connect: spawn connect my-first-instance
 ✓ Auto-terminates in 1h
 ```
 
-spawn automatically found the latest Amazon Linux 2023 AMI, created an SSH key, configured networking, and installed spored on the instance.
+spawn automatically found the latest Amazon Linux 2023 AMI, imported your existing SSH public key (or generated a managed one if you had none), created a Linux user matching your local login, configured networking, and installed spored on the instance.
 
 ---
 
@@ -100,11 +100,9 @@ spawn automatically found the latest Amazon Linux 2023 AMI, created an SSH key, 
 spawn connect my-first-instance
 ```
 
-This prints the SSH command. Or connect directly:
-
-```sh
-ssh ec2-user@54.123.45.67
-```
+This logs you in **as your own username** (the Linux user spawn created to match
+your local login), using the key it imported — you don't need to know the address,
+key path, or username. Raw `ssh <you>@<public-ip>` works too if you prefer.
 
 ::: tip
 If you get "Connection refused", the instance is still booting. Wait 30 seconds and try again.
@@ -158,7 +156,7 @@ When you're done, permanently terminate it (destroys the instance and its EBS vo
 spawn terminate my-first-instance       # confirms first; add -y to skip
 ```
 
-Or `spawn stop my-first-instance` to keep the EBS volume and resume later — or just leave it, since it auto-terminates after 1 hour (the default idle timeout).
+Or `spawn stop my-first-instance` to keep the EBS volume and resume later (the volume still bills until you terminate) — or just leave it, since it auto-terminates at the **1-hour TTL you set** with `--ttl 1h`. (TTL is a hard deadline that *terminates*; idle timeout is a separate, opt-in setting that *stops*.)
 
 ---
 

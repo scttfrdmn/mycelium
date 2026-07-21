@@ -21,10 +21,15 @@ scoop install truffle spawn
 ```
 
 ```sh [Manual]
-# Download from GitHub Releases
-# https://github.com/spore-host/spore-host/releases/latest
-tar -xzf spawn_*_$(uname -s)_$(uname -m).tar.gz
-tar -xzf truffle_*_$(uname -s)_$(uname -m).tar.gz
+# Download the latest release assets for your OS/arch, then extract onto PATH.
+OS=$(uname -s); ARCH=$(uname -m)
+for tool in spawn truffle; do
+  url=$(curl -fsSL "https://api.github.com/repos/spore-host/${tool}/releases/latest" \
+    | grep -o "https://[^\"]*_${OS}_${ARCH}.tar.gz" | head -1)
+  curl -fsSL "$url" -o "${tool}.tar.gz"
+  tar -xzf "${tool}.tar.gz" "$tool"
+  sudo install "$tool" /usr/local/bin/
+done
 ```
 
 :::
@@ -38,14 +43,18 @@ spawn --version
 
 ## Authenticate with AWS
 
-spore.host uses whatever AWS credentials your shell already has. The recommended way to get them is **`aws login`** (AWS CLI v2.34+), which signs you in and refreshes short-lived credentials automatically:
+spore.host uses whatever AWS credentials your shell already has. The recommended way to get them is **`aws login`** (AWS CLI v2.32.0+), which signs you in and refreshes short-lived credentials automatically:
 
 ```sh
 aws login                       # sign in (opens your browser)
 aws sts get-caller-identity     # confirm you're authenticated
 ```
 
-If your organization issues static keys instead, `aws configure` (Access Key ID / Secret Access Key / region) also works — `aws login` is preferred because the credentials are short-lived.
+Other paths work too — pick whichever matches your organization:
+- **IAM Identity Center (SSO):** `aws configure sso` then `aws sso login --profile <name>` (set `AWS_PROFILE` or `--profile`).
+- **Static keys / CI / assumed roles:** any credential your shell already resolves (env vars, `~/.aws/credentials`, instance role) is used as-is.
+
+`aws login` is preferred where available because the credentials are short-lived.
 
 Your credentials need permission to launch and manage EC2 instances; see the [minimal IAM policy](/reference/iam-permissions). For the full picture — profiles, `SPORE_*` config, and how your auth relates to what spore.host does on your behalf — see [AWS Authentication](/guides/aws-auth).
 
@@ -82,22 +91,27 @@ spawn launch \
   --ttl 4h
 ```
 
-Once running, you'll see the instance ID, public IP, and SSH command:
+Once running, you'll see the instance ID, hostname, and how to connect:
 
 ```
 ✓ Instance i-0a1b2c3d4e5f running
 ✓ my-first-instance.abc123.spore.host
-✓ SSH: ssh ec2-user@3.84.123.45
+✓ Connect: spawn connect my-first-instance
 ✓ Auto-terminates in 4h
 ```
 
 ## Connect
 
 ```sh
-ssh ec2-user@<public-ip>
+spawn connect my-first-instance
 ```
 
-The SSH key used is whichever key you specified at launch. By default, spawn uses your `~/.ssh/id_rsa` or prompts you to select one.
+`spawn connect` is the canonical way in — it resolves the instance, uses the
+right key, and logs you in as **your own username** (spawn creates a Linux user
+matching your local login and imports your existing public key —
+`~/.ssh/id_ed25519` or `~/.ssh/id_rsa` — generating a managed key only if you have
+neither). Raw `ssh <you>@<public-ip>` works too, but prefer `spawn connect` so you
+don't have to track the address, key, or username yourself.
 
 ## Check status
 
@@ -114,11 +128,24 @@ If you need more time before the instance terminates:
 spawn extend my-first-instance 8h
 ```
 
-## Stop or terminate
+## Clean up
+
+When you're done, **terminate** — this deletes the instance and its EBS volume,
+so nothing keeps billing:
 
 ```sh
-spawn stop my-first-instance       # stopped, can be restarted with spawn start
+spawn terminate my-first-instance
 ```
+
+Prefer to pause and resume later? **Stop** instead — but note a stopped instance
+still bills for its EBS storage until you terminate it:
+
+```sh
+spawn stop my-first-instance       # resumable with `spawn start`; EBS still bills
+```
+
+(You didn't have to remember this: the `--ttl` you set means the instance
+self-terminates at its deadline regardless.)
 
 ## Next steps
 

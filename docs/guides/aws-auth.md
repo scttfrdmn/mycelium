@@ -8,7 +8,7 @@ spore.host tools (`spawn`, `truffle`, `lagotto`) act on AWS with **your own AWS 
 
 ## Sign in with `aws login`
 
-The recommended way to authenticate is **`aws login`** (AWS CLI **v2.34+**), which signs you in and manages **short-lived, auto-refreshing** credentials:
+The recommended way to authenticate is **`aws login`** (AWS CLI **v2.32.0+**), which signs you in and manages **short-lived, auto-refreshing** credentials:
 
 ```sh
 aws login                     # opens your browser to sign in
@@ -20,6 +20,21 @@ That's it — `spawn`, `truffle`, and `lagotto` pick these credentials up automa
 ::: tip Why `aws login` over static keys
 `aws login` credentials expire and refresh, so there's no long-lived secret to leak. Prefer it. Static access keys (`aws configure`) still work as a fallback — see below — but treat them as legacy/CI-only.
 :::
+
+### IAM Identity Center (SSO)
+
+If your institution uses **AWS IAM Identity Center** (formerly AWS SSO) — common
+at universities and larger organizations — configure a profile once and sign in
+through it:
+
+```sh
+aws configure sso                 # one-time: set SSO start URL, region, account, role
+aws sso login --profile research  # sign in (opens your browser); refresh when it expires
+```
+
+Then point the spore.host tools at that profile (`AWS_PROFILE=research`, or
+`--profile research`, or the `sporeconfig` layer below). These are short-lived
+credentials, same as `aws login`.
 
 ### Static keys (fallback)
 
