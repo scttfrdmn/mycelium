@@ -147,6 +147,7 @@ const sidebar = {
       text: 'Reference',
       collapsed: true,
       items: [
+        { text: 'Maturity & support policy', link: '/reference/maturity' },
         { text: 'Configuration', link: '/reference/configuration' },
         { text: 'EC2 Tags', link: '/reference/ec2-tags' },
         { text: 'Environment Variables', link: '/reference/environment-variables' },
