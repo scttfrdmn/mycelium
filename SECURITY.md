@@ -276,34 +276,32 @@ spawn:idle-timeout = <duration>  (if specified)
 the spored binary and a `.sha256` checksum from a public, regional S3 bucket
 (`spawn-binaries-<region>`), verifies the checksum, then installs and runs it.
 
-**What the SHA-256 check does — and does not — provide:**
+**Two layers protect the download:**
 
-- ✅ **Corruption detection.** It catches an incomplete or corrupted download
-  (truncated transfer, storage bit-rot). If the bytes don't match, the install
-  fails and the instance does not run a damaged binary.
-- ❌ **It does NOT authenticate the publisher.** The checksum is served from the
-  **same bucket** (same trust domain) as the binary. An attacker who could modify
-  the binary in the bucket could also replace the `.sha256` — the check would then
-  pass. A same-origin checksum guards against accidental corruption, **not**
-  against compromise of the artifact-publishing account or bucket. HTTPS protects
-  the transport, not the origin.
+- ✅ **Publisher signature (authenticity).** As of spawn v0.91.1, each spored
+  binary is signed with a spore.host-held **KMS asymmetric key** (ECDSA_SHA_256,
+  `kms:Sign` — the private key never leaves KMS), and the `.sig` is published
+  alongside the binary. The bootstrap verifies that signature with `openssl`
+  against a public key **compiled into spawn** — whose own release is
+  independently trusted via Homebrew / GitHub Releases — *before executing
+  spored*, and **fails closed** on a missing or invalid signature. Because the
+  trust root is the spawn binary, **not** the S3 bucket, an attacker who rewrites
+  the bucket cannot forge a signature without the KMS key. (spore-host#440)
+- ✅ **Corruption detection.** The `.sha256` still guards against an incomplete or
+  corrupted download (truncated transfer, bit-rot) as a cheap first check.
 
-**This is a known limitation with signing in progress.** Publisher
-authentication for spored binaries is tracked at
-[spore-host#440](https://github.com/spore-host/spore-host/issues/440): the target
-design signs each spored binary with a spore.host-held key, publishes the
-signature alongside the binary, and has the bootstrap verify that signature
-against a public key **compiled into spawn** (whose own release is independently
-trusted via Homebrew / GitHub Releases) — moving the trust root out of the S3
-bucket. Until that ships, treat the S3 SHA-256 as an integrity (not authenticity)
-control and rely on the S3 bucket policy + account controls below to limit who can
-write to the bucket.
+Why the checksum alone was not enough (and why the signature was added): the
+`.sha256` is served from the **same bucket** as the binary, so an attacker who
+could modify the binary could also replace the checksum — a same-origin checksum
+proves integrity (not corrupted) but **not authenticity** (from the real
+publisher). The signature closes that gap by moving the trust root out of the
+bucket.
 
-> **Note — this is distinct from plugin signing, which *is* shipped.** Official
-> **plugins** in the registry are cryptographically signed with cosign/sigstore
-> (keyless, via a GitHub Actions OIDC identity) and their signature is verified by
-> spawn before install (§4, *Plugin supply chain*). That covers plugin manifests,
-> not the spored/spawn release binaries, which are the subject of #440 above.
+> **Related — plugin signing.** Official **plugins** in the registry are also
+> signed, but with cosign/sigstore keyless (GitHub Actions OIDC → Fulcio/Rekor),
+> verified by spawn before install (§4, *Plugin supply chain*). Plugins use
+> keyless; the spored *binaries* use the KMS key above, because the bootstrap
+> verifies at boot in bash before any sigstore tooling exists.
 
 **S3 Bucket Policy (public read, restricted write):**
 ```json
@@ -514,7 +512,7 @@ Notes on the reaper (see
 | Excessive instance launches | Medium | AWS Budgets, SCPs, `--ttl` requirement |
 | IAM role privilege escalation | Low | Role scoped to `spawn:managed=true` only |
 | spored binary corruption | Low | SHA256 verification, HTTPS |
-| spored binary tampering (bucket compromise) | Medium | S3 bucket write-access controls today; publisher signing in progress (#440) — same-bucket SHA256 does **not** mitigate this |
+| spored binary tampering (bucket compromise) | Low | Publisher signature verified at boot against a key compiled into spawn (KMS-signed release, #440); a bucket rewrite can't forge it. Plus S3 bucket write-access controls. |
 | Forgotten instances | Low | TTL enforcement, idle detection |
 | Insider threat (malicious user) | Medium | CloudTrail auditing, IAM least privilege |
 | Credential exposure | Medium | No credentials in user-data, IMDSv2 supported |
@@ -528,7 +526,7 @@ Notes on the reaper (see
 ✅ **Cost Controls:** Budgets, SCPs, Spot instances
 ✅ **Binary Integrity (corruption):** SHA256 verification of spored downloads
 ✅ **Plugin Authenticity:** official plugins cosign-signed + verified by spawn
-⏳ **spored Binary Authenticity:** publisher signing in progress (#440); today's same-bucket SHA256 detects corruption, not compromise
+✅ **spored Binary Authenticity:** each spored binary is KMS-signed at release and its signature is verified at boot against a key compiled into spawn, fail-closed (#440)
 ✅ **Network Security:** User controls VPC, security groups, subnets
 
 ---
@@ -863,16 +861,14 @@ It cannot access S3, RDS, DynamoDB, or any other AWS services.
 
 ### Q: What if someone modifies the spored binary on S3?
 
-**A:** Be precise about the two cases. **Accidental corruption** (truncated
-download, bit-rot) is caught: user-data verifies the SHA-256 before executing, and
-a mismatch aborts installation. **Malicious replacement by an attacker who has
-write access to the bucket** is *not* caught today, because the `.sha256` is served
-from the same bucket — an attacker who can replace the binary can also replace its
-checksum. That gap is mitigated by restricting bucket write access to the release
-pipeline, and is being closed by publisher signing
-([#440](https://github.com/spore-host/spore-host/issues/440)), which verifies a
-signature against a key compiled into spawn rather than a checksum from the same
-bucket. See §4, *Binary Distribution Security*.
+**A:** Both cases are covered. **Accidental corruption** (truncated download,
+bit-rot) is caught by the SHA-256 check. **Malicious replacement by an attacker
+with write access to the bucket** is caught by the **publisher signature**: each
+spored binary is KMS-signed at release, and the bootstrap verifies the `.sig`
+against a public key compiled into spawn before executing spored, failing closed
+on a mismatch (spawn v0.91.1+, [#440](https://github.com/spore-host/spore-host/issues/440)).
+Because the verifying key lives in the spawn binary (not the bucket), rewriting
+the bucket can't forge a valid signature. See §4, *Binary Distribution Security*.
 
 ---
 
