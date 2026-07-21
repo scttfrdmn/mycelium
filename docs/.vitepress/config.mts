@@ -4,6 +4,18 @@ import path from 'node:path'
 
 const SITE_URL = 'https://docs.spore.host'
 
+// Build stamp — makes every deployed build self-identifying so you can tell from
+// the live site which commit/date it was built from (a docs-release-integrity
+// check: if the footer commit doesn't match main, the deploy is stale). In CI,
+// GITHUB_SHA and DOCS_BUILD_DATE are set by .github/workflows/docs.yaml; locally
+// they're absent, so we fall back to a "dev" marker and today's date.
+const BUILD_SHA = (process.env.GITHUB_SHA || '').slice(0, 7) || 'dev'
+const BUILD_DATE = process.env.DOCS_BUILD_DATE || new Date().toISOString().slice(0, 10)
+const BUILD_STAMP =
+  BUILD_SHA === 'dev'
+    ? `local build · ${BUILD_DATE}`
+    : `build <a href="https://github.com/spore-host/spore-host/commit/${process.env.GITHUB_SHA}"><code>${BUILD_SHA}</code></a> · ${BUILD_DATE}`
+
 // Sidebar is a top-level const so the llms.txt generator (buildEnd, below) can
 // walk the exact same structure the site renders — the manifest can't drift from
 // the nav.
@@ -243,7 +255,7 @@ export default defineConfig({
 
     footer: {
       message: 'Get help on <a href="https://discord.gg/2deGRFCW">Discord</a> · <a href="https://github.com/spore-host/spore-host/issues/new/choose">Report a problem</a> · <a href="https://github.com/spore-host/spore-host/security/advisories/new">Report a vulnerability</a> · Released under the <a href="https://github.com/spore-host/spore-host/blob/main/LICENSE">Apache 2.0 License</a>.',
-      copyright: '© 2026 Scott Friedman',
+      copyright: `© 2026 Scott Friedman · ${BUILD_STAMP}`,
     },
 
     search: {
