@@ -1,0 +1,60 @@
+# Contributing to spore.host
+
+Thanks for your interest in improving spore.host. This repo (`spore-host`) is the
+umbrella: it holds the documentation site, the hosted API/dashboard, deployment
+automation, and this project-wide guidance. The individual tools live in their own
+repositories.
+
+## Where things live (open issues in the right repo)
+
+| You want to… | Repo |
+|--------------|------|
+| Report a docs problem, or a website/dashboard/API issue | [spore-host](https://github.com/spore-host/spore-host) (this repo) |
+| File a bug or request a feature in **spawn** (launch/lifecycle) | [spawn](https://github.com/spore-host/spawn) |
+| …in **truffle** (discovery/pricing/quotas) | [truffle](https://github.com/spore-host/truffle) |
+| …in **lagotto** (capacity watching) | [lagotto](https://github.com/spore-host/lagotto) |
+| …in the **MCP server** | [spore-host-mcp](https://github.com/spore-host/spore-host-mcp) |
+| Add or fix an official **plugin** | [spore-plugins](https://github.com/spore-host/spore-plugins) |
+| A **workflow adapter** (Nextflow/Snakemake/CWL/WDL/Airflow) | its own `*-spawn` / `*-executor-plugin-spawn` repo |
+
+Not sure which repo? Open it here and we'll route it, or ask in
+[Discord](https://discord.gg/2deGRFCW).
+
+## Getting help vs. reporting
+
+- **Question or usage help:** [Discord](https://discord.gg/2deGRFCW) is faster than an issue.
+- **Bug / feature:** open an issue in the relevant repo (templates provided).
+- **Security vulnerability:** do **not** open a public issue — use the private
+  [security advisory form](https://github.com/spore-host/spore-host/security/advisories/new).
+  See [SECURITY.md](SECURITY.md).
+
+## Development
+
+Each Go tool follows the same conventions (see the repo's `CLAUDE.md` / `Makefile`):
+
+- **Build/test:** `make check` (fmt, vet, lint, short tests) before every commit;
+  `make test` for full coverage; `make build` to build.
+- **Style:** `gofmt`/`goimports`; pass `go vet` + `staticcheck` + `golangci-lint`;
+  godoc comments on exported identifiers; wrap errors with `fmt.Errorf("op: %w", err)`.
+- **Commits:** [Conventional Commits](https://www.conventionalcommits.org/)
+  (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`), branch prefixes `feat/` `fix/`
+  `docs/`, one PR per change, link the issue.
+- **Versioning:** [SemVer 2.0.0](https://semver.org) + a Keep-a-Changelog
+  `CHANGELOG.md`; update `## [Unreleased]` in the **same PR** as any user-facing change.
+- **Docs:** the site is VitePress under `docs/`. `cd docs && npm install && npm run
+  docs:dev` to preview; `npm run build` must pass. CLI references are generated —
+  don't hand-edit generated pages.
+
+## Cost safety (important)
+
+Several tools launch **real, billable** AWS resources. Any test that touches AWS
+must set a TTL, terminate explicitly when done, and be independently leak-checked
+(no orphaned instances). Never commit changes that could leave resources running.
+
+## Code of Conduct
+
+By participating you agree to the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+## License
+
+Contributions are accepted under the project's [Apache 2.0 license](LICENSE).

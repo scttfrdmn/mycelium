@@ -217,6 +217,14 @@ export default defineConfig({
       { text: 'Workflows', link: '/guides/' },
       { text: 'Tools', link: '/tools/' },
       { text: 'Reference', link: '/reference/' },
+      {
+        text: 'Get help',
+        items: [
+          { text: '💬 Community chat (Discord)', link: 'https://discord.gg/2deGRFCW' },
+          { text: '🐛 Report a problem', link: 'https://github.com/spore-host/spore-host/issues/new/choose' },
+          { text: '🔒 Report a vulnerability (private)', link: 'https://github.com/spore-host/spore-host/security/advisories/new' },
+        ],
+      },
       { text: 'spore.host', link: 'https://spore.host', target: '_blank' },
     ],
 
@@ -224,6 +232,7 @@ export default defineConfig({
 
     socialLinks: [
       { icon: 'github', link: 'https://github.com/spore-host/spore-host' },
+      { icon: 'discord', link: 'https://discord.gg/2deGRFCW' },
     ],
 
     editLink: {
@@ -232,7 +241,7 @@ export default defineConfig({
     },
 
     footer: {
-      message: 'Released under the <a href="https://github.com/spore-host/spore-host/blob/main/LICENSE">Apache 2.0 License</a>.',
+      message: 'Get help on <a href="https://discord.gg/2deGRFCW">Discord</a> · <a href="https://github.com/spore-host/spore-host/issues/new/choose">Report a problem</a> · <a href="https://github.com/spore-host/spore-host/security/advisories/new">Report a vulnerability</a> · Released under the <a href="https://github.com/spore-host/spore-host/blob/main/LICENSE">Apache 2.0 License</a>.',
       copyright: '© 2026 Scott Friedman',
     },
 

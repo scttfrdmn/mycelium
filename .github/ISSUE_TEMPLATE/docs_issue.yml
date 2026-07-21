@@ -1,0 +1,29 @@
+name: Documentation issue
+description: Report an error, gap, or confusing wording in the docs or website
+labels: ["documentation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve the spore.host docs. For a broken or incorrect
+        statement, please link the exact page.
+  - type: input
+    id: page
+    attributes:
+      label: Page / URL
+      description: The docs page or website URL with the problem.
+      placeholder: "e.g. https://docs.spore.host/quickstart"
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's wrong or missing?
+      description: What does it say (or fail to say), and why is that a problem?
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested fix (optional)
+      description: If you know what it should say, tell us here.
