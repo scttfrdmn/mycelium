@@ -14,6 +14,10 @@ own changelogs for CLI releases.
 ## [Unreleased]
 
 ### Added
+- **Docs: "Verify a download" section** in the installation guide — how to check a
+  manually-downloaded release with keyless cosign (`cosign verify-blob --bundle`
+  against the release workflow's OIDC identity) plus the checksum, for the CLIs now
+  cosign-signed under spore-host#344. Notes that spored is verified automatically.
 - **Docs: new "Worked transcripts" page** (`/guides/transcripts`) — complete,
   annotated terminal sessions using the tools' real output: a passing `spawn
   doctor`, a preflight blocked by a missing IAM permission (with the exact fix
