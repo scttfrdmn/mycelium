@@ -14,6 +14,12 @@ own changelogs for CLI releases.
 ## [Unreleased]
 
 ### Added
+- **Docs: new "Worked transcripts" page** (`/guides/transcripts`) — complete,
+  annotated terminal sessions using the tools' real output: a passing `spawn
+  doctor`, a preflight blocked by a missing IAM permission (with the exact fix
+  lines), a protected launch, `spawn status` showing the lifecycle-protection
+  block, and terminate + cleanup verification. Linked from Start Here and the first
+  instance guide.
 - **Marketing site (spore.host) now deploys via CI.** New `deploy-site.yaml` syncs
   `web/` → the site bucket + invalidates CloudFront on every push to `main` under
   `web/**` (short HTML cache, long asset cache, post-deploy smoke). Previously the

@@ -45,6 +45,7 @@ const sidebar = {
         { text: 'AWS Authentication', link: '/guides/aws-auth' },
         { text: 'Required permissions', link: '/reference/iam-permissions' },
         { text: 'Your first instance', link: '/guides/first-instance' },
+        { text: 'Worked transcripts', link: '/guides/transcripts' },
         { text: 'Verify lifecycle protection', link: '/guides/first-instance#verify-lifecycle-protection' },
         { text: 'Clean up everything', link: '/guides/first-instance#clean-up' },
       ]
