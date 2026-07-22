@@ -13,6 +13,15 @@ own changelogs for CLI releases.
 
 ## [Unreleased]
 
+### Added
+- **Marketing site (spore.host) now deploys via CI.** New `deploy-site.yaml` syncs
+  `web/` → the site bucket + invalidates CloudFront on every push to `main` under
+  `web/**` (short HTML cache, long asset cache, post-deploy smoke). Previously the
+  site shipped only via the manual `web/deploy.sh`, so homepage edits could sit in
+  `main` unpublished and the live site drifted from source — the root cause of the
+  stale-homepage findings in the external reviews. (`web/deploy.sh` stays for
+  manual/emergency deploys.)
+
 ### Security
 - **spore-bot Lambda: bump `google.golang.org/grpc` 1.80.0 → 1.82.1** (indirect,
   via substrate) — resolves GHSA-hrxh-6v49-42gf (gRPC-Go xDS RBAC / HTTP/2, HIGH).
