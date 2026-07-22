@@ -1,12 +1,12 @@
 ---
-description: "The spore.host MCP server exposes truffle and spawn as tools for AI assistants that support the Model Context Protocol — including Claude Desktop and Cursor."
+description: "The spore.host MCP server exposes truffle and spawn as tools for AI assistants that support the Model Context Protocol — Claude Code, Claude Desktop, Cursor, Windsurf, and more."
 ---
 
 # MCP Server <span class="doc-badge automation">Automation</span> <span class="doc-badge stable">Stable</span>
 
 **What it is.** The spore.host MCP server exposes truffle and spawn as tools for AI
 assistants that support the [Model Context Protocol](https://modelcontextprotocol.io)
-— including Claude Desktop and Cursor.
+— Claude Code, Claude Desktop, Cursor, Windsurf, and any other MCP-compatible client.
 
 **When to use it.** When you'd rather describe what you need in plain language —
 *"find the cheapest A100 in us-east-1, then give me the spawn command to launch it
@@ -31,7 +31,16 @@ brew install spore-host/tap/spore-host-mcp
 
 ## Configure
 
-Add to `~/.claude/claude_desktop_config.json`:
+**Claude Code** — from your project directory:
+
+```sh
+claude mcp add spore-host -- spore-host-mcp
+# or, with a named AWS profile:
+claude mcp add spore-host -e AWS_PROFILE=my-profile -- spore-host-mcp
+```
+
+**Claude Desktop, Cursor, Windsurf, and other clients** — add to the client's
+MCP config (`~/.claude/claude_desktop_config.json` for Claude Desktop):
 
 ```json
 {
@@ -43,7 +52,8 @@ Add to `~/.claude/claude_desktop_config.json`:
 }
 ```
 
-Restart Claude Desktop. A hammer icon in the input bar confirms the server is connected.
+Restart the client. See the [setup guide](/guides/mcp-setup) for per-client
+config paths (Claude Code, Claude Desktop, Cursor, Windsurf, Kiro, Codex, Zed, …).
 
 ## Available tools
 
@@ -60,9 +70,9 @@ Restart Claude Desktop. A hammer icon in the input bar confirms the server is co
 | Tool | Description |
 |------|-------------|
 | `spawn_list` | List instances, filter by state and region |
-| `spawn_status` | Detailed status by instance name or ID |
+| `spawn_status` | Detailed status by instance name or ID, incl. absolute reap deadline |
 | `spawn_stop` | Stop or hibernate a running instance |
-| `spawn_terminate` | Permanently terminate an instance |
+| `spawn_terminate` | Permanently terminate an instance — two-phase: previews first, requires `confirm=true`; refuses an ambiguous name |
 | `spawn_extend` | Update an instance's TTL |
 
 ## Example interactions
@@ -81,7 +91,7 @@ Restart Claude Desktop. A hammer icon in the input bar confirms the server is co
 
 ## Credentials
 
-The MCP server uses whichever AWS credentials are active in your environment — the same ones the CLI uses. No additional setup is needed.
+The MCP server uses whichever AWS credentials are active in your environment — the same ones the CLI uses (`AWS_PROFILE`/`AWS_REGION`, `~/.aws/…`, or instance metadata). It also honors the shared spore.host config base: `SPORE_PROFILE`/`SPORE_REGION` and the `[spore]` table of `~/.config/spore/config.toml`. No additional setup is needed if the CLI already works.
 
 For a full setup walkthrough, see [AI Assistant (MCP)](/guides/mcp-setup).
 

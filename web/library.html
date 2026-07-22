@@ -134,16 +134,18 @@ client.UpdateInstanceTags(ctx, result.Region, result.InstanceID,
         <p class="section-label">Available now</p>
         <h2 class="section-title">MCP server</h2>
         <p class="section-sub">
-          <span class="inline-code">spore-host-mcp</span> exposes truffle and spawn as MCP tools for Claude Desktop, Cursor, and any MCP-compatible AI assistant.
-          It uses the same Go packages above — no API keys, no extra auth, just your existing AWS credentials.
+          <span class="inline-code">spore-host-mcp</span> exposes truffle and spawn as MCP tools for Claude Code, Claude Desktop, Cursor, Windsurf, and any MCP-compatible AI assistant.
+          It uses the same Go packages above and your existing AWS credential chain — no extra API keys. Read + manage-existing only: there's no launch tool, by design.
         </p>
 
         <div class="dev-grid">
           <div class="dev-block">
             <h3>Install</h3>
 <pre><code>brew install spore-host/tap/spore-host-mcp</code></pre>
-            <h3 style="margin-top:1.5rem">Configure (Claude Desktop)</h3>
-<pre><code>// ~/.claude/claude_desktop_config.json
+            <h3 style="margin-top:1.5rem">Configure (Claude Code)</h3>
+<pre><code>claude mcp add spore-host -- spore-host-mcp</code></pre>
+            <h3 style="margin-top:1.5rem">Configure (Claude Desktop, Cursor, Windsurf, …)</h3>
+<pre><code>// e.g. ~/.claude/claude_desktop_config.json
 {
   "mcpServers": {
     "spore-host": {
