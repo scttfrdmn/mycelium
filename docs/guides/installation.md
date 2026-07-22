@@ -75,6 +75,49 @@ Then add to `~/.claude/claude_desktop_config.json`:
 }
 ```
 
+## Verify a download (optional)
+
+Homebrew, Scoop, and the `.deb`/`.rpm` packages verify integrity for you. If you
+download a release archive manually and want to confirm it's authentic, each
+release is **signed with keyless [cosign](https://docs.sigstore.dev/)** (Sigstore)
+by the tool's GitHub Actions release workflow — no key to fetch, and the signature
+is tied to the release's OIDC identity rather than a bucket you'd have to trust.
+
+Every release publishes a `checksums.txt` (SHA-256 of each artifact) and a
+`checksums.txt.bundle` (the cosign signature + certificate + transparency-log
+entry). Verify the bundle, then check your file against `checksums.txt`. Example
+for `spawn` — substitute the repo/tool name and version for `truffle`, `lagotto`,
+or `spore-host-mcp`:
+
+```sh
+REPO=spawn TOOL=spawn VERSION=0.92.0    # set to the release you downloaded
+BASE="https://github.com/spore-host/${REPO}/releases/download/v${VERSION}"
+
+# 1. Fetch the checksum file + its cosign bundle
+curl -fsSLO "${BASE}/checksums.txt"
+curl -fsSLO "${BASE}/checksums.txt.bundle"
+
+# 2. Verify the checksums.txt was signed by this repo's release workflow
+cosign verify-blob \
+  --bundle checksums.txt.bundle \
+  --certificate-identity-regexp "^https://github.com/spore-host/${REPO}/\.github/workflows/release\.ya?ml@refs/tags/v${VERSION}$" \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+  checksums.txt
+# → Verified OK
+
+# 3. Confirm your downloaded archive matches its checksum
+shasum -a 256 --ignore-missing -c checksums.txt
+```
+
+If step 2 prints anything other than `Verified OK`, or step 3 doesn't say `OK` for
+your file, **do not use the binary** — [report it](https://github.com/spore-host/spore-host/issues/new/choose).
+
+::: tip spored is verified automatically
+The `spored` daemon that runs on each instance is signed separately (an AWS KMS
+key) and verified at boot by spawn before it runs — you don't need to do anything.
+See [Security](/architecture) for the full trust model.
+:::
+
 ## AWS credentials
 
 spore.host uses whichever credentials are active in your shell — the same ones the AWS CLI uses. The recommended way to obtain them is **`aws login`** (AWS CLI v2.32.0+), which manages short-lived credentials for you; static `aws configure` keys also work.
