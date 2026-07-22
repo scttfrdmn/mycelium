@@ -5,11 +5,16 @@ umbrella: it holds the documentation site, the hosted API/dashboard, deployment
 automation, and this project-wide guidance. The individual tools live in their own
 repositories.
 
-## Where things live (open issues in the right repo)
+## Where things live
 
-| You want to… | Repo |
+The fastest way to report anything — a bug, a docs problem, a question — is
+[Discord](https://discord.gg/2deGRFCW); maintainers triage from there and open the
+tracking issue in the right repo. If you're a contributor sending a PR, here's
+where each tool's code and issues live:
+
+| Area | Repo |
 |--------------|------|
-| Report a docs problem, or a website/dashboard/API issue | [spore-host](https://github.com/spore-host/spore-host) (this repo) |
+| Docs, website, dashboard, or API | [spore-host](https://github.com/spore-host/spore-host) (this repo) |
 | File a bug or request a feature in **spawn** (launch/lifecycle) | [spawn](https://github.com/spore-host/spawn) |
 | …in **truffle** (discovery/pricing/quotas) | [truffle](https://github.com/spore-host/truffle) |
 | …in **lagotto** (capacity watching) | [lagotto](https://github.com/spore-host/lagotto) |
@@ -17,14 +22,20 @@ repositories.
 | Add or fix an official **plugin** | [spore-plugins](https://github.com/spore-host/spore-plugins) |
 | A **workflow adapter** (Nextflow/Snakemake/CWL/WDL/Airflow) | its own `*-spawn` / `*-executor-plugin-spawn` repo |
 
-Not sure which repo? Open it here and we'll route it, or ask in
-[Discord](https://discord.gg/2deGRFCW).
+Not sure which repo, or don't have a GitHub account?
+[Discord](https://discord.gg/2deGRFCW) is the place — we'll route it from there.
 
 ## Getting help vs. reporting
 
-- **Question or usage help:** [Discord](https://discord.gg/2deGRFCW) is faster than an issue.
-- **Bug / feature:** open an issue in the relevant repo (templates provided).
-- **Security vulnerability:** do **not** open a public issue — use the private
+- **Questions, usage help, bugs, and problems:** start in
+  [Discord](https://discord.gg/2deGRFCW). It's open to everyone (no GitHub account
+  needed), it's where maintainers triage, and it's faster than an issue. This is
+  the default channel — use it whenever you're unsure.
+- **Contributing a fix:** if you're opening a PR, file or reference an issue in the
+  relevant tool repo so the change is tracked (issue templates are provided in each
+  repo for contributors with write access; otherwise raise it in Discord first and
+  we'll open the tracking issue).
+- **Security vulnerability:** do **not** report it publicly — use the private
   [security advisory form](https://github.com/spore-host/spore-host/security/advisories/new).
   See [SECURITY.md](SECURITY.md).
 

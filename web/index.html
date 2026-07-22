@@ -214,11 +214,21 @@ scoop install lagotto spore-host-mcp</code></pre>
         </div>
 
         <div id="tab-manual" class="tab-content" role="tabpanel" aria-labelledby="btn-manual">
-<pre><code># Download from GitHub Releases
-# https://github.com/spore-host/spore-host/releases/latest
-
-tar -xzf spawn_*_$(uname -s)_$(uname -m).tar.gz
-tar -xzf truffle_*_$(uname -s)_$(uname -m).tar.gz</code></pre>
+<pre><code># Assets use lowercase GOOS/GOARCH (darwin|linux, amd64|arm64),
+# so normalize uname before matching the release asset.
+OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+case "$(uname -m)" in
+  x86_64|amd64) ARCH=amd64 ;;
+  arm64|aarch64) ARCH=arm64 ;;
+esac
+for tool in spawn truffle; do
+  url=$(curl -fsSL "https://api.github.com/repos/spore-host/${tool}/releases/latest" \
+    | grep -o "https://[^\"]*_${OS}_${ARCH}.tar.gz" | head -1)
+  curl -fsSL "$url" -o "${tool}.tar.gz"
+  tar -xzf "${tool}.tar.gz" "$tool"
+  sudo install "$tool" /usr/local/bin/
+done</code></pre>
+        <p style="margin-top:1rem; font-size:0.875rem; color:var(--text-muted);">See <a href="https://docs.spore.host/quickstart#install">other installation methods</a> in the docs.</p>
         </div>
 
         <p style="margin-top:2rem; font-size:0.875rem; color:var(--text-muted);">
@@ -282,7 +292,7 @@ tar -xzf truffle_*_$(uname -s)_$(uname -m).tar.gz</code></pre>
         <a href="https://github.com/spore-host/spore-host" target="_blank" rel="noopener">GitHub</a>
         <a href="https://github.com/spore-host/spore-host/releases" target="_blank" rel="noopener">Releases</a>
         <a href="library.html">For Developers</a>
-        <a href="https://github.com/spore-host/spore-host/issues" target="_blank" rel="noopener">Issues</a>
+        <a href="https://discord.gg/2deGRFCW" target="_blank" rel="noopener">Get help (Discord)</a>
         <a href="/privacy.html">Privacy</a>
         <a href="/terms.html">Terms</a>
       </nav>
