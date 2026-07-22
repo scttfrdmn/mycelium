@@ -31,6 +31,14 @@ own changelogs for CLI releases.
   `main` unpublished and the live site drifted from source — the root cause of the
   stale-homepage findings in the external reviews. (`web/deploy.sh` stays for
   manual/emergency deploys.)
+- **Docs + site: MCP client coverage and safety flow.** The MCP setup guide
+  (`/guides/mcp-setup`) and reference (`/tools/mcp-server`) now cover **Claude
+  Code** (`claude mcp add`), Windsurf, and a generic stdio-client section for
+  Kiro/Codex/Zed/etc. — previously only Claude Desktop + Cursor. All surfaces
+  (docs + `web/` homepage and library page) now document `spawn_terminate`'s
+  two-phase `confirm=true` flow and ambiguous-name refusal, the deliberate
+  no-launch boundary, and the `SPORE_PROFILE`/`~/.config/spore/config.toml`
+  config options; corrected the marketing site's "no extra auth" wording.
 
 ### Security
 - **spore-bot Lambda: bump `google.golang.org/grpc` 1.80.0 → 1.82.1** (indirect,
