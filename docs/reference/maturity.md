@@ -48,7 +48,7 @@ out where they appear in the docs; the list below is the canonical index.
 | **Per-event notification filtering** | <span class="doc-badge planned">Planned</span> | See [Lifecycle Notifications](/guides/notifications). |
 
 If a page and this table ever disagree, the more conservative (less mature) label
-wins — please [report it](https://github.com/spore-host/spore-host/issues/new/choose).
+wins — please [tell us on Discord](https://discord.gg/2deGRFCW).
 
 ## Versioning — what you can rely on
 
@@ -124,7 +124,7 @@ minors"). While we're pre-1.0, **the latest release of each tool is the supporte
 one**; fixes land on the latest and are shipped as a new PATCH or MINOR. If you
 need a longer support commitment for an institutional deployment, that's a good
 thing to raise in the [deployment packet](/reference/deployment-packet)
-conversation with your admin — or [ask us](https://github.com/spore-host/spore-host/issues/new/choose).
+conversation with your admin — or [ask us on Discord](https://discord.gg/2deGRFCW).
 
 ## See also
 

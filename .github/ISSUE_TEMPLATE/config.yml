@@ -1,11 +1,13 @@
-blank_issues_enabled: true
+blank_issues_enabled: false
 contact_links:
-  - name: 💬 Community chat (Discord)
+  - name: 💬 Get help & report a problem (Discord)
     url: https://discord.gg/2deGRFCW
-    about: Questions, help, and discussion — faster than an issue for usage questions.
+    about: >-
+      The primary place to ask questions, get help, and report bugs or problems —
+      open to everyone, no GitHub account needed. Maintainers triage from here.
   - name: 📖 Documentation
     url: https://spore.host/docs
     about: Guides and reference for the spore.host tools.
-  - name: 🔒 Security issue
+  - name: 🔒 Report a security vulnerability (private)
     url: https://github.com/spore-host/spore-host/security/advisories/new
-    about: Report a vulnerability privately, not as a public issue.
+    about: Report a vulnerability privately via a GitHub Security Advisory — never as a public issue.
