@@ -13,16 +13,6 @@ own changelogs for CLI releases.
 
 ## [Unreleased]
 
-### Changed
-- **Support: Discord is now the single, consistent "get help / report a problem"
-  channel** (from a third external review — the public GitHub issue path was a dead
-  end for logged-out users). The docs nav "Get help" menu, docs footer, marketing
-  site footer, the issue-template chooser (`blank_issues_enabled: false`, Discord as
-  the prominent contact link), and `CONTRIBUTING.md` all now route reporting to
-  Discord (open to everyone, no account needed); the private security-advisory path
-  is unchanged. Removed the "Report a problem" → `issues/new` links that led to a
-  restricted destination.
-
 ### Security
 - **spore-bot Lambda: bump `google.golang.org/grpc` 1.80.0 → 1.82.1** (indirect,
   via substrate) — resolves GHSA-hrxh-6v49-42gf (gRPC-Go xDS RBAC / HTTP/2, HIGH).
