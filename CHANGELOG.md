@@ -23,6 +23,10 @@ own changelogs for CLI releases.
   is unchanged. Removed the "Report a problem" → `issues/new` links that led to a
   restricted destination.
 
+### Security
+- **spore-bot Lambda: bump `google.golang.org/grpc` 1.80.0 → 1.82.1** (indirect,
+  via substrate) — resolves GHSA-hrxh-6v49-42gf (gRPC-Go xDS RBAC / HTTP/2, HIGH).
+
 ### Fixed
 - **Site: homepage manual-install tab now has a working command.** It previously
   showed only a comment + a bare `tar` line using `$(uname -s)_$(uname -m)` (wrong
