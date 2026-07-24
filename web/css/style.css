@@ -470,3 +470,41 @@ footer {
 .theme-transitioning, .theme-transitioning *, .theme-transitioning *::before, .theme-transitioning *::after {
   transition: background-color 0.2s, color 0.2s, border-color 0.2s !important;
 }
+
+/* ── Portal chrome (app/) — the default portal shell that hosts ToolSurfaces.
+   Reuses the brand + --spawn/--truffle/--lagotto accent tokens above. ── */
+.portal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 1.5rem; height: 56px;
+  border-bottom: 1px solid var(--border); background: var(--bg-card);
+}
+.portal-brand { font-size: 1.3rem; text-decoration: none; }
+.portal-account { display: flex; align-items: center; gap: 0.75rem; font-size: 0.9rem; color: var(--text-muted); }
+.portal-account .acct b { color: var(--text); }
+.portal-account button, .portal-gate button, .portal-banner button {
+  font: inherit; cursor: pointer; border-radius: var(--radius);
+  border: 1px solid var(--border-strong); background: var(--bg); color: var(--text);
+  padding: 0.35rem 0.8rem;
+}
+.portal-signin, .portal-signin-lg { border-color: var(--spawn); color: var(--spawn); }
+.portal-body { display: flex; min-height: calc(100vh - 56px); }
+.portal-nav {
+  flex: 0 0 200px; border-right: 1px solid var(--border);
+  background: var(--bg-subtle); padding: 1rem 0.5rem; display: flex; flex-direction: column; gap: 0.25rem;
+}
+.portal-tool {
+  display: block; padding: 0.5rem 0.75rem; border-radius: var(--radius);
+  text-decoration: none; color: var(--text); border-left: 3px solid transparent;
+}
+.portal-tool:hover { background: var(--bg-card); }
+.portal-tool.active { border-left-color: var(--accent); color: var(--accent); font-weight: 700; }
+.portal-main { flex: 1; padding: 1.5rem; overflow: auto; }
+.portal-gate { max-width: 460px; margin: 3rem auto; text-align: center; }
+.portal-gate p { color: var(--text-muted); }
+.portal-signin-lg { margin-top: 1rem; padding: 0.6rem 1.2rem; font-size: 1rem; }
+.portal-empty, .portal-error { color: var(--text-muted); padding: 2rem; text-align: center; }
+.portal-error { color: var(--accent-red); }
+.portal-banner { padding: 0.6rem 1.5rem; font-size: 0.9rem; }
+.portal-banner.warn { background: var(--truffle-bg); color: var(--truffle); }
+.portal-banner.expired { background: #fef2f2; color: var(--accent-red); }
+[data-theme="dark"] .portal-banner.expired { background: #2a1010; }
