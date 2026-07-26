@@ -619,3 +619,39 @@ footer {
 .costs-table th, .costs-table td { text-align: left; padding: 0.35rem 0.6rem; border-bottom: 1px solid var(--border); }
 .costs-table th { color: var(--text-muted); font-weight: 600; }
 .costs-table td { color: var(--text); font-variant-numeric: tabular-nums; }
+
+/* ── teams surface — CRUD over the shared dashboard-api (accent --lagotto) ── */
+.teams-surface { max-width: 820px; }
+.teams-hint { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem; }
+.teams-status { color: var(--text-muted); }
+.teams-status.error { color: var(--accent-red); }
+.teams-back { font: inherit; cursor: pointer; background: none; border: none; color: var(--lagotto); padding: 0 0 0.5rem; }
+.teams-list { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1rem; }
+.teams-card {
+  display: block; width: 100%; text-align: left; cursor: pointer; font: inherit;
+  border: 1px solid var(--border); border-radius: var(--radius); padding: 0.7rem 0.9rem; background: var(--bg-card); color: var(--text);
+}
+.teams-card:hover { border-color: var(--lagotto); }
+.teams-card-head { display: flex; align-items: baseline; gap: 0.75rem; }
+.teams-name { font-weight: 700; color: var(--text); }
+.teams-role { margin-left: auto; font-size: 0.75rem; color: var(--lagotto); text-transform: uppercase; letter-spacing: 0.03em; }
+.teams-card-meta { color: var(--text-muted); font-size: 0.85rem; margin-top: 0.2rem; }
+.teams-desc { display: block; color: var(--text-muted); font-size: 0.85rem; margin-top: 0.3rem; }
+.teams-members { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin: 1rem 0; }
+.teams-members th, .teams-members td { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--border); }
+.teams-members th { color: var(--text-muted); font-weight: 600; }
+.teams-members td { color: var(--text); word-break: break-all; }
+.teams-memb-action { text-align: right; }
+.teams-remove { font: inherit; cursor: pointer; font-size: 0.8rem; padding: 0.2rem 0.5rem; border-radius: 4px; border: 1px solid var(--border-strong); background: var(--bg); color: var(--accent-red); }
+.teams-create { margin: 1rem 0; }
+.teams-create summary { cursor: pointer; color: var(--lagotto); font-weight: 600; }
+.teams-form { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; margin-top: 0.75rem; }
+.teams-addmember { margin-top: 1rem; }
+.teams-input { flex: 1 1 220px; font: inherit; padding: 0.45rem 0.65rem; border-radius: var(--radius); border: 1px solid var(--border-strong); background: var(--bg); color: var(--text); }
+.teams-input:focus-visible { outline: 2px solid var(--lagotto); outline-offset: -2px; }
+.teams-submit { font: inherit; cursor: pointer; padding: 0.45rem 1rem; border-radius: var(--radius); border: 1px solid var(--lagotto); background: var(--lagotto); color: #fff; }
+.teams-submit:disabled { opacity: 0.6; cursor: default; }
+.teams-formmsg { font-size: 0.85rem; color: var(--text-muted); }
+.teams-formmsg.error { color: var(--accent-red); }
+.teams-danger { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+.teams-delete { font: inherit; cursor: pointer; padding: 0.45rem 1rem; border-radius: var(--radius); border: 1px solid var(--accent-red); background: var(--bg); color: var(--accent-red); }
