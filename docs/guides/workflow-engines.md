@@ -30,13 +30,13 @@ completion) is still evolving — see [spawn#386](https://github.com/spore-host/
 | **WDL** (`miniwdl-spawn`) | <span class="doc-badge experimental">Experimental</span> early | v0.1.0 | in progress ([#395](https://github.com/spore-host/spore-host/issues/395)) | `MINIWDL__SCHEDULER__CONTAINER_BACKEND=spawn` |
 | **CWL** (`cwl-spawn`) | <span class="doc-badge experimental">Experimental</span> early (v0.1) | v0.1.0 | verified end-to-end, leak-checked | `cwl-spawn workflow.cwl inputs.yml` |
 | **Snakemake** (`snakemake-executor-plugin-spawn`) | <span class="doc-badge experimental">Experimental</span> early (v0.1) | v0.1.0 | verified end-to-end, leak-checked | `snakemake --executor spawn` |
-| **Apache Airflow** (`spawn-airflow`) | <span class="doc-badge experimental">Experimental</span> early (v0.1) | v0.1.0 | verified end-to-end, leak-checked | `SpawnRunTaskOperator(...)` in a DAG |
+| **Apache Airflow** (`airflow-spawn`) | <span class="doc-badge experimental">Experimental</span> early (v0.1) | v0.1.0 | verified end-to-end, leak-checked | `SpawnRunTaskOperator(...)` in a DAG |
 
 Repos: [nf-spawn](https://github.com/spore-host/nf-spawn) ·
 [miniwdl-spawn](https://github.com/spore-host/miniwdl-spawn) ·
 [cwl-spawn](https://github.com/spore-host/cwl-spawn) ·
 [snakemake-executor-plugin-spawn](https://github.com/spore-host/snakemake-executor-plugin-spawn) ·
-[spawn-airflow](https://github.com/spore-host/spawn-airflow). Each repo's README and
+[airflow-spawn](https://github.com/spore-host/airflow-spawn). Each repo's README and
 CHANGELOG are the authoritative status; the table above summarizes them.
 
 The three [AWS HealthOmics](https://aws.amazon.com/healthomics/)-supported
