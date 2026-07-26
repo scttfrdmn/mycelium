@@ -78,6 +78,13 @@ export const surfaces: ToolSurface[] = [
     load: () => import("./teams.js").then((m) => ({ mount: m.teamsSurface.mount })),
   }),
   lazy({
+    id: "slack",
+    label: "Slack",
+    accent: "--bot",
+    requiresAuth: false,
+    load: () => import("./slack.js").then((m) => ({ mount: m.slackSurface.mount })),
+  }),
+  lazy({
     id: "connect",
     label: "Connect account",
     accent: "--bot",
