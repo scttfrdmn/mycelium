@@ -56,6 +56,13 @@ export const surfaces: ToolSurface[] = [
     requiresAuth: true,
     load: () => import("./terminal.js").then((m) => ({ mount: m.terminalSurface.mount })),
   }),
+  lazy({
+    id: "connect",
+    label: "Connect account",
+    accent: "--bot",
+    requiresAuth: false,
+    load: () => import("./onboarding.js").then((m) => ({ mount: m.onboardingSurface.mount })),
+  }),
 ];
 
 export function findSurface(id: string): ToolSurface | undefined {

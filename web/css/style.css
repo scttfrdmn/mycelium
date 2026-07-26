@@ -538,3 +538,23 @@ footer {
 .terminal-status { color: var(--text-muted); font-size: 0.9rem; min-height: 1.2em; }
 .terminal-host { height: 460px; border-radius: var(--radius); overflow: hidden; border: 2px solid transparent; background: var(--terminal-bg); }
 .terminal-host:focus-within { border-color: var(--spored); }
+
+/* ── onboarding surface — "Connect your AWS account" (BYOA quick-create) ── */
+.onboard-surface { max-width: 720px; }
+.onboard-panel p { color: var(--text); line-height: 1.5; }
+.onboard-steps { color: var(--text); line-height: 1.7; padding-left: 1.2rem; }
+.onboard-steps b { color: var(--text); }
+.onboard-region { margin: 1rem 0; }
+.onboard-region label { font-size: 0.9rem; color: var(--text-muted); display: inline-flex; align-items: center; gap: 0.5rem; }
+.onboard-region select { font: inherit; padding: 0.35rem 0.5rem; border-radius: var(--radius); border: 1px solid var(--border-strong); background: var(--bg); color: var(--text); }
+.onboard-launch {
+  display: inline-block; margin: 0.5rem 0 1rem; padding: 0.6rem 1.2rem;
+  border-radius: var(--radius); background: var(--bot); color: #fff; font-weight: 700;
+  text-decoration: none;
+}
+.onboard-launch:hover { filter: brightness(1.08); }
+.onboard-details { margin-top: 1rem; color: var(--text-muted); font-size: 0.9rem; }
+.onboard-details summary { cursor: pointer; color: var(--bot); }
+.onboard-details code, .onboard-panel code { background: var(--code-bg); padding: 0.05rem 0.35rem; border-radius: 4px; font-size: 0.85em; }
+.onboard-extid code { word-break: break-all; }
+.onboard-unconfigured { color: var(--text-muted); }

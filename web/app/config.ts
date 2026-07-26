@@ -12,6 +12,15 @@ const DEFAULTS: PortalConfig = {
   globusClientId: import.meta.env.VITE_GLOBUS_CLIENT_ID ?? "",
   roleArn: import.meta.env.VITE_ROLE_ARN ?? "",
   redirectUri: import.meta.env.VITE_REDIRECT_URI ?? defaultRedirectUri(),
+  onboarding: {
+    // The onboarding template deploys alongside the portal (copy-static →
+    // dist/cloudformation/); default to its served URL on this origin.
+    templateUrl:
+      import.meta.env.VITE_ONBOARD_TEMPLATE_URL ??
+      `${window.location.origin}/cloudformation/portal-onboarding-role.yaml`,
+    phoneHomeRoleArn: import.meta.env.VITE_PHONE_HOME_ROLE_ARN ?? "",
+    phoneHomeUrl: import.meta.env.VITE_PHONE_HOME_URL ?? "",
+  },
 };
 
 function defaultRedirectUri(): string {
@@ -34,6 +43,8 @@ export function resolveConfig(search = window.location.search): PortalConfig {
     roleArn: params.get("role_arn") ?? stored?.roleArn ?? DEFAULTS.roleArn,
     // redirectUri is always this page — never take it from the URL.
     redirectUri: DEFAULTS.redirectUri,
+    // Onboarding config isn't overridable per-visit (build-time only).
+    onboarding: DEFAULTS.onboarding,
   };
   sessionStorage.setItem(SS_CONFIG, JSON.stringify(merged));
   return merged;

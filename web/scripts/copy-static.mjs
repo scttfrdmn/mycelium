@@ -19,4 +19,13 @@ for (const p of pages) {
 for (const d of dirs) {
   await cp(resolve(web, d), resolve(dist, d), { recursive: true });
 }
-console.log(`copied ${pages.length} pages + ${dirs.join(", ")} → dist/`);
+
+// The BYOA onboarding CloudFormation template — served publicly so the portal's
+// "Connect account" quick-create URL can point CloudFormation at it. Lives in the
+// repo's deployment/ dir (one level above web/), copied to dist/cloudformation/.
+const cfnSrc = resolve(web, "..", "deployment", "cloudformation", "portal-onboarding-role.yaml");
+const cfnDest = resolve(dist, "cloudformation", "portal-onboarding-role.yaml");
+await mkdir(dirname(cfnDest), { recursive: true });
+await cp(cfnSrc, cfnDest);
+
+console.log(`copied ${pages.length} pages + ${dirs.join(", ")} + onboarding template → dist/`);
