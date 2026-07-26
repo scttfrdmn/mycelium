@@ -39,4 +39,16 @@ export interface PortalConfig {
   roleArn: string;
   /** OAuth redirect URI (this portal's app/ URL). */
   redirectUri: string;
+  /**
+   * BYOA onboarding (the "connect your AWS account" quick-create). Optional —
+   * the onboarding surface degrades to instructions if any are unset.
+   */
+  onboarding: {
+    /** Public HTTPS URL of the CloudFormation onboarding template. */
+    templateUrl: string;
+    /** Phone-home Lambda execution role ARN the onboarding role trusts. */
+    phoneHomeRoleArn: string;
+    /** Phone-home Function URL (baked into the template default too). */
+    phoneHomeUrl: string;
+  };
 }
