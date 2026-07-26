@@ -5,6 +5,9 @@
 import { SpawnClient } from "@spore-host/spawn-ts";
 import { EC2Provider } from "@spore-host/spawn-ts";
 import { Dashboard, confirmDialog } from "@spore-host/spawn-ts/ui";
+// The Dashboard's own component styles (tokens scoped to .dashboard/.modal-backdrop,
+// so they don't fight the portal's brand theme). Loaded with the instances chunk.
+import "@spore-host/spawn-ts/ui/style.css";
 import type { Disposable, SurfaceContext, ToolSurface } from "./types.js";
 
 export const instancesSurface: ToolSurface = {
