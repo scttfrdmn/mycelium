@@ -1,0 +1,226 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  spore.host portal — BYOA onboarding. Creates a cross-account IAM role that lets
+  the spore.host portal launch and manage EC2 instances in THIS account on your
+  behalf, and (via a phone-home custom resource) auto-registers the role with the
+  portal so there is nothing to copy-paste.
+
+  Deploy this once per AWS account you want to use with the portal. The web
+  quick-create builds the console URL for you; the `spawn onboard` CLI does the
+  equivalent without the console.
+
+Parameters:
+  PhoneHomeLambdaRoleArn:
+    Type: String
+    Description: >
+      ARN of the portal phone-home Lambda execution role in spore-host-infra
+      (the PortalPhoneHomeLambdaRole output of infra/tofu/portal-phone-home).
+      This is the only principal allowed to assume the role created here.
+    AllowedPattern: 'arn:aws:iam::\d{12}:role/.+'
+    ConstraintDescription: Must be a valid IAM role ARN
+
+  PhoneHomeUrl:
+    Type: String
+    Description: >
+      The portal phone-home Function URL (function_url output of
+      infra/tofu/portal-phone-home). The custom resource POSTs the new role's
+      registration here on stack create.
+    AllowedPattern: 'https://.+'
+
+  ExternalId:
+    Type: String
+    Description: >
+      High-entropy STS ExternalId the portal must present when assuming this role
+      (confused-deputy guard). The web quick-create + `spawn onboard` generate one
+      per account; do not reuse across accounts.
+    MinLength: 16
+    NoEcho: true
+
+  RoleName:
+    Type: String
+    Default: spore-portal-onboard
+    Description: Name of the cross-account role to create.
+
+  SporedInstanceProfile:
+    Type: String
+    Default: spored-instance-profile
+    Description: >
+      Instance profile launched instances receive (spored self-terminate + DNS
+      invoke). iam:PassRole is scoped to exactly this role. Must exist in this
+      account (create it separately if absent).
+
+Resources:
+
+  PortalOnboardRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Ref RoleName
+      Description: Allows the spore.host portal to launch + manage EC2 in this account.
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Ref PhoneHomeLambdaRoleArn
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                sts:ExternalId: !Ref ExternalId
+      Policies:
+        - PolicyName: PortalEC2Launch
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: RunAndInspect
+                Effect: Allow
+                Action:
+                  - ec2:RunInstances
+                  - ec2:DescribeInstances
+                  - ec2:DescribeInstanceStatus
+                  - ec2:DescribeImages
+                  - ec2:DescribeSubnets
+                  - ec2:DescribeSecurityGroups
+                  - ec2:DescribeVpcs
+                  - ec2:DescribeKeyPairs
+                  - ec2:CreateTags
+                Resource: '*'
+              - Sid: Lifecycle
+                Effect: Allow
+                Action:
+                  - ec2:TerminateInstances
+                  - ec2:StopInstances
+                  - ec2:StartInstances
+                # Destructive actions restricted to spawn-managed instances so a
+                # portal session can't touch unrelated instances in this account.
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    'aws:ResourceTag/spawn:managed': 'true'
+              - Sid: ReadSpotAndQuotas
+                Effect: Allow
+                Action:
+                  - ec2:DescribeSpotPriceHistory
+                  - servicequotas:GetServiceQuota
+                  - servicequotas:ListServiceQuotas
+                Resource: '*'
+              - Sid: SSMSession
+                Effect: Allow
+                Action:
+                  - ssm:StartSession
+                Resource:
+                  - 'arn:aws:ec2:*:*:instance/*'
+                  - 'arn:aws:ssm:*::document/SSM-SessionManagerRunShell'
+              - Sid: SSMSessionManage
+                Effect: Allow
+                Action:
+                  - ssm:TerminateSession
+                  - ssm:ResumeSession
+                Resource: 'arn:aws:ssm:*:*:session/*'
+        - PolicyName: PortalPassSporedProfile
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # PassRole scoped to the single spored profile + PassedToService ec2
+              # — required to attach the profile at RunInstances, nothing broader.
+              - Effect: Allow
+                Action: iam:PassRole
+                Resource: !Sub 'arn:aws:iam::${AWS::AccountId}:role/${SporedInstanceProfile}'
+                Condition:
+                  StringEquals:
+                    iam:PassedToService: ec2.amazonaws.com
+      Tags:
+        - Key: 'spawn:managed'
+          Value: 'false'
+        - Key: Purpose
+          Value: spore-portal-onboard
+
+  # Phone-home custom resource: on stack CREATE, POST the new role's registration
+  # to the portal so onboarding needs no copy-paste (the Coiled pattern). Backed
+  # by an inline Lambda that signs a SigV4 request to the phone-home Function URL
+  # using the stack's own execution credentials — so the phone-home handler sees
+  # THIS account as the verified caller.
+  PhoneHomeFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.12
+      Handler: index.handler
+      Timeout: 30
+      Role: !GetAtt PhoneHomeFunctionRole.Arn
+      Environment:
+        Variables:
+          PHONE_HOME_URL: !Ref PhoneHomeUrl
+      Code:
+        ZipFile: |
+          import json, os, urllib.request
+          import boto3
+          from botocore.auth import SigV4Auth
+          from botocore.awsrequest import AWSRequest
+          import cfnresponse
+
+          def handler(event, context):
+              try:
+                  if event["RequestType"] == "Delete":
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+                      return
+                  props = event["ResourceProperties"]
+                  url = os.environ["PHONE_HOME_URL"]
+                  body = json.dumps({
+                      "roleArn": props["RoleArn"],
+                      "externalId": props["ExternalId"],
+                      "region": props.get("Region", "us-east-1"),
+                  }).encode()
+                  # Sign with the function's own (this-account) credentials so the
+                  # phone-home handler's SigV4-verified caller == this account.
+                  sess = boto3.Session()
+                  creds = sess.get_credentials().get_frozen_credentials()
+                  region = context.invoked_function_arn.split(":")[3]
+                  req = AWSRequest(method="POST", url=url, data=body,
+                                   headers={"content-type": "application/json"})
+                  SigV4Auth(creds, "lambda", region).add_auth(req)
+                  r = urllib.request.Request(url, data=body, method="POST",
+                                             headers=dict(req.headers))
+                  with urllib.request.urlopen(r, timeout=20) as resp:
+                      out = resp.read().decode()
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, {"response": out})
+              except Exception as e:
+                  cfnresponse.send(event, context, cfnresponse.FAILED, {"error": str(e)})
+
+  PhoneHomeFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: InvokePhoneHome
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # This role's identity grants itself invoke on the phone-home
+              # Function URL — the per-account grant the AWS_IAM URL relies on.
+              - Effect: Allow
+                Action: lambda:InvokeFunctionUrl
+                Resource: '*'
+
+  PhoneHome:
+    Type: AWS::CloudFormation::CustomResource
+    Properties:
+      ServiceToken: !GetAtt PhoneHomeFunction.Arn
+      RoleArn: !GetAtt PortalOnboardRole.Arn
+      ExternalId: !Ref ExternalId
+      Region: !Ref AWS::Region
+
+Outputs:
+  RoleArn:
+    Description: The cross-account role ARN (auto-registered with the portal).
+    Value: !GetAtt PortalOnboardRole.Arn
+  # NOTE: the ExternalId is deliberately NOT output. It's a NoEcho secret, and the
+  # phone-home custom resource already registers {roleArn, externalId, region} with
+  # the portal automatically — so there's no need to echo the secret back into the
+  # stack outputs (which would defeat NoEcho; cfn-lint W2010). The onboarding
+  # tool that launched the stack retains the value it generated.
