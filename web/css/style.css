@@ -508,3 +508,33 @@ footer {
 .portal-banner.warn { background: var(--truffle-bg); color: var(--truffle); }
 .portal-banner.expired { background: #fef2f2; color: var(--accent-red); }
 [data-theme="dark"] .portal-banner.expired { background: #2a1010; }
+
+/* ── truffle surface — offline instance-type catalog search ── */
+.truffle-surface { max-width: 820px; }
+.truffle-hint { color: var(--text-muted); font-size: 0.9rem; }
+.truffle-hint code { background: var(--code-bg); padding: 0.05rem 0.35rem; border-radius: 4px; }
+.truffle-form { display: flex; gap: 0.5rem; margin: 0.75rem 0 1.25rem; }
+.truffle-q { flex: 1; font: inherit; padding: 0.5rem 0.75rem; border-radius: var(--radius); border: 1px solid var(--border-strong); background: var(--bg); color: var(--text); }
+.truffle-q:focus-visible { outline: 2px solid var(--truffle); outline-offset: -2px; }
+.truffle-form button { font: inherit; cursor: pointer; padding: 0.5rem 1rem; border-radius: var(--radius); border: 1px solid var(--truffle); background: var(--truffle); color: #fff; }
+.truffle-count, .truffle-note { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.5rem; }
+.truffle-note { margin-top: 0.75rem; }
+.truffle-status.error { color: var(--accent-red); }
+.truffle-row { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.6rem 0.8rem; margin-bottom: 0.5rem; background: var(--bg-card); }
+.truffle-row-head { display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap; }
+.truffle-type { font-weight: 700; color: var(--truffle); }
+.truffle-specs { color: var(--text); font-size: 0.9rem; }
+.truffle-price { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--text-muted); }
+.truffle-reasons { margin: 0.4rem 0 0; padding-left: 1.1rem; color: var(--text-muted); font-size: 0.85rem; }
+
+/* ── terminal surface — SSM Session Manager shell ── */
+.terminal-surface { display: flex; flex-direction: column; gap: 1rem; }
+.terminal-hint { color: var(--text-muted); font-size: 0.9rem; max-width: 640px; }
+.terminal-form { display: flex; gap: 0.5rem; align-items: center; }
+.terminal-target { flex: 0 1 320px; font: inherit; font-family: ui-monospace, monospace; padding: 0.5rem 0.75rem; border-radius: var(--radius); border: 1px solid var(--border-strong); background: var(--bg); color: var(--text); }
+.terminal-target:focus-visible { outline: 2px solid var(--spored); outline-offset: -2px; }
+.terminal-form button { font: inherit; cursor: pointer; padding: 0.5rem 1rem; border-radius: var(--radius); border: 1px solid var(--border-strong); background: var(--bg); color: var(--text); }
+.terminal-open { border-color: var(--spored) !important; color: var(--spored) !important; }
+.terminal-status { color: var(--text-muted); font-size: 0.9rem; min-height: 1.2em; }
+.terminal-host { height: 460px; border-radius: var(--radius); overflow: hidden; border: 2px solid transparent; background: var(--terminal-bg); }
+.terminal-host:focus-within { border-color: var(--spored); }
