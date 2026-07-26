@@ -57,6 +57,13 @@ export const surfaces: ToolSurface[] = [
     load: () => import("./terminal.js").then((m) => ({ mount: m.terminalSurface.mount })),
   }),
   lazy({
+    id: "costs",
+    label: "Cost history",
+    accent: "--spawn",
+    requiresAuth: true,
+    load: () => import("./costs.js").then((m) => ({ mount: m.costsSurface.mount })),
+  }),
+  lazy({
     id: "catalog",
     label: "Software catalog",
     accent: "--strata",
