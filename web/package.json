@@ -1,0 +1,23 @@
+{
+  "name": "spore-host-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "spore.host default portal — a browser mirror of the CLI tools, driven by the @spore-host/*-ts libraries.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && node scripts/copy-static.mjs",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "deploy": "npm run build && ./deploy.sh"
+  },
+  "dependencies": {
+    "@spore-host/spawn-ts": "^0.6.0",
+    "@spore-host/truffle-ts": "^0.4.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0",
+    "vite": "^6.0.0"
+  }
+}

@@ -84,14 +84,17 @@ rm /tmp/bucket-policy.json
 echo -e "${GREEN}✓${NC} Bucket policy set"
 
 # Step 4: Upload website files
+# The site is a Vite build: `npm run build` emits dist/ (marketing pages +
+# hashed portal SPA under app/). Sync the built output, not the source tree.
 echo ""
-echo -e "${BLUE}→${NC} Uploading website files..."
-aws s3 sync . "s3://$BUCKET_NAME/" \
+if [ ! -d dist ]; then
+    echo -e "${RED}Error: dist/ not found — run 'npm run build' first (or 'npm run deploy').${NC}"
+    exit 1
+fi
+echo -e "${BLUE}→${NC} Uploading built site (dist/)..."
+aws s3 sync ./dist "s3://$BUCKET_NAME/" \
     --delete \
-    --exclude ".git/*" \
     --exclude ".DS_Store" \
-    --exclude "*.sh" \
-    --exclude "README.md" \
     --cache-control "max-age=3600" \
     --profile "$AWS_PROFILE"
 echo -e "${GREEN}✓${NC} Files uploaded"
