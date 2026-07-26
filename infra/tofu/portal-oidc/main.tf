@@ -197,7 +197,6 @@ resource "aws_iam_role_policy" "pass_spored_profile" {
     Version = "2012-10-17"
     Statement = [{
       Effect = "Allow"
-      # nosemgrep: terraform.lang.security.iam.no-iam-resource-exposure.no-iam-resource-exposure
       # PassRole is REQUIRED to attach an instance profile at RunInstances, and it
       # is already maximally scoped: a single named role ARN in THIS account (not a
       # wildcard) plus iam:PassedToService=ec2, so it can only ever hand
@@ -205,6 +204,7 @@ resource "aws_iam_role_policy" "pass_spored_profile" {
       # unconditionally; the scoping here is the mitigation. (Same inline-suppress
       # convention as spore-bot/main.tf:111. Suppression reviewed + approved by the
       # repo owner, 2026-07-26.)
+      # nosemgrep: terraform.lang.security.iam.no-iam-resource-exposure.no-iam-resource-exposure
       Action   = "iam:PassRole"
       Resource = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.spored_instance_profile}"
       Condition = {
