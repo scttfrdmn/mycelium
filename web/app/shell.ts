@@ -78,7 +78,10 @@ export class Shell {
   }
 
   private currentId(): string {
-    const id = location.hash.replace(/^#\/?/, "").split("/")[0];
+    // Strip a trailing ?query before splitting the path — a surface can be
+    // returned to with params (e.g. the Slack OAuth callback lands on
+    // #/slack?bot=connected), and the route id must still resolve.
+    const id = location.hash.replace(/^#\/?/, "").split("?")[0]!.split("/")[0];
     return id || surfaces[0]?.id || "";
   }
 

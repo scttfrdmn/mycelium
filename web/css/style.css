@@ -655,3 +655,21 @@ footer {
 .teams-formmsg.error { color: var(--accent-red); }
 .teams-danger { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border); }
 .teams-delete { font: inherit; cursor: pointer; padding: 0.45rem 1rem; border-radius: var(--radius); border: 1px solid var(--accent-red); background: var(--bg); color: var(--accent-red); }
+
+/* ── slack surface — connect-a-workspace OAuth launcher (accent --bot) ── */
+.slack-surface { max-width: 720px; }
+.slack-hint { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem; }
+.slack-banner { border-radius: var(--radius); padding: 0.6rem 0.9rem; margin-bottom: 1rem; font-size: 0.9rem; }
+.slack-banner.ok { background: var(--spored-bg); color: var(--spored); border: 1px solid var(--spored); }
+.slack-banner.error { background: var(--bg-subtle); color: var(--accent-red); border: 1px solid var(--accent-red); }
+.slack-panel { border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.1rem; background: var(--bg-card); }
+.slack-connect {
+  display: inline-block; padding: 0.6rem 1.2rem; border-radius: var(--radius);
+  background: var(--bot); color: #fff; font-weight: 700; text-decoration: none;
+}
+.slack-connect:hover { filter: brightness(1.08); }
+.slack-note { color: var(--text-muted); font-size: 0.85rem; margin: 0.75rem 0 0; line-height: 1.5; }
+.slack-details { margin-top: 1rem; color: var(--text-muted); font-size: 0.9rem; }
+.slack-details summary { cursor: pointer; color: var(--bot); }
+.slack-scopes { margin: 0.5rem 0 0; padding-left: 1.2rem; line-height: 1.7; }
+.slack-scopes code, .slack-panel code { background: var(--code-bg); padding: 0.05rem 0.35rem; border-radius: 4px; font-size: 0.85em; }
