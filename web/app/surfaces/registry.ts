@@ -71,6 +71,13 @@ export const surfaces: ToolSurface[] = [
     load: () => import("./catalog.js").then((m) => ({ mount: m.catalogSurface.mount })),
   }),
   lazy({
+    id: "teams",
+    label: "Teams",
+    accent: "--lagotto",
+    requiresAuth: true,
+    load: () => import("./teams.js").then((m) => ({ mount: m.teamsSurface.mount })),
+  }),
+  lazy({
     id: "connect",
     label: "Connect account",
     accent: "--bot",
