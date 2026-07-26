@@ -9,6 +9,7 @@ const SS_CONFIG = "portal.config";
 // the fallbacks keep dev working before infra is wired.
 const DEFAULTS: PortalConfig = {
   region: import.meta.env.VITE_AWS_REGION ?? "us-east-1",
+  apiBase: import.meta.env.VITE_API_BASE ?? "https://api.spore.host",
   globusClientId: import.meta.env.VITE_GLOBUS_CLIENT_ID ?? "",
   roleArn: import.meta.env.VITE_ROLE_ARN ?? "",
   redirectUri: import.meta.env.VITE_REDIRECT_URI ?? defaultRedirectUri(),
@@ -38,6 +39,8 @@ export function resolveConfig(search = window.location.search): PortalConfig {
   const params = new URLSearchParams(search);
   const merged: PortalConfig = {
     region: params.get("region") ?? stored?.region ?? DEFAULTS.region,
+    // apiBase is build-time only (not overridable per-visit).
+    apiBase: stored?.apiBase ?? DEFAULTS.apiBase,
     globusClientId:
       params.get("client_id") ?? stored?.globusClientId ?? DEFAULTS.globusClientId,
     roleArn: params.get("role_arn") ?? stored?.roleArn ?? DEFAULTS.roleArn,
