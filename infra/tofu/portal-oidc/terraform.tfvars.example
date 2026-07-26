@@ -1,0 +1,13 @@
+# portal-oidc example vars. Copy to terraform.tfvars (gitignored) and fill in.
+#
+# The portal's Globus public-client UUID (the id_token aud). Register the app at
+# developers.globus.org with redirect URI https://spore.host/app/ and paste its
+# client-ID here.
+globus_client_id = "00000000-0000-0000-0000-000000000000"
+
+# Globus identity UUIDs allowed to federate + launch. Resolve with
+# `globus get-identities <user>@<inst>`. Defaults to friedman@ucla.edu if omitted.
+# allowed_globus_subs = ["66cae890-db2e-11e5-b782-d7b2bd2feb16"]
+
+# region      = "us-east-1"
+# aws_profile = "spore-host-dev"
