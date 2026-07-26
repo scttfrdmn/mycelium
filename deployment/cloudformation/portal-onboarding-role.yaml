@@ -21,10 +21,11 @@ Parameters:
 
   PhoneHomeUrl:
     Type: String
+    Default: 'https://omnvm7osdhhnr2f7qm4xghz2xq0txwjl.lambda-url.us-east-1.on.aws/'
     Description: >
       The portal phone-home Function URL (function_url output of
       infra/tofu/portal-phone-home). The custom resource POSTs the new role's
-      registration here on stack create.
+      registration here on stack create. Defaults to the deployed prod endpoint.
     AllowedPattern: 'https://.+'
 
   ExternalId:

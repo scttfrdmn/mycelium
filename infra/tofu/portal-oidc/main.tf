@@ -89,6 +89,17 @@ variable "spored_instance_profile" {
   default = "spored-instance-profile"
 }
 
+# Other Globus client IDs (auds) this ONE shared IAM OIDC provider must keep
+# trusting besides the portal's. AWS allows a single OIDC provider per URL per
+# account, and the dev account already has one for auth.globus.org carrying the
+# spawn-ts BYOA demo client. Listing it here means importing/managing the provider
+# under tofu does NOT revoke the demo's access. Add the demo client by default.
+variable "additional_client_ids" {
+  type        = list(string)
+  description = "Extra Globus client IDs the shared OIDC provider trusts (besides the portal's)."
+  default     = ["983c5d9a-dcf3-4294-bcb3-836c8e69c0ba"] # spawn-ts BYOA demo client
+}
+
 locals {
   provider_url  = "https://auth.globus.org"
   provider_host = "auth.globus.org"
@@ -103,17 +114,26 @@ locals {
 data "aws_caller_identity" "current" {}
 
 # ── OIDC identity provider ────────────────────────────────────────────────────
-# Globus as an IAM OIDC provider. client_id_list = the portal's aud (the token's
-# audience must match). Modern AWS verifies the OIDC provider's TLS chain against
-# its trust store, so the thumbprint is no longer security-critical for well-known
-# CAs; AWS still requires the field, and it self-heals on well-known issuers.
-# Terraform's tls provider could compute it, but to keep this module dependency-
-# free we set Globus's leaf thumbprint and let AWS reconcile if it rotates.
+# Globus as an IAM OIDC provider. AWS permits ONE provider per URL per account, so
+# this is a SHARED resource — the dev account already has it (from the spawn-ts
+# demo). client_id_list carries the portal's aud PLUS any additional_client_ids
+# (the demo's) so importing/managing it here never revokes another app's access.
+# Modern AWS verifies the provider's TLS chain against its trust store, so the
+# thumbprint isn't security-critical for well-known CAs; AWS reconciles it, and we
+# ignore drift on it so a Globus cert rotation doesn't force a diff.
+#
+# If the provider already exists (dev does), import it before apply:
+#   tofu import aws_iam_openid_connect_provider.globus \
+#     arn:aws:iam::<account>:oidc-provider/auth.globus.org
 resource "aws_iam_openid_connect_provider" "globus" {
   url             = local.provider_url
-  client_id_list  = [var.globus_client_id]
-  thumbprint_list = ["990f4193972f2becf12ddeda5237f9c952f20d9e"] # placeholder; AWS reconciles for well-known CAs
+  client_id_list  = concat([var.globus_client_id], var.additional_client_ids)
+  thumbprint_list = ["06b25927c42a721631c1efd9431e648fa62e1e39"] # Globus leaf (dev provider's current value)
   tags            = local.common_tags
+
+  lifecycle {
+    ignore_changes = [thumbprint_list]
+  }
 }
 
 # ── Launch role ───────────────────────────────────────────────────────────────
@@ -123,7 +143,7 @@ resource "aws_iam_openid_connect_provider" "globus" {
 # only the enumerated identities pass. This is the tightened form from the demo.
 resource "aws_iam_role" "portal_launch" {
   name                 = local.role_name
-  description          = "spore.host portal — Globus-federated EC2 launch role (browser AssumeRoleWithWebIdentity)"
+  description          = "spore.host portal - Globus-federated EC2 launch role (browser AssumeRoleWithWebIdentity)"
   max_session_duration = 3600
 
   assume_role_policy = jsonencode({
