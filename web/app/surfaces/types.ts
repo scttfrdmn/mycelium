@@ -33,6 +33,12 @@ export interface ToolSurface {
 /** Portal configuration, resolved from Vite build-time defaults + URL overrides. */
 export interface PortalConfig {
   region: string;
+  /**
+   * Base URL of the shared dashboard-api (teams, strata catalog, cost-history,
+   * Slack). Authenticated via the session's federated creds in an
+   * X-AWS-Credentials header. Defaults to https://api.spore.host.
+   */
+  apiBase: string;
   /** Globus OIDC application (public client) id. */
   globusClientId: string;
   /** The AssumeRoleWithWebIdentity role the browser federates into. */

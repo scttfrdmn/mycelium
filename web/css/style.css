@@ -32,6 +32,8 @@
   --mcp-bg:       #eef0ff;
   --spored:       #059669;   /* emerald — lifecycle / self-healing */
   --spored-bg:    #ecfdf5;
+  --strata:       #db2777;   /* pink/magenta — software formations */
+  --strata-bg:    #fdf2f8;
 
   --code-bg:      #f3f4f6;
   --terminal-bg:  #f3f4f6;
@@ -68,6 +70,7 @@
   --bot-bg:       #1a0d30;
   --mcp-bg:       #12103a;
   --spored-bg:    #052e22;
+  --strata-bg:    #2d0a1f;
 
   --code-bg:      #1a0e28;
   --terminal-bg:  #1a0e28;
@@ -558,3 +561,15 @@ footer {
 .onboard-details code, .onboard-panel code { background: var(--code-bg); padding: 0.05rem 0.35rem; border-radius: 4px; font-size: 0.85em; }
 .onboard-extid code { word-break: break-all; }
 .onboard-unconfigured { color: var(--text-muted); }
+
+/* ── catalog surface — strata software formations (shared dashboard-api) ── */
+.catalog-surface { max-width: 820px; }
+.catalog-hint { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.25rem; }
+.catalog-count { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.5rem; }
+.catalog-status { color: var(--text-muted); }
+.catalog-status.error { color: var(--accent-red); }
+.catalog-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.7rem 0.9rem; margin-bottom: 0.6rem; background: var(--bg-card); }
+.catalog-card-head { display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap; }
+.catalog-name { font-weight: 700; color: var(--strata); }
+.catalog-slug { margin-left: auto; background: var(--code-bg); padding: 0.05rem 0.4rem; border-radius: 4px; font-size: 0.8rem; color: var(--text-muted); }
+.catalog-desc { margin: 0.4rem 0 0; color: var(--text); font-size: 0.9rem; }
