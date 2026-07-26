@@ -74,7 +74,30 @@ resource "aws_dynamodb_table" "accounts" {
     enabled = true
   }
 
+  # Encrypt at rest. AWS-owned key is the default; enabling SSE explicitly
+  # satisfies the scanner and documents intent (the table holds account role
+  # ARNs + ExternalIds).
+  server_side_encryption {
+    enabled = true
+  }
+
   tags = local.common_tags
+}
+
+# ── KMS key for Lambda environment encryption ────────────────────────────────
+# Encrypts the function's environment variables at rest (the scanner flags the
+# AWS-default env encryption as insufficient). Env here only holds the table name,
+# but a dedicated CMK is cheap and satisfies defense-in-depth.
+resource "aws_kms_key" "lambda_env" {
+  description             = "Encrypts portal-phone-home Lambda environment variables"
+  deletion_window_in_days = 7
+  enable_key_rotation     = true
+  tags                    = local.common_tags
+}
+
+resource "aws_kms_alias" "lambda_env" {
+  name          = "alias/portal-phone-home-env"
+  target_key_id = aws_kms_key.lambda_env.key_id
 }
 
 # ── Execution role ───────────────────────────────────────────────────────────
@@ -97,17 +120,34 @@ resource "aws_iam_role_policy_attachment" "basic_execution" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-# Write/read the accounts table only.
-resource "aws_iam_role_policy" "dynamo" {
-  name = "PortalAccountsTableAccess"
+# Write/read the accounts table + write X-Ray traces. The KMS grant for the env
+# CMK is added separately (lambda decrypts its env at cold start via the service,
+# but the execution role needs kms:Decrypt on the CMK).
+resource "aws_iam_role_policy" "runtime" {
+  name = "PortalPhoneHomeRuntime"
   role = aws_iam_role.phone_home.id
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Effect   = "Allow"
-      Action   = ["dynamodb:PutItem", "dynamodb:GetItem"]
-      Resource = aws_dynamodb_table.accounts.arn
-    }]
+    Statement = [
+      {
+        Sid      = "AccountsTable"
+        Effect   = "Allow"
+        Action   = ["dynamodb:PutItem", "dynamodb:GetItem"]
+        Resource = aws_dynamodb_table.accounts.arn
+      },
+      {
+        Sid      = "XRayWrite"
+        Effect   = "Allow"
+        Action   = ["xray:PutTraceSegments", "xray:PutTelemetryRecords"]
+        Resource = "*"
+      },
+      {
+        Sid      = "DecryptEnv"
+        Effect   = "Allow"
+        Action   = ["kms:Decrypt"]
+        Resource = aws_kms_key.lambda_env.arn
+      },
+    ]
   })
 }
 
@@ -126,10 +166,18 @@ resource "aws_lambda_function" "phone_home" {
 
   filename = "${path.module}/placeholder.zip"
 
+  # Encrypt environment variables with the dedicated CMK (not the AWS default).
+  kms_key_arn = aws_kms_key.lambda_env.arn
+
   environment {
     variables = {
       ACCOUNTS_TABLE = aws_dynamodb_table.accounts.name
     }
+  }
+
+  # End-to-end request tracing (paired with xray:Put* in the runtime policy).
+  tracing_config {
+    mode = "Active"
   }
 
   lifecycle {
