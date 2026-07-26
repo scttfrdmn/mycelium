@@ -12,7 +12,7 @@
     "deploy": "npm run build && ./deploy.sh"
   },
   "dependencies": {
-    "@spore-host/spawn-ts": "^0.6.0",
+    "@spore-host/spawn-ts": "^0.6.1",
     "@spore-host/truffle-ts": "^0.4.2"
   },
   "devDependencies": {
