@@ -57,6 +57,19 @@ locals {
   }
 }
 
+# ── KMS key for the accounts table ────────────────────────────────────────────
+resource "aws_kms_key" "table" {
+  description             = "Encrypts the portal-phone-home accounts DynamoDB table"
+  deletion_window_in_days = 7
+  enable_key_rotation     = true
+  tags                    = local.common_tags
+}
+
+resource "aws_kms_alias" "table" {
+  name          = "alias/portal-phone-home-table"
+  target_key_id = aws_kms_key.table.key_id
+}
+
 # ── DynamoDB: onboarded-account registry ─────────────────────────────────────
 # accountId (the SigV4-verified caller account) is the partition key; one row per
 # onboarded account, upserted on re-onboard. On-demand billing (sporadic writes).
@@ -74,11 +87,12 @@ resource "aws_dynamodb_table" "accounts" {
     enabled = true
   }
 
-  # Encrypt at rest. AWS-owned key is the default; enabling SSE explicitly
-  # satisfies the scanner and documents intent (the table holds account role
-  # ARNs + ExternalIds).
+  # Encrypt at rest with a customer-managed CMK (the scanner requires an explicit
+  # kms_key_arn, not just the AWS-owned default). The table holds account role
+  # ARNs + ExternalIds, so a dedicated rotating key is warranted.
   server_side_encryption {
-    enabled = true
+    enabled     = true
+    kms_key_arn = aws_kms_key.table.arn
   }
 
   tags = local.common_tags
@@ -146,6 +160,14 @@ resource "aws_iam_role_policy" "runtime" {
         Effect   = "Allow"
         Action   = ["kms:Decrypt"]
         Resource = aws_kms_key.lambda_env.arn
+      },
+      {
+        # DynamoDB SSE with a CMK requires the caller role to have KMS perms on
+        # the table key (Decrypt for reads, GenerateDataKey for writes).
+        Sid      = "TableKMS"
+        Effect   = "Allow"
+        Action   = ["kms:Decrypt", "kms:GenerateDataKey"]
+        Resource = aws_kms_key.table.arn
       },
     ]
   })
