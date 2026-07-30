@@ -1,11 +1,17 @@
 name: Deploy Site
 
-# Deploys the marketing site (spore.host) on every push to main under web/**.
-# Before this workflow the site had NO CI deploy — it shipped only via the manual
-# web/deploy.sh, so homepage edits sat in main until someone ran the script by
-# hand and the live site drifted from source (exactly the staleness external
-# reviews kept hitting). This gives web/ the same continuous, verified deploy the
-# docs already have.
+# Deploys the marketing site AND the portal (spore.host + spore.host/app) on
+# every push to main under web/**. Before this workflow the site had NO CI
+# deploy — it shipped only via the manual web/deploy.sh, so homepage edits sat in
+# main until someone ran the script by hand and the live site drifted from source
+# (exactly the staleness external reviews kept hitting). This gives web/ the same
+# continuous, verified deploy the docs already have.
+#
+# web/ is a Vite build: `npm run build` emits web/dist/ (marketing pages copied
+# verbatim + the portal SPA with hashed assets). We MUST build and sync dist/,
+# never the source tree: web/app/index.html references `./main.ts`, which only
+# exists in source. Syncing raw web/ overwrites the built app/index.html with
+# that source one and the live portal 404s on main.ts into an empty shell.
 
 on:
   push:
@@ -25,6 +31,42 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: web
+        run: npm ci
+
+      # Typecheck before deploying — the portal's only PR gate today. A type
+      # error here means the bundle is wrong; better to fail than ship it.
+      - name: Typecheck portal
+        working-directory: web
+        run: npm run typecheck
+
+      # Emits web/dist: hashed portal SPA under app/ + assets/, marketing pages
+      # and css/assets/cloudformation copied verbatim (scripts/copy-static.mjs).
+      # Build-time config comes from the committed web/.env.production (all public
+      # identifiers — see the comments there).
+      - name: Build site + portal
+        working-directory: web
+        run: npm run build
+
+      # Guard the exact failure this workflow used to cause: the built portal HTML
+      # must reference a hashed bundle, never the source ./main.ts entry.
+      - name: Assert the portal build is not a source stub
+        run: |
+          set -euo pipefail
+          if grep -qF 'main.ts' web/dist/app/index.html; then
+            echo "::error::web/dist/app/index.html still references main.ts — the Vite build did not replace the entry." >&2
+            exit 1
+          fi
+          grep -qE 'src="\.\./assets/app-[^"]+\.js"' web/dist/app/index.html
+          echo "✅ portal HTML references a hashed bundle"
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@517a711dbcd0e402f90c77e7e2f81e849156e31d # v6
         with:
@@ -32,28 +74,25 @@ jobs:
           aws-region: us-east-1
 
       # Two-pass sync so caching matches asset lifetime, and so returning visitors
-      # never see a stale homepage. Fingerprinted-ish assets (css/js/assets) get a
-      # long cache; HTML gets a short, must-revalidate cache. --delete only on the
-      # HTML pass prunes removed pages. Excludes match the manual web/deploy.sh
-      # (no deploy.sh / README.md in the bucket).
+      # never see a stale homepage. Hashed/static assets (css/js/assets) get a long
+      # cache; HTML gets a short, must-revalidate cache. --delete only on the HTML
+      # pass prunes removed pages. Source is web/dist (the build output) — see the
+      # header: syncing raw web/ would ship the source app/index.html and break the
+      # portal. dist/ contains only publishable artifacts, so no deploy.sh/README
+      # excludes are needed.
       - name: Deploy to S3
         run: |
           # Pass 1: static assets — long cache.
-          aws s3 sync web/ s3://spore-host-website/ \
+          aws s3 sync web/dist/ s3://spore-host-website/ \
             --cache-control "public, max-age=86400" \
             --exclude "*.html" \
-            --exclude "*.sh" \
-            --exclude "README.md" \
-            --exclude ".git/*" \
             --exclude ".DS_Store"
           # Pass 2: HTML — short cache, always revalidate; --delete prunes here.
-          aws s3 sync web/ s3://spore-host-website/ \
+          aws s3 sync web/dist/ s3://spore-host-website/ \
             --delete \
             --cache-control "public, max-age=60, must-revalidate" \
             --exclude "*" \
-            --include "*.html" \
-            --exclude "*.sh" \
-            --exclude "README.md"
+            --include "*.html"
 
       - name: Invalidate CloudFront
         run: |
@@ -81,11 +120,19 @@ jobs:
             body="$(curl -fsS "$BASE/$1")" || return 1
             grep -qF "$2" <<<"$body"
           }
+          # The portal's entry must reference a hashed bundle live, not main.ts —
+          # a source stub returns 200 for /app/ but renders an empty shell, so
+          # checking the status code alone would miss it.
+          portal_ok() {
+            local body
+            body="$(curl -fsS "$BASE/app/")" || return 1
+            grep -qE 'src="\.\./assets/app-[^"]+\.js"' <<<"$body"
+          }
           ok=0
           for attempt in 1 2 3 4 5 6 7 8; do
-            if check "/" "Six tools"; then
+            if check "/" "Six tools" && portal_ok; then
               ok=1
-              echo "✅ Live spore.host serves the current homepage."
+              echo "✅ Live spore.host serves the current homepage + portal bundle."
               break
             fi
             echo "Attempt $attempt: live site not current yet (invalidation may still be propagating) — waiting…"
