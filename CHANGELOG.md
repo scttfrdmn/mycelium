@@ -14,6 +14,40 @@ own changelogs for CLI releases.
 ## [Unreleased]
 
 ### Added
+- **Account lifecycle state machine for BYOA deprovisioning** (`lambda/portal-phone-home/lifecycle.go`,
+  spawn#457 checkbox 2). Onboarding was one-way — the registry exposed only
+  `PutAccount`/`GetAccount`, so nothing could ever conclude "this account is gone"
+  and every artifact left behind was permanent. One of those artifacts is a real
+  hazard: a Route53 A-record whose public IP has returned to the EC2 pool
+  eventually resolves to an unrelated instance.
+  - New `Account` lifecycle fields, all `omitempty`: `status`, `lastSeenAt`,
+    `lastErrorAt`, `consecutiveFailures`, `lastInstanceAt`, `statusReason`,
+    `statusChangedAt`. A row written before this change unmarshals to the zero
+    value and reads as `active` via `AccountStatus()` — **no backfill needed**.
+  - Four states — `active`, `unreachable`, `dormant`, `offboarded` — each existing
+    to answer one question: is it safe to delete this account's DNS records?
+    `DNSExpiryEligible` says yes for only `dormant` (emptiness *proven* through a
+    working `DescribeInstances`) and `offboarded` (a human stated intent).
+  - `ApplyProbes` is the pure state machine (no AWS, no clock — `now` is a
+    parameter), driven by the liveness signal the reaper already pays for: it
+    assumes every account's role every 10 minutes. Policy is K/N configurable,
+    defaulting to K=6 consecutive failed runs (one hour) and N=30 days.
+  - **Refuses to act on correlated failure**: if *every* probe fails, nothing
+    changes. The reaper's role ARN embeds a CloudFormation-generated physical ID,
+    so recreating that stack breaks every customer's trust policy at once — a
+    machine acting on assume-role failure alone would forget the entire customer
+    base because we redeployed. Same instinct as the DNS sweep's refusal to delete
+    against a partial live set.
+  - **`unreachable` deletes nothing**, deliberately. It is the state we would most
+    like to clean up and the one where verification has become impossible, because
+    the deleted role is what we would have verified through.
+  - `ListAccounts` (paginated Scan) and `UpdateLifecycle` (UpdateItem, not Put — a
+    Put would clobber a concurrent re-onboard's fresh ExternalId with the stale copy
+    a reaper run happened to read) plus `Offboard` for the explicit human path. No
+    `DeleteItem`: the registry is the audit trail.
+  - 45 tests, mutation-verified — every guard above fails a test when reverted.
+    Not yet wired to the reaper (cross-repo; the IAM grants for `Scan`/`UpdateItem`
+    land with that wiring, so no perms exist without a caller). See spawn#457.
 - **Docs: "Verify a download" section** in the installation guide — how to check a
   manually-downloaded release with keyless cosign (`cosign verify-blob --bundle`
   against the release workflow's OIDC identity) plus the checksum, for the CLIs now
