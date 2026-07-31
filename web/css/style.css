@@ -191,17 +191,16 @@ section + section { border-top: 1px solid var(--border); }
 .hero { padding: 5rem 0 3rem; }
 .hero-inner { max-width: var(--max-width); margin: 0 auto; padding: 0 1.5rem; }
 
-/* Hero logo — large wordmark above the headline */
-.hero-logo {
-  display: flex; align-items: center;
-  margin-bottom: 1.5rem; line-height: 1;
+/* Hero mascot — the jellyfish, shown large above the headline */
+.hero-mascot {
+  display: flex; justify-content: center;
+  margin-bottom: 1.5rem;
 }
-/* Real spore.host wordmark logo (transparent PNG). Cap the height so it reads as
-   a headline lockup; width auto-scales. */
-.hero-logo-img {
-  height: clamp(3rem, 8vw, 5.5rem);
+.hero-mascot-img {
+  height: clamp(180px, 30vw, 340px);
   width: auto; max-width: 100%;
   display: block;
+  filter: drop-shadow(0 8px 28px rgba(51, 222, 249, 0.28));
 }
 .hero-eyebrow {
   display: inline-block; font-size: 0.8rem; font-weight: 600;
