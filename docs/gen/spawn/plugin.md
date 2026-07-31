@@ -16,6 +16,85 @@ Examples:
 spawn plugin
 ```
 
+### `spawn plugin gen-index`
+
+Generate index.json for a plugin registry from its plugins/ directory.
+
+This is the generator side of plugin discovery, in the same arrangement as
+'spawn plugin manifest': it lives here, and the registry's CI invokes it, so the
+index is always derived by the same parser that installs plugins and can never
+describe a spec differently from the spec itself.
+
+--generated-at takes an RFC3339 timestamp (CI passes the commit time) so
+regenerating an unchanged registry produces a byte-identical file. It defaults to
+now, which makes every run differ — fine locally, churn in CI.
+
+Examples:
+  spawn plugin gen-index ./plugins -o index.json
+  spawn plugin gen-index ./plugins --generated-at 2026-07-29T00:00:00Z
+
+```
+spawn plugin gen-index <plugins-dir> [flags]
+```
+
+**Flags:**
+
+| Flag | Short | Type | Default | Description |
+|------|-------|------|---------|-------------|
+| `--generated-at` |  | string |  | RFC3339 generation timestamp (default: now) |
+| `--output` | `-o` | string |  | Write index to this file instead of stdout |
+| `--source` |  | string | `spore-host/spore-plugins` | owner/repo the index describes |
+
+### `spawn plugin info`
+
+Show what the registry knows about a plugin: version, description, config
+parameters, and declared capability surface.
+
+This reads the registry index and contacts no instance. It describes the plugin
+as PUBLISHED — for the full spec of what installing would run, including every
+step, use 'spawn plugin inspect &lt;ref&gt;'.
+
+Examples:
+  spawn plugin info tailscale
+  spawn plugin info jupyterlab --output json
+
+```
+spawn plugin info <name> [flags]
+```
+
+**Flags:**
+
+| Flag | Short | Type | Default | Description |
+|------|-------|------|---------|-------------|
+| `--refresh` |  | bool |  | Bypass the local cache and refetch the registry index |
+
+### `spawn plugin inspect`
+
+Resolve a plugin reference and render its plan — resolved source and
+version, local (controller) vs remote (instance) steps, requested controller
+environment, root vs login-user execution, downloads, health checks, cleanup,
+and its declared permissions block — WITHOUT executing anything or contacting an
+instance.
+
+Installing a plugin runs its author's code on your machine and, on the instance,
+as root. Inspect it first, especially for third-party (github:) plugins.
+
+Plugin ref formats are the same as 'spawn plugin install':
+  name                  official registry (spore-host/spore-plugins)
+  name@v1.2.0           pinned to git tag
+  github:user/repo/name custom GitHub repository
+  ./path/to/plugin.yaml local file
+
+```
+spawn plugin inspect <plugin-ref> [flags]
+```
+
+**Flags:**
+
+| Flag | Short | Type | Default | Description |
+|------|-------|------|---------|-------------|
+| `--insecure` |  | bool |  | Skip signature/checksum verification for official plugin releases (unsafe) |
+
 ### `spawn plugin install`
 
 Install a plugin on a running spore instance.
@@ -42,6 +121,8 @@ spawn plugin install <plugin-ref> [flags]
 | Flag | Short | Type | Default | Description |
 |------|-------|------|---------|-------------|
 | `--config` |  | stringArray |  | Config as key=value (repeatable) |
+| `--dry-run` |  | bool |  | Preview the plan without installing (contacts no instance) |
+| `--insecure` |  | bool |  | Skip signature/checksum verification for official plugin releases (unsafe) |
 | `--instance` | `-i` | string |  | Instance ID or hostname (required) |
 | `--key` |  | string |  | Path to SSH private key |
 | `--user` |  | string |  | SSH username for the instance (default: ec2-user) |
@@ -62,6 +143,29 @@ spawn plugin list [flags]
 | `--key` |  | string |  | Path to SSH private key |
 | `--user` |  | string |  | SSH username for the instance (default: ec2-user) |
 
+### `spawn plugin manifest`
+
+Generate the checksum manifest (manifest.json) for a plugin directory. The
+manifest records the sha256 of the plugin's plugin.yaml so that spawn can verify
+a fetched official plugin matches the released bytes. This is the generator side
+of the registry supply-chain story: the registry's release workflow runs it and
+publishes the output as a GitHub Release asset; spawn verifies against it at
+install time. Contacts nothing.
+
+Examples:
+  spawn plugin manifest ./plugins/tailscale
+  spawn plugin manifest ./plugins/tailscale -o manifest.json
+
+```
+spawn plugin manifest <plugin-dir> [flags]
+```
+
+**Flags:**
+
+| Flag | Short | Type | Default | Description |
+|------|-------|------|---------|-------------|
+| `--output` | `-o` | string |  | Write manifest to this file instead of stdout |
+
 ### `spawn plugin remove`
 
 Remove a plugin from an instance
@@ -78,6 +182,30 @@ spawn plugin remove <name> [flags]
 | `--key` |  | string |  | Path to SSH private key |
 | `--user` |  | string |  | SSH username for the instance (default: ec2-user) |
 | `--yes` | `-y` | bool |  | Skip the confirmation prompt |
+
+### `spawn plugin search`
+
+Search the official plugin registry (spore-host/spore-plugins) for plugins
+available to install. With no query, lists everything.
+
+Reads a generated index published by the registry, cached locally so this works
+offline; the age of what you're seeing is always shown. This lists what EXISTS —
+use 'spawn plugin list --instance &lt;id&gt;' for what is installed on an instance.
+
+Examples:
+  spawn plugin search
+  spawn plugin search jupyter
+  spawn plugin search --refresh
+
+```
+spawn plugin search [query] [flags]
+```
+
+**Flags:**
+
+| Flag | Short | Type | Default | Description |
+|------|-------|------|---------|-------------|
+| `--refresh` |  | bool |  | Bypass the local cache and refetch the registry index |
 
 ### `spawn plugin status`
 
@@ -102,11 +230,22 @@ instance. Checks schema, semver, known step/condition/config types, that the
 containing directory matches the plugin name, and that every &#123;&#123; config.X &#125;&#125;
 template reference points at a declared config parameter.
 
+With --strict, also enforce that the declared permissions: block is consistent
+with the plugin's steps (e.g. instance.root=false must have no remote step that
+runs as root). --strict requires a permissions: block. The official registry's
+CI runs --strict so a published plugin's declared capability surface is enforced.
+
 Examples:
   spawn plugin validate ./plugins/tailscale/plugin.yaml
-  spawn plugin validate ./plugins/*/plugin.yaml
+  spawn plugin validate --strict ./plugins/*/plugin.yaml
 
 ```
-spawn plugin validate <path>...
+spawn plugin validate <path>... [flags]
 ```
+
+**Flags:**
+
+| Flag | Short | Type | Default | Description |
+|------|-------|------|---------|-------------|
+| `--strict` |  | bool |  | Also enforce permissions/step consistency (requires a permissions: block) |
 
