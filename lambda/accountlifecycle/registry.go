@@ -1,4 +1,4 @@
-package main
+package accountlifecycle
 
 import (
 	"context"
@@ -65,7 +65,10 @@ type Registry struct {
 	accountTable string
 }
 
-func newRegistry(cfg aws.Config) *Registry {
+// NewRegistry builds a Registry against ACCOUNTS_TABLE (default
+// spore-portal-accounts). Shared by the phone-home registrar (which writes
+// registrations) and the account prober (which writes lifecycle transitions).
+func NewRegistry(cfg aws.Config) *Registry {
 	table := os.Getenv("ACCOUNTS_TABLE")
 	if table == "" {
 		table = "spore-portal-accounts"

@@ -14,7 +14,51 @@ own changelogs for CLI releases.
 ## [Unreleased]
 
 ### Added
-- **Account lifecycle state machine for BYOA deprovisioning** (`lambda/portal-phone-home/lifecycle.go`,
+- **`portal-account-prober` — the scheduled caller the lifecycle state machine was
+  written for** (`lambda/portal-account-prober/`, `infra/tofu/portal-account-prober/`,
+  spore-host#491). Each run scans the account registry, assumes each account's
+  `spore-portal-onboard` role, counts `spawn:managed` instances across 11 regions,
+  and persists only the transitions `ApplyProbes` decided. This is what finally makes
+  a stale `{base36}.spore.host` A-record expirable.
+  - **A separate Lambda on purpose.** The ttl-reaper already assumes into customer
+    accounts, but a *different* role (`spawn-ttl-reaper-ec2`, hand-listed in
+    `REAPER_ROLE_ARNS`) — it holds no credentials for the roles the registry knows
+    about, so pointing it at the registry would mean recording accounts it cannot
+    reach as unreachable. And `portal-phone-home`, which does hold the trust
+    relationship, is internet-facing under a Function URL: granting it
+    assume-into-any-customer would put that one handler bug from the public edge.
+    The prober has no URL and one EventBridge rule as its only invoker.
+  - **`lifecycle.go`/`registry.go` extracted to a new `lambda/accountlifecycle`
+    module** rather than copied. `ApplyProbes`' refusals are mutation-verified and a
+    second copy would drift out from under those tests.
+  - **Guards against two false-deprovision doors the prober's existence opens.**
+    STS returns `AccessDenied` both for a *deleted* role (the uninstall signal) and
+    for a role whose trust policy doesn't name us — and every role onboarded before
+    this Lambda existed names only the phone-home role, so they will all deny it. The
+    correlated-failure guard cannot catch that (it needs *every* probe to fail; this
+    is a subset), so `ApplyProbes` now treats a denial as evidence **only for an
+    account with a `lastSeenAt` baseline**: one that provably admitted us before.
+    Separately, a probe that reached only *some* regions reports `EmptinessUnproven`
+    and skips the dormancy evaluation — zero-of-a-partial-set is not zero — without
+    re-stamping `lastInstanceAt`, so one failing region defers dormancy rather than
+    blocking it forever.
+  - **Read-only credentials despite a launch-capable role.** `spore-portal-onboard`
+    can `RunInstances`, and a trust policy governs who may assume rather than what
+    they may then do — so every assume attaches an STS **session policy** allowing
+    only `ec2:DescribeInstances`. Effective permissions are the intersection, so a
+    compromised prober cannot launch or terminate anything. That is what makes the
+    new optional `ProberLambdaRoleArn` trust grant honest to ask for instead of
+    shipping a second read-only role into customer accounts.
+  - **Alarms on the refusal, not just on errors.** A run that concludes nothing
+    because *our* credentials broke looks identical to a run with nothing to do, so
+    the handler logs `REFUSING to conclude anything` and Tofu puts a metric filter +
+    alarm on it. Ships with `dry_run = true`.
+  - 35 prober tests (84%) + 8/8 mutations caught, including the end-to-end
+    `TestRun_PreExistingAccountsSurviveTheProberRollout` (baseline-less accounts
+    denying for 3×K runs *alongside* a healthy one, so the correlated-failure guard
+    is demonstrably not what spares them) and its mandatory converse
+    `TestRun_UninstallAfterBaselineIsDetected`.
+- **Account lifecycle state machine for BYOA deprovisioning** (`lambda/accountlifecycle/lifecycle.go`,
   spawn#457 checkbox 2). Onboarding was one-way — the registry exposed only
   `PutAccount`/`GetAccount`, so nothing could ever conclude "this account is gone"
   and every artifact left behind was permanent. One of those artifacts is a real
@@ -45,9 +89,10 @@ own changelogs for CLI releases.
     Put would clobber a concurrent re-onboard's fresh ExternalId with the stale copy
     a reaper run happened to read) plus `Offboard` for the explicit human path. No
     `DeleteItem`: the registry is the audit trail.
-  - 45 tests, mutation-verified — every guard above fails a test when reverted.
-    Not yet wired to the reaper (cross-repo; the IAM grants for `Scan`/`UpdateItem`
-    land with that wiring, so no perms exist without a caller). See spawn#457.
+  - 45 tests, mutation-verified — every guard above fails a test when reverted. The
+    caller landed separately as `portal-account-prober` (above), which is where the
+    `Scan`/`UpdateItem` grants live, so no permission ever existed without a caller.
+    See spawn#457.
 - **Docs: "Verify a download" section** in the installation guide — how to check a
   manually-downloaded release with keyless cosign (`cosign verify-blob --bundle`
   against the release workflow's OIDC identity) plus the checksum, for the CLIs now

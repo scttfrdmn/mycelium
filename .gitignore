@@ -63,3 +63,7 @@ spawn/lambda/rest-api/rest-api
 lambda/rest-api/rest-api
 lambda/spore-bot/spore-bot
 lambda/spore-bot/prism-bot
+# `go build` with no -o writes a binary named after the directory; the Makefiles
+# use -o bootstrap (already ignored above) but a bare `go build .` does not.
+lambda/portal-phone-home/portal-phone-home
+lambda/portal-account-prober/portal-account-prober

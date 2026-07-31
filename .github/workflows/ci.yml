@@ -28,11 +28,22 @@ jobs:
           - module: lambda/spore-bot
             min_coverage: '12'   # current ~13.8%
           - module: lambda/portal-phone-home
-            min_coverage: '70'   # current ~76.8% — the SigV4 invariant and the
-                                 # account lifecycle machine (spawn#457) are both
-                                 # pure and fully covered, so this floor is real.
-                                 # Was absent from this matrix entirely, so its
-                                 # tests had never run in CI.
+            min_coverage: '35'   # current ~36.6%. Was 70 while the registry +
+                                 # lifecycle machine lived here; both moved to
+                                 # lambda/accountlifecycle, taking their coverage
+                                 # with them. What's left is the SigV4 invariant
+                                 # (fully covered) plus Lambda wiring that only an
+                                 # integration test could reach.
+          - module: lambda/accountlifecycle
+            min_coverage: '85'   # current ~88.4% — the registry and the spawn#457
+                                 # state machine. Pure logic plus substrate-backed
+                                 # persistence tests, so a high floor is honest here.
+          - module: lambda/portal-account-prober
+            min_coverage: '80'   # current ~83%. probeAccount/isDenied/countManaged
+                                 # are 100% and the run loop is driven through a
+                                 # recording fake registry, so the writes-that-must-
+                                 # not-happen assertions are real. Only init() and
+                                 # the STS client factory are uncovered.
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 

@@ -1,0 +1,22 @@
+# portal-account-prober example vars. Copy to terraform.tfvars (gitignored).
+#
+# Every default is deliberate; the two worth thinking about before an apply:
+
+# Start in dry-run. The prober probes and decides normally but persists nothing, so
+# the first runs can be read from CloudWatch before any account's status changes.
+# Flip to false once the logs show what you expect — specifically that pre-existing
+# accounts show up as denied-with-no-baseline (left alone) rather than as failures.
+dry_run = true
+
+# K in accountlifecycle is counted in RUNS, not elapsed time, so this expression is
+# what turns K=6 into a wall-clock duration. Hourly ⇒ six hours to unreachable.
+# schedule_expression = "rate(1 hour)"
+
+# Must match portal-onboarding-role.yaml's RoleName default. A mismatch denies every
+# probe — which the state machine refuses to interpret, so it fails visibly rather
+# than deprovisioning anyone, but it also means the prober does nothing.
+# onboard_role_name = "spore-portal-onboard"
+
+# accounts_table = "spore-portal-accounts"
+# region         = "us-east-1"
+# aws_profile    = "spore-host-infra"

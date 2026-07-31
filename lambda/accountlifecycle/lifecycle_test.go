@@ -1,4 +1,4 @@
-package main
+package accountlifecycle
 
 import (
 	"context"
@@ -301,6 +301,201 @@ func TestApplyProbes_UnparseableTimestampDoesNotTransition(t *testing.T) {
 	}
 	if got.LastInstanceAt != rfc(t0) {
 		t.Errorf("lastInstanceAt = %q, want re-stamped to %q", got.LastInstanceAt, rfc(t0))
+	}
+}
+
+// AccessDenied on an account that has NEVER succeeded is not evidence: with no
+// baseline we cannot separate "the customer deleted the role" from "our principal
+// was never in their trust policy", and STS returns the same AccessDenied for both.
+// This is the second door into spawn#457 trap 1 — the correlated-failure guard
+// cannot catch a SUBSET failing for a reason that is our own fault, so an account
+// onboarded before the prober's principal existed would otherwise be marked
+// unreachable within K runs despite being perfectly healthy.
+func TestApplyProbes_DeniedWithNoBaselineIsNotEvidence(t *testing.T) {
+	pol := DefaultLifecyclePolicy()
+	const denied = "111111111111"
+	const alive = "222222222222"
+
+	// Sustained well past K, always alongside a succeeding account so the
+	// correlated-failure guard is NOT what spares it.
+	acct := Account{AccountID: denied, Status: StatusActive} // never seen: no LastSeenAt
+	for run := 1; run <= pol.FailuresBeforeUnreachable*3; run++ {
+		changed := ApplyProbes(
+			[]Account{acct, {AccountID: alive, Status: StatusActive}},
+			[]ProbeResult{
+				{AccountID: denied, Reachable: false, AssumeRoleDenied: true},
+				{AccountID: alive, Reachable: true, LiveInstances: 1},
+			},
+			t0.Add(time.Duration(run)*10*time.Minute), pol)
+		if got := find(changed, denied); got != nil {
+			t.Fatalf("run %d: never-reached account was written (%+v); with no baseline it must be left entirely alone", run, got)
+		}
+	}
+	if acct.ConsecutiveFailures != 0 {
+		t.Errorf("consecutiveFailures = %d, want 0 — a refusal we may never have been allowed past is not a failure", acct.ConsecutiveFailures)
+	}
+	if acct.AccountStatus() != StatusActive {
+		t.Errorf("status = %q, want it untouched at active", acct.AccountStatus())
+	}
+}
+
+// The other half of the discriminator: an account that HAS succeeded before proved
+// its trust policy admits us, so AccessDenied now is a change the customer made —
+// real evidence, and the uninstall signal the whole design is built to read.
+// Without this, deleting the role would never be detected at all.
+func TestApplyProbes_DeniedAfterPriorSuccessIsEvidence(t *testing.T) {
+	pol := DefaultLifecyclePolicy()
+	const gone = "111111111111"
+	const alive = "222222222222"
+
+	// A baseline success on the record — the trust policy demonstrably admitted us.
+	acct := Account{AccountID: gone, Status: StatusActive, LastSeenAt: rfc(t0.Add(-time.Hour))}
+	for run := 1; run <= pol.FailuresBeforeUnreachable; run++ {
+		changed := ApplyProbes(
+			[]Account{acct, {AccountID: alive, Status: StatusActive}},
+			[]ProbeResult{
+				{AccountID: gone, Reachable: false, AssumeRoleDenied: true},
+				{AccountID: alive, Reachable: true, LiveInstances: 1},
+			},
+			t0.Add(time.Duration(run)*10*time.Minute), pol)
+		got := find(changed, gone)
+		if got == nil {
+			t.Fatalf("run %d: a denial after a proven success must count", run)
+		}
+		if got.ConsecutiveFailures != run {
+			t.Errorf("run %d: consecutiveFailures = %d, want %d", run, got.ConsecutiveFailures, run)
+		}
+		acct = *got
+	}
+	if acct.AccountStatus() != StatusUnreachable {
+		t.Errorf("status = %q, want %q after K denials against a proven baseline", acct.AccountStatus(), StatusUnreachable)
+	}
+}
+
+// A no-baseline denial must not stamp liveness either — we observed nothing, so
+// LastSeenAt must not advance and a dormant account must not silently revive.
+func TestApplyProbes_DeniedWithNoBaselineDoesNotStampLiveness(t *testing.T) {
+	pol := DefaultLifecyclePolicy()
+	const denied = "111111111111"
+	existing := []Account{{AccountID: denied, Status: StatusDormant}} // no LastSeenAt
+	changed := ApplyProbes(existing, []ProbeResult{
+		{AccountID: denied, Reachable: false, AssumeRoleDenied: true},
+		{AccountID: "222222222222", Reachable: true, LiveInstances: 1},
+	}, t0, pol)
+	if got := find(changed, denied); got != nil {
+		t.Errorf("no-baseline denial changed the row: %+v", got)
+	}
+}
+
+// An account absent from the registry has no baseline either — same answer. It must
+// not get a seeded row off a denial, or the very next run would read that row's
+// (still empty) LastSeenAt and start counting toward unreachable.
+func TestApplyProbes_DeniedUnknownAccountGetsNoRow(t *testing.T) {
+	pol := DefaultLifecyclePolicy()
+	changed := ApplyProbes(nil, []ProbeResult{
+		{AccountID: "444444444444", Reachable: false, AssumeRoleDenied: true},
+		{AccountID: "222222222222", Reachable: true, LiveInstances: 1},
+	}, t0, pol)
+	if got := find(changed, "444444444444"); got != nil {
+		t.Errorf("an unregistered account that denied us must not be seeded: %+v", got)
+	}
+}
+
+// A round where every account either refused us or failed is uninformative about
+// all of them — a denial cannot satisfy the correlated-failure guard.
+func TestApplyProbes_AllDeniedChangesNothing(t *testing.T) {
+	pol := DefaultLifecyclePolicy()
+	existing := []Account{
+		{AccountID: "111111111111", Status: StatusActive, LastSeenAt: rfc(t0.Add(-time.Hour))},
+		{AccountID: "222222222222", Status: StatusActive, LastSeenAt: rfc(t0.Add(-time.Hour))},
+	}
+	probes := []ProbeResult{
+		{AccountID: "111111111111", Reachable: false, AssumeRoleDenied: true},
+		{AccountID: "222222222222", Reachable: false}, // a genuine failure
+	}
+	if changed := ApplyProbes(existing, probes, t0, pol); len(changed) != 0 {
+		t.Errorf("no reachable probe in the round, so nothing is informative; got %+v", changed)
+	}
+}
+
+// Emptiness proven across only SOME regions must not authorize dormancy. This is
+// the third door into a false deprovision, and unlike the other two the prober
+// itself opens it: it fans out across ~11 regions per account, and one throttled
+// DescribeInstances would otherwise turn a busy account's partial zero into a
+// dormant verdict — a state that authorizes deleting its DNS records.
+func TestApplyProbes_PartialRegionCoverageDoesNotProveEmptiness(t *testing.T) {
+	pol := DefaultLifecyclePolicy()
+	const id = "111111111111"
+	existing := []Account{{
+		AccountID:      id,
+		Status:         StatusActive,
+		LastInstanceAt: rfc(t0.Add(-90 * 24 * time.Hour)), // long past N
+	}}
+	got := find(ApplyProbes(existing, []ProbeResult{
+		{AccountID: id, Reachable: true, LiveInstances: 0, EmptinessUnproven: true},
+	}, t0, pol), id)
+	if got == nil {
+		t.Fatal("expected a liveness change row — reachability WAS proven")
+	}
+	if got.AccountStatus() != StatusDormant && got.AccountStatus() != StatusActive {
+		t.Fatalf("unexpected status %q", got.AccountStatus())
+	}
+	if got.AccountStatus() == StatusDormant {
+		t.Error("dormant on a partial region sweep: zero-of-a-partial-set is not zero")
+	}
+	if got.LastSeenAt != rfc(t0) {
+		t.Errorf("lastSeenAt = %q, want %q — the assume-role did succeed", got.LastSeenAt, rfc(t0))
+	}
+}
+
+// The unproven flag must DEFER dormancy, not prevent it forever: LastInstanceAt is
+// left alone rather than re-stamped, so one chronically failing region does not
+// freeze the N-day clock. The next complete sweep decides.
+func TestApplyProbes_UnprovenDefersRatherThanResetsTheClock(t *testing.T) {
+	pol := DefaultLifecyclePolicy()
+	const id = "111111111111"
+	lastSeen := rfc(t0.Add(-90 * 24 * time.Hour))
+	acct := Account{AccountID: id, Status: StatusActive, LastInstanceAt: lastSeen}
+
+	// Many partial rounds: the clock must never be pushed forward.
+	for run := 1; run <= 5; run++ {
+		changed := ApplyProbes([]Account{acct}, []ProbeResult{
+			{AccountID: id, Reachable: true, LiveInstances: 0, EmptinessUnproven: true},
+		}, t0.Add(time.Duration(run)*time.Hour), pol)
+		if got := find(changed, id); got != nil {
+			if got.LastInstanceAt != lastSeen {
+				t.Fatalf("run %d: lastInstanceAt moved to %q; a partial sweep must not reset the dormancy clock", run, got.LastInstanceAt)
+			}
+			acct = *got
+		}
+	}
+	// One complete sweep and the deferred verdict lands.
+	got := find(ApplyProbes([]Account{acct}, []ProbeResult{
+		{AccountID: id, Reachable: true, LiveInstances: 0},
+	}, t0.Add(6*time.Hour), pol), id)
+	if got == nil || got.AccountStatus() != StatusDormant {
+		t.Errorf("a complete sweep should reach the deferred dormant verdict; got %+v", got)
+	}
+}
+
+// A live instance is positive evidence regardless of coverage — finding one in the
+// regions we DID reach proves the account is in use, and partial coverage cannot
+// unfind it.
+func TestApplyProbes_UnprovenStillAcceptsPositiveEvidence(t *testing.T) {
+	pol := DefaultLifecyclePolicy()
+	const id = "111111111111"
+	existing := []Account{{AccountID: id, Status: StatusDormant}}
+	got := find(ApplyProbes(existing, []ProbeResult{
+		{AccountID: id, Reachable: true, LiveInstances: 2, EmptinessUnproven: true},
+	}, t0, pol), id)
+	if got == nil {
+		t.Fatal("expected a recovery change row")
+	}
+	if got.AccountStatus() != StatusActive {
+		t.Errorf("status = %q, want active — a found instance is proof of use, whatever we missed elsewhere", got.AccountStatus())
+	}
+	if got.LastInstanceAt != rfc(t0) {
+		t.Errorf("lastInstanceAt = %q, want %q", got.LastInstanceAt, rfc(t0))
 	}
 }
 
