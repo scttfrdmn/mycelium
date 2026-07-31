@@ -1,4 +1,6 @@
-<h1 align="center">🍄 spore.host</h1>
+<p align="center">
+  <img src="docs/brand/spore-host-hero.png" alt="spore.host — Infrastructure that grows with your research" width="820">
+</p>
 
 <p align="center">
   <a href="https://github.com/spore-host/spore-host/actions/workflows/ci.yml"><img src="https://github.com/spore-host/spore-host/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
