@@ -13,6 +13,10 @@
 // anything in the body. The body's roleArn MUST belong to the verified account,
 // or we reject — so a caller can only ever register a role in its own account.
 // No shared secret, no allow-list to maintain, no spoofable claims.
+//
+// The registry schema and the account lifecycle state machine live in the shared
+// accountlifecycle module, because portal-account-prober writes lifecycle
+// transitions to the same table and ApplyProbes must have exactly one copy.
 package main
 
 import (
@@ -25,9 +29,10 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/spore-host/spore-host/lambda/accountlifecycle"
 )
 
-var reg *Registry
+var reg *accountlifecycle.Registry
 
 // roleArnRE extracts the account id from an IAM role ARN and validates shape.
 var roleArnRE = regexp.MustCompile(`^arn:aws:iam::(\d{12}):role/.+$`)
@@ -38,7 +43,7 @@ func init() {
 	if err != nil {
 		log.Fatalf("load AWS config: %v", err)
 	}
-	reg = newRegistry(cfg)
+	reg = accountlifecycle.NewRegistry(cfg)
 }
 
 // phoneHomeRequest is the onboarding payload. accountId is NOT trusted from the
@@ -100,7 +105,7 @@ type validationError struct {
 // roleArn belongs to the verified account, and normalize into an Account to
 // persist. This is where the security invariant lives, so it's unit-tested with
 // no AWS at all.
-func validate(verifiedAccount, callerARN string, req phoneHomeRequest) (*Account, *validationError) {
+func validate(verifiedAccount, callerARN string, req phoneHomeRequest) (*accountlifecycle.Account, *validationError) {
 	m := roleArnRE.FindStringSubmatch(strings.TrimSpace(req.RoleArn))
 	if m == nil {
 		return nil, &validationError{400, "roleArn must be a valid IAM role ARN"}
@@ -117,7 +122,7 @@ func validate(verifiedAccount, callerARN string, req phoneHomeRequest) (*Account
 	if region == "" {
 		region = "us-east-1"
 	}
-	return &Account{
+	return &accountlifecycle.Account{
 		AccountID:    verifiedAccount,
 		RoleArn:      strings.TrimSpace(req.RoleArn),
 		ExternalId:   strings.TrimSpace(req.ExternalId),

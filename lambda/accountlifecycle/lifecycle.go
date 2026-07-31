@@ -1,21 +1,26 @@
-// lifecycle.go — the account deprovisioning state machine (spawn#457).
+// Package accountlifecycle is the BYOA account registry and its deprovisioning
+// state machine (spawn#457), shared by the two Lambdas that touch the registry:
+// portal-phone-home writes registrations, portal-account-prober writes lifecycle
+// transitions. It is its own Go module so ApplyProbes has exactly ONE copy — the
+// two refusals below are mutation-verified, and a second copy would drift out from
+// under those tests.
 //
 // The problem it solves: onboarding was one-way. Nothing ever concluded "this
 // account is gone", so every artifact left behind was permanent — and one of them
 // (a Route53 A-record whose public IP has returned to the EC2 pool) eventually
 // resolves to a stranger's instance. That is the hazard driving the whole design.
 //
-// The signal is free: the reaper already assumes every account's role every 10
-// minutes, and that probe distinguishes exactly the states that matter — the role
-// is gone (the customer uninstalled) versus the role works but the account is
-// empty (dormant but reachable). No new API and no customer action beyond the
-// uninstall gesture they would already make.
+// The signal is cheap: assume the account's role and DescribeInstances, and that
+// one probe distinguishes exactly the states that matter — the role is gone (the
+// customer uninstalled) versus the role works but the account is empty (dormant
+// but reachable). No new API and no customer action beyond the uninstall gesture
+// they would already make.
 //
-// The whole file is pure: no AWS, no clock, no I/O. The reaper supplies probe
+// The whole file is pure: no AWS, no clock, no I/O. The prober supplies probe
 // results and `now`; this decides. That is deliberate, because the interesting
 // parts are the two refusals — and a refusal is only trustworthy if you can test
 // it exhaustively without mocking a cloud.
-package main
+package accountlifecycle
 
 import (
 	"fmt"
@@ -58,7 +63,7 @@ func (a *Account) AccountStatus() string {
 	return a.Status
 }
 
-// ProbeResult is one account's outcome from one reaper run: did the assume-role
+// ProbeResult is one account's outcome from one probe run: did the assume-role
 // work, and if so, did the account hold any live managed instances.
 type ProbeResult struct {
 	AccountID string
@@ -69,6 +74,50 @@ type ProbeResult struct {
 	// when Reachable — a zero from an unreachable probe proves nothing, because we
 	// did not look and could not have.
 	LiveInstances int
+	// AssumeRoleDenied is a RAW observation, not a judgment: STS answered
+	// AccessDenied to sts:AssumeRole. The prober reports the API's answer; whether
+	// it counts as evidence is decided here, because the error code alone cannot
+	// decide it.
+	//
+	// AccessDenied is irreducibly ambiguous. STS returns it both when the role was
+	// DELETED — the uninstall gesture, precisely the signal we want — and when the
+	// role exists but its trust policy does not list our principal. It deliberately
+	// does not distinguish the two, so as not to leak whether a role exists. So the
+	// same three words mean either "the customer left" or "we were never allowed
+	// in", and acting on the first reading when the second is true deprovisions a
+	// healthy account.
+	//
+	// This is the second door into spawn#457 trap 1, and the guard below does not
+	// cover it: that guard only fires when EVERY probe fails, so it cannot catch a
+	// SUBSET failing for a reason that is our own fault. An account onboarded before
+	// the prober's principal was added to the onboarding template refuses us forever
+	// no matter how healthy it is — and from the inside that is indistinguishable
+	// from a handful of customers who uninstalled.
+	//
+	// The discriminator is not in the error, it is in the registry: LastSeenAt.
+	// If this account has EVER completed an assume-role, its trust policy provably
+	// admitted us once, so a denial now is a change the customer made — real
+	// evidence. If it never has, we have no baseline, cannot tell our own rollout
+	// gap from their uninstall, and so treat the probe as NO OBSERVATION AT ALL:
+	// neither advancing the failure counter nor stamping liveness. "We were never
+	// allowed to look" is not a fact about the customer. See ApplyProbes.
+	AssumeRoleDenied bool
+	// EmptinessUnproven means the assume-role worked and LiveInstances is a real
+	// count — but of only SOME of the regions we meant to check, because at least
+	// one region's DescribeInstances failed.
+	//
+	// Third door into a false deprovision, and the one the prober itself opens:
+	// dormancy is "reachable AND empty", and emptiness is established by finding
+	// nothing across every region a spore could be in. Zero-of-a-partial-set is not
+	// zero. One throttled region on the run that happens to cross the N-day line
+	// would otherwise mark a busy account dormant — and dormant is one of the two
+	// states that authorizes deleting its DNS records.
+	//
+	// Liveness is still stamped, because reachability WAS proven. Only the dormancy
+	// evaluation is skipped, and LastInstanceAt is left alone rather than
+	// re-stamped: re-stamping would reset the N-day clock, so one chronically
+	// failing region would block dormancy forever. Skipping merely defers it.
+	EmptinessUnproven bool
 }
 
 // LifecyclePolicy is the K/N tuning from spawn#457.
@@ -111,6 +160,10 @@ func ApplyProbes(existing []Account, probes []ProbeResult, now time.Time, pol Li
 	// question is whether OUR probing worked at all, and a single-account
 	// deployment whose one probe failed is exactly as uninformative as a
 	// hundred-account one where all hundred failed.
+	//
+	// A denied probe cannot satisfy this either (it is not Reachable), which is the
+	// right answer: a round where every account either refused us or failed tells us
+	// nothing about any of them.
 	anyReachable := false
 	for _, p := range probes {
 		if p.Reachable {
@@ -138,6 +191,17 @@ func ApplyProbes(existing []Account, probes []ProbeResult, now time.Time, pol Li
 			acct = Account{AccountID: p.AccountID}
 		}
 		before := acct
+
+		// Resolve the AccessDenied ambiguity (see AssumeRoleDenied). A denial is
+		// evidence only for an account that has succeeded at least once: that success
+		// proves the trust policy admitted us, so a refusal now is a change the
+		// customer made. With no such baseline we cannot separate their uninstall from
+		// our own rollout gap, so we conclude nothing at all rather than guess in the
+		// direction that deprovisions. An account absent from the registry has no
+		// baseline either, which is the same answer.
+		if p.AssumeRoleDenied && acct.LastSeenAt == "" {
+			continue
+		}
 
 		if !p.Reachable {
 			// Failed, and at least one other account succeeded — so this is about
@@ -174,6 +238,13 @@ func ApplyProbes(existing []Account, probes []ProbeResult, now time.Time, pol Li
 				// human decision, and only a human (a re-onboard) should undo it.
 				setStatus(&acct, StatusActive, stamp, "live managed instance observed")
 			}
+
+		case p.EmptinessUnproven:
+			// Reachable, and we found nothing — but we did not finish looking. See the
+			// field comment: zero-of-a-partial-set is not zero, and dormancy is one of
+			// the two states that authorizes deleting DNS records. Liveness above is
+			// kept (reachability was proven); the dormancy clock is neither advanced
+			// nor read.
 
 		case acct.LastInstanceAt == "":
 			// Reachable and empty, but we have never seen an instance here. Seed the

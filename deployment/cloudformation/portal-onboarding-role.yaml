@@ -15,9 +15,29 @@ Parameters:
     Description: >
       ARN of the portal phone-home Lambda execution role in spore-host-infra
       (the PortalPhoneHomeLambdaRole output of infra/tofu/portal-phone-home).
-      This is the only principal allowed to assume the role created here.
+      Allowed to assume the role created here, alongside ProberLambdaRoleArn.
     AllowedPattern: 'arn:aws:iam::\d{12}:role/.+'
     ConstraintDescription: Must be a valid IAM role ARN
+
+  ProberLambdaRoleArn:
+    Type: String
+    Default: ''
+    Description: >
+      ARN of the portal account-prober Lambda execution role in spore-host-infra
+      (the role_arn output of infra/tofu/portal-account-prober). It periodically
+      assumes this role and calls ec2:DescribeInstances — nothing else — to check
+      whether the account is still reachable and whether it still runs any spores.
+      That is the signal spore.host uses to expire DNS records belonging to accounts
+      that have been deprovisioned, so a stale record cannot later resolve to a
+      stranger's instance.
+
+      Leave blank to omit it. Blank is SAFE rather than merely tolerated: an account
+      whose trust policy does not name the prober simply denies it, and the lifecycle
+      state machine treats a denial from an account it has never successfully probed
+      as no evidence at all — not as an uninstall. The only cost of omitting it is
+      that this account's DNS records are never eligible for automatic expiry.
+    AllowedPattern: '^$|arn:aws:iam::\d{12}:role/.+'
+    ConstraintDescription: Must be a valid IAM role ARN, or empty
 
   PhoneHomeUrl:
     Type: String
@@ -50,6 +70,12 @@ Parameters:
       invoke). iam:PassRole is scoped to exactly this role. Must exist in this
       account (create it separately if absent).
 
+Conditions:
+  # The prober principal is optional so this template stays deployable by anyone who
+  # only has the phone-home ARN to hand, and so an existing stack can be updated to
+  # add the prober later without a template change.
+  HasProberRole: !Not [!Equals [!Ref ProberLambdaRoleArn, '']]
+
 Resources:
 
   PortalOnboardRole:
@@ -67,6 +93,26 @@ Resources:
             Condition:
               StringEquals:
                 sts:ExternalId: !Ref ExternalId
+          # The lifecycle prober (optional — see the ProberLambdaRoleArn parameter).
+          # Same ExternalId guard. Note it inherits the SAME permissions as the
+          # statement above, because a trust policy says who may assume, not what
+          # they may then do — so on paper the prober could RunInstances here.
+          # It cannot in practice: the prober attaches an STS SESSION POLICY allowing
+          # only ec2:DescribeInstances, and effective permissions are the intersection
+          # of the two, so the credentials it holds cannot launch or terminate
+          # anything even if the prober itself is compromised. That self-limit is in
+          # lambda/portal-account-prober/main.go, and it is why this does not need a
+          # second, read-only role in your account.
+          - !If
+            - HasProberRole
+            - Effect: Allow
+              Principal:
+                AWS: !Ref ProberLambdaRoleArn
+              Action: sts:AssumeRole
+              Condition:
+                StringEquals:
+                  sts:ExternalId: !Ref ExternalId
+            - !Ref 'AWS::NoValue'
       Policies:
         - PolicyName: PortalEC2Launch
           PolicyDocument:
