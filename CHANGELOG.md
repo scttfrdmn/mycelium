@@ -20,7 +20,9 @@ own changelogs for CLI releases.
   mascot (replacing the CSS-text + SVG-circle stand-in). Added Open Graph /
   Twitter social-card meta pointing at `spore-host-og.png`, so links unfurl with
   the brand card. Brand assets live under `web/assets/brand/` (logo, jellyfish
-  mascot, hero, OG).
+  mascot, hero, OG). The mascot and wordmark are the clean, transparent-background
+  brand renders (`spore-host-mark` / `spore-host-wordmark`), so they sit correctly
+  on the dark hero with no white box.
 
 ### Added
 - **`portal-account-prober` — the scheduled caller the lifecycle state machine was
