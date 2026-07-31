@@ -30,10 +30,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.41.10 // indirect
 	github.com/aws/smithy-go v1.24.2 // indirect
 	github.com/spore-host/spore-host/lambda/accountlifecycle v0.0.0
-	golang.org/x/net v0.55.0 // indirect
-	golang.org/x/sys v0.45.0 // indirect
-	golang.org/x/text v0.39.0 // indirect
-	google.golang.org/grpc v1.82.1 // indirect
 )
 
 replace github.com/spore-host/spore-host/lambda/accountlifecycle => ../accountlifecycle
