@@ -82,11 +82,25 @@ jobs:
       # excludes are needed.
       - name: Deploy to S3
         run: |
-          # Pass 1: static assets — long cache.
+          # Pass 1: long-lived, content-addressed assets — long cache. Vite emits
+          # hashed filenames under assets/ (e.g. terminal-UsCfG-Qc.js), so those are
+          # safe to cache for a day. EXCLUDE css/ here: css/style.css is a hand-copied
+          # static file with a STABLE name, so a 24h cache means a CSS change is
+          # invisible to returning visitors for up to a day even after a CloudFront
+          # invalidation (the edge is fresh, the browser isn't) — which is exactly how
+          # a CSS update once paired new HTML with stale CSS and blew up the hero logo.
           aws s3 sync web/dist/ s3://spore-host-website/ \
             --cache-control "public, max-age=86400" \
             --exclude "*.html" \
+            --exclude "css/*" \
             --exclude ".DS_Store"
+          # Pass 1b: CSS — short cache + must-revalidate (like HTML), because the
+          # filename is unhashed. A CSS change now shows up within ~1 min instead of
+          # being stuck behind a browser's 24h cache.
+          aws s3 sync web/dist/ s3://spore-host-website/ \
+            --cache-control "public, max-age=60, must-revalidate" \
+            --exclude "*" \
+            --include "css/*"
           # Pass 2: HTML — short cache, always revalidate; --delete prunes here.
           aws s3 sync web/dist/ s3://spore-host-website/ \
             --delete \

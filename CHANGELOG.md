@@ -13,6 +13,16 @@ own changelogs for CLI releases.
 
 ## [Unreleased]
 
+### Fixed
+- **Site CSS changes no longer take up to 24h to reach returning visitors.** The
+  deploy cached all static assets (including the hand-copied, unhashed
+  `css/style.css` / `dashboard.css`) for `max-age=86400`, so a CSS change paired
+  new HTML with a browser's day-old CSS — which is how a hero style update once
+  rendered the mascot at full natural size until a hard refresh. CSS now deploys
+  with a short `max-age=60, must-revalidate` (like the HTML); Vite's
+  content-hashed JS keeps the long cache. (Images under `assets/` remain
+  long-cached — they're name-stable and change rarely.)
+
 ### Changed
 - **Marketing site (`web/`) now uses the real spore.host brand art.** The landing
   hero leads with the **jellyfish mascot** shown large (replacing the small
