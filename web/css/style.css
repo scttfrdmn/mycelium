@@ -170,7 +170,7 @@ section + section { border-top: 1px solid var(--border); }
    The wordmark PNG carries the mascot orb + a faint tentacle glow, so a little
    extra height reads well without crowding. */
 .nav-logo-img {
-  height: 30px; width: auto; display: block;
+  height: 45px; width: auto; display: block;
 }
 .nav-links {
   display: flex; align-items: center; gap: 1.5rem;
@@ -340,7 +340,7 @@ h2.section-title {
 
 /* Hero trust strip */
 .trust-strip {
-  margin: 1rem auto 0;
+  margin: 1rem 0 0;
   font-size: 0.85rem;
   color: var(--text-muted);
   max-width: 46rem;
