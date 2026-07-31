@@ -206,9 +206,11 @@ section + section { border-top: 1px solid var(--border); }
   display: flex; justify-content: center;
   margin-bottom: 1.5rem;
 }
-.hero-mascot-img {
-  height: clamp(180px, 30vw, 340px);
-  width: auto; max-width: 100%;
+/* Hero wordmark — the full `spore ● host` lockup (wide image), sized by WIDTH
+   since it's ~2.5:1. Baseline presence ~640px, shown 20% smaller (×0.8 ≈ 512px). */
+.hero-wordmark-img {
+  width: clamp(240px, 55vw, 512px);
+  height: auto; max-width: 100%;
   display: block;
   filter: drop-shadow(0 8px 28px rgba(51, 222, 249, 0.28));
 }
