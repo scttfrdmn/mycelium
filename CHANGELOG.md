@@ -14,6 +14,10 @@ own changelogs for CLI releases.
 ## [Unreleased]
 
 ### Changed
+- **Canonical mascot art is now the clean, transparent de-pinked mark** (replacing
+  the sticker-derived knockout and the earlier pink-checkerboard icon export).
+  Updated the brand mascot assets under `web/assets/brand/` and `docs/brand/`.
+
 - **The site nav bar now shows the real `spore ● host` wordmark image** (across
   the landing page and the developer/library page), replacing the CSS-text +
   gradient-circle lockup. Sized 45px to sit in the nav.
