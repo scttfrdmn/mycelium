@@ -673,3 +673,40 @@ footer {
 .slack-details summary { cursor: pointer; color: var(--bot); }
 .slack-scopes { margin: 0.5rem 0 0; padding-left: 1.2rem; line-height: 1.7; }
 .slack-scopes code, .slack-panel code { background: var(--code-bg); padding: 0.05rem 0.35rem; border-radius: 4px; font-size: 0.85em; }
+
+/* ── lagotto surface — watch for EC2 capacity (accent --lagotto) ── */
+.lagotto-surface { max-width: 820px; }
+.lagotto-hint { color: var(--text-muted); font-size: 0.9rem; max-width: 640px; }
+.lagotto-hint code, .lagotto-fieldhint code, .lagotto-match-next code { background: var(--code-bg); padding: 0.05rem 0.35rem; border-radius: 4px; font-size: 0.85em; }
+/* Two rows: the inputs, then spot + the actions. Fields align on their INPUT
+   (not their bottom edge) so a wrapping hint doesn't shove one field upward. */
+.lagotto-form { margin: 1.25rem 0; }
+.lagotto-fields { display: flex; flex-wrap: wrap; gap: 0.75rem 1rem; align-items: start; }
+.lagotto-controls { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; margin-top: 1rem; }
+.lagotto-field { display: grid; grid-template-rows: auto auto auto; gap: 0.25rem; flex: 0 1 150px; }
+.lagotto-field-wide { flex: 1 1 220px; }
+.lagotto-field label { font-size: 0.85rem; color: var(--text-muted); }
+.lagotto-field input, .lagotto-field select { font: inherit; padding: 0.45rem 0.65rem; border-radius: var(--radius); border: 1px solid var(--border-strong); background: var(--bg); color: var(--text); }
+.lagotto-pattern { font-family: ui-monospace, monospace; }
+.lagotto-field input:focus-visible, .lagotto-field select:focus-visible { outline: 2px solid var(--lagotto); outline-offset: -2px; }
+.lagotto-field input:disabled, .lagotto-field select:disabled { opacity: 0.6; }
+.lagotto-fieldhint { font-size: 0.75rem; color: var(--text-muted); }
+.lagotto-check { display: flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; color: var(--text); }
+.lagotto-actions { display: flex; gap: 0.5rem; flex: 0 0 auto; }
+.lagotto-actions button { font: inherit; cursor: pointer; padding: 0.45rem 1rem; border-radius: var(--radius); border: 1px solid var(--border-strong); background: var(--bg); color: var(--text); }
+.lagotto-start { border-color: var(--lagotto) !important; background: var(--lagotto) !important; color: #fff !important; }
+.lagotto-actions button:disabled { opacity: 0.6; cursor: default; }
+.lagotto-result { color: var(--text-muted); font-size: 0.9rem; min-height: 1.2em; }
+.lagotto-result.error { color: var(--accent-red); }
+.lagotto-match { border: 1px solid var(--lagotto); border-radius: var(--radius); padding: 0.8rem 1rem; background: var(--lagotto-bg); }
+.lagotto-match-head { display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap; }
+.lagotto-match-type { font-weight: 700; font-size: 1.05rem; color: var(--lagotto); font-family: ui-monospace, monospace; }
+.lagotto-match-kind { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-muted); }
+.lagotto-match-price { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--text); font-weight: 600; }
+.lagotto-match-meta { display: grid; grid-template-columns: auto 1fr; gap: 0.2rem 0.75rem; margin: 0.6rem 0 0; font-size: 0.85rem; }
+.lagotto-match-meta dt { color: var(--text-muted); }
+.lagotto-match-meta dd { margin: 0; color: var(--text); }
+.lagotto-match-next { margin: 0.75rem 0 0; font-size: 0.85rem; color: var(--text); line-height: 1.5; }
+.lagotto-match-next a { color: var(--lagotto); font-weight: 600; }
+.lagotto-log { list-style: none; margin: 1rem 0 0; padding: 0; font-family: ui-monospace, monospace; font-size: 0.8rem; color: var(--text-muted); max-height: 260px; overflow: auto; }
+.lagotto-log li { padding: 0.2rem 0; border-bottom: 1px solid var(--border); }

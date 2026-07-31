@@ -1,0 +1,158 @@
+<!doctype html>
+<!--
+  Dev-only harness for the lagotto surface. Mounts the REAL surface module with a
+  stub SurfaceContext and a stubbed window.fetch that answers the two EC2 Query
+  calls with canned XML, so the whole chain runs for real: EC2Client → the
+  portal's CapacityFinder → lagotto-ts's CapacityWatcher + pure matcher → render.
+  Open at /app/surfaces/lagotto.harness.html under `npm run dev`. Not part of the
+  Vite build inputs, so it never ships to spore.host.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>lagotto harness</title>
+    <link rel="stylesheet" href="../../css/style.css" />
+  </head>
+  <body>
+    <div id="host" class="portal-main"></div>
+    <pre id="verdict"></pre>
+    <script>
+      // ?dark — the portal picks its theme in app/index.html; mirror that here.
+      if (location.search.includes("dark")) document.documentElement.setAttribute("data-theme", "dark");
+    </script>
+    <script type="module">
+      const OFFERINGS = `<?xml version="1.0" encoding="UTF-8"?>
+<DescribeInstanceTypeOfferingsResponse xmlns="http://ec2.amazonaws.com/doc/2016-11-15/">
+  <requestId>req-1</requestId>
+  <instanceTypeOfferingSet>
+    <item><instanceType>p5.48xlarge</instanceType><locationType>availability-zone</locationType><location>us-east-1d</location></item>
+    <item><instanceType>p5.48xlarge</instanceType><locationType>availability-zone</locationType><location>us-east-1b</location></item>
+    <item><instanceType>p5e.48xlarge</instanceType><locationType>availability-zone</locationType><location>us-east-1c</location></item>
+    <item><instanceType>m7i.large</instanceType><locationType>availability-zone</locationType><location>us-east-1a</location></item>
+  </instanceTypeOfferingSet>
+</DescribeInstanceTypeOfferingsResponse>`;
+
+      // Two points for p5.48xlarge@us-east-1b: the newer one must win.
+      const SPOT = `<?xml version="1.0" encoding="UTF-8"?>
+<DescribeSpotPriceHistoryResponse xmlns="http://ec2.amazonaws.com/doc/2016-11-15/">
+  <requestId>req-2</requestId>
+  <spotPriceHistorySet>
+    <item><instanceType>p5.48xlarge</instanceType><availabilityZone>us-east-1d</availabilityZone><spotPrice>30.0</spotPrice><productDescription>Linux/UNIX</productDescription><timestamp>2026-07-30T12:00:00.000Z</timestamp></item>
+    <item><instanceType>p5.48xlarge</instanceType><availabilityZone>us-east-1b</availabilityZone><spotPrice>9.99</spotPrice><productDescription>Linux/UNIX</productDescription><timestamp>2026-07-30T11:00:00.000Z</timestamp></item>
+    <item><instanceType>p5.48xlarge</instanceType><availabilityZone>us-east-1b</availabilityZone><spotPrice>22.5</spotPrice><productDescription>Linux/UNIX</productDescription><timestamp>2026-07-30T12:30:00.000Z</timestamp></item>
+  </spotPriceHistorySet>
+</DescribeSpotPriceHistoryResponse>`;
+
+      const calls = [];
+      window.fetch = async (req) => {
+        const body = typeof req === "object" && req.body ? await new Response(req.body).text() : "";
+        const action = /Action=([A-Za-z]+)/.exec(body)?.[1] ?? "?";
+        calls.push({ action, body });
+        const xml =
+          action === "DescribeSpotPriceHistory" ? SPOT
+          : action === "DescribeInstanceTypeOfferings" ? OFFERINGS
+          : "";
+        return new Response(xml, { status: 200, headers: { "content-type": "text/xml" } });
+      };
+
+      const { lagottoSurface } = await import("./lagotto.ts");
+
+      const session = {
+        region: "us-east-1",
+        accountId: "000000000000",
+        signedIn: true,
+        getCreds: () => ({ accessKeyId: "AKIAHARNESS", secretAccessKey: "s", sessionToken: "t" }),
+        onExpiry: () => () => {},
+      };
+      const host = document.getElementById("host");
+      const disposable = await lagottoSurface.mount(host, {
+        session,
+        config: { region: "us-east-1" },
+        navigate: () => {},
+      });
+
+      const checks = [];
+      const assert = (name, cond, detail = "") => checks.push(`${cond ? "PASS" : "FAIL"} ${name}${detail ? " — " + detail : ""}`);
+      const $ = (s) => host.querySelector(s);
+      const settle = () => new Promise((r) => setTimeout(r, 150));
+
+      assert("form renders", Boolean($(".lagotto-form")));
+      assert("default pattern is p5.*", $(".lagotto-pattern").value === "p5.*");
+
+      // 1. On-demand "Check once": static pricing, cheapest match, sorted AZs.
+      $(".lagotto-once").click();
+      await settle();
+      const onDemandText = $(".lagotto-result").textContent;
+      assert("on-demand match rendered", $(".lagotto-result").classList.contains("found"), onDemandText.slice(0, 80));
+      assert("pattern filtered out m7i.large", !onDemandText.includes("m7i"));
+      assert("zone is the first sorted AZ (us-east-1b, not the API's 1d)", $(".lagotto-match-meta dd:nth-of-type(2)")?.textContent === "us-east-1b", onDemandText);
+      assert("both offered AZs carried", /us-east-1b, us-east-1d/.test(onDemandText));
+      // EC2's Query protocol serializes the filter list as Filter.N.* (singular),
+      // and `*` percent-encodes to %2A.
+      assert(
+        "glob pushed to EC2 as a server-side instance-type filter",
+        /Filter\.1\.Name=instance-type/.test(calls[0]?.body ?? "") && /Filter\.1\.Value\.1=p5\.%2A/.test(calls[0]?.body ?? ""),
+        calls[0]?.body?.slice(0, 200),
+      );
+
+      // 2. Spot: latest price per AZ wins, cheapest AZ chosen.
+      $(".lagotto-spot").checked = true;
+      $(".lagotto-once").click();
+      await settle();
+      const spotText = $(".lagotto-result").textContent;
+      assert("spot match rendered", $(".lagotto-result").classList.contains("found"), spotText.slice(0, 80));
+      assert("labelled Spot", spotText.includes("Spot"));
+      assert("latest point per AZ wins ($22.5 not the older $9.99)", spotText.includes("22.5000"), spotText);
+      assert("cheapest AZ chosen (1b @22.5 over 1d @30)", spotText.includes("us-east-1d") === false || /us-east-1b/.test(spotText), spotText);
+      assert("spot pricing was queried", calls.some((c) => c.action === "DescribeSpotPriceHistory"));
+
+      // 3. Price cap rejects.
+      $(".lagotto-maxprice").value = "1";
+      $(".lagotto-once").click();
+      await settle();
+      assert("price cap rejects the match", $(".lagotto-result").textContent.includes("No matching capacity"), $(".lagotto-result").textContent);
+
+      // 4. AZ pin narrows to a zone with no offering.
+      $(".lagotto-maxprice").value = "";
+      $(".lagotto-spot").checked = false;
+      $(".lagotto-azs").value = "us-east-1f";
+      $(".lagotto-once").click();
+      await settle();
+      assert("AZ pin excludes non-offering zones", $(".lagotto-result").textContent.includes("No matching capacity"), $(".lagotto-result").textContent);
+
+      // 5. Poll: logs a check, then finds capacity; stop clears the running state.
+      $(".lagotto-azs").value = "";
+      $(".lagotto-form").dispatchEvent(new Event("submit"));
+      await settle();
+      assert("poll found capacity and logged a check", host.querySelectorAll(".lagotto-log li").length >= 1, `${host.querySelectorAll(".lagotto-log li").length} log lines`);
+      assert("controls re-enabled after the poll resolved", $(".lagotto-start").hidden === false);
+
+      // 6. A raw regex can't be expressed as an EC2 wildcard → no server-side
+      // filter, fetch everything and match locally.
+      $(".lagotto-pattern").value = "(p5|trn2)\\..*";
+      $(".lagotto-once").click();
+      await settle();
+      const lastOfferings = [...calls].reverse().find((c) => c.action === "DescribeInstanceTypeOfferings");
+      assert("regex pattern sends no server-side filter", !/Filter\.1\.Name/.test(lastOfferings?.body ?? "x"), lastOfferings?.body?.slice(0, 160));
+      assert("regex pattern still matches locally", $(".lagotto-result").classList.contains("found"), $(".lagotto-result").textContent.slice(0, 60));
+
+      // 7. dispose() removes everything.
+      disposable.dispose();
+      assert("dispose removes the surface", host.querySelector(".lagotto-surface") === null);
+
+      // ?keep — re-mount and show a match, for eyeballing the rendered surface
+      // (the assertions above end with dispose(), which leaves the page empty).
+      if (location.search.includes("keep")) {
+        await lagottoSurface.mount(host, { session, config: { region: "us-east-1" }, navigate: () => {} });
+        host.querySelector(".lagotto-once").click();
+        await settle();
+        document.getElementById("verdict").hidden = true;
+      }
+
+      const failed = checks.filter((c) => c.startsWith("FAIL"));
+      document.getElementById("verdict").textContent =
+        checks.join("\n") + "\n\n" + (failed.length ? `${failed.length} FAILED` : "ALL PASS") + `\n(${calls.length} EC2 calls: ${calls.map((c) => c.action).join(", ")})`;
+      document.title = failed.length ? "HARNESS FAIL" : "HARNESS PASS";
+    </script>
+  </body>
+</html>

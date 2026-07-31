@@ -199,9 +199,18 @@ resource "aws_iam_role_policy" "ec2_launch" {
         }
       },
       {
-        Sid      = "ReadSpotAndQuotas"
-        Effect   = "Allow"
-        Action   = ["ec2:DescribeSpotPriceHistory", "servicequotas:GetServiceQuota", "servicequotas:ListServiceQuotas"]
+        Sid    = "ReadSpotAndQuotas"
+        Effect = "Allow"
+        Action = [
+          "ec2:DescribeSpotPriceHistory",
+          # AZ-level "is this type offered here right now?" — the capacity signal
+          # the lagotto surface polls. Read-only and account-agnostic (offerings
+          # are a property of the region, not of any resource), so there is
+          # nothing narrower to scope it to than "*".
+          "ec2:DescribeInstanceTypeOfferings",
+          "servicequotas:GetServiceQuota",
+          "servicequotas:ListServiceQuotas",
+        ]
         Resource = "*"
       },
     ]
