@@ -153,6 +153,7 @@ section + section { border-top: 1px solid var(--border); }
   width: 1em; height: 1em;
   vertical-align: -0.15em;
   margin: 0 0.05em;
+  object-fit: contain;
 }
 
 .nav-brand {
@@ -192,15 +193,15 @@ section + section { border-top: 1px solid var(--border); }
 
 /* Hero logo — large wordmark above the headline */
 .hero-logo {
-  display: flex; align-items: center; gap: 0.15em;
-  font-size: clamp(2.5rem, 6vw, 4rem);
-  font-weight: 800; letter-spacing: -0.03em;
+  display: flex; align-items: center;
   margin-bottom: 1.5rem; line-height: 1;
 }
-.hero-logo .logo-orb {
-  width: 0.9em; height: 0.9em;
-  vertical-align: -0.1em;
-  margin: 0 0.04em;
+/* Real spore.host wordmark logo (transparent PNG). Cap the height so it reads as
+   a headline lockup; width auto-scales. */
+.hero-logo-img {
+  height: clamp(3rem, 8vw, 5.5rem);
+  width: auto; max-width: 100%;
+  display: block;
 }
 .hero-eyebrow {
   display: inline-block; font-size: 0.8rem; font-weight: 600;

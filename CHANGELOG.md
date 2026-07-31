@@ -13,6 +13,14 @@ own changelogs for CLI releases.
 
 ## [Unreleased]
 
+### Changed
+- **Marketing site (`web/`) now uses the real spore.host brand art.** The landing
+  hero shows the actual `spore ● host` wordmark logo (transparent PNG) instead of
+  the CSS-text + SVG-circle stand-in, and the nav orb across `index.html` /
+  `library.html` is the real mascot. Added Open Graph / Twitter social-card meta
+  pointing at `spore-host-og.png`, so links unfurl with the brand card. Brand
+  assets live under `web/assets/brand/` (logo, hero, mascot, OG).
+
 ### Added
 - **`portal-account-prober` — the scheduled caller the lifecycle state machine was
   written for** (`lambda/portal-account-prober/`, `infra/tofu/portal-account-prober/`,
