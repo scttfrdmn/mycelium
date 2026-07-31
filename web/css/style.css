@@ -137,7 +137,11 @@ section + section { border-top: 1px solid var(--border); }
   max-width: var(--max-width); margin: 0 auto; padding: 0 1.5rem;
   display: flex; align-items: center; gap: 2rem; height: 56px;
 }
-/* ── Logo mark ── */
+/* ── Logo mark ──
+   The marketing nav (index/library) now uses the real wordmark image
+   (.nav-logo-img). These CSS-text-lockup rules are retained because dashboard.html
+   still uses them (it's not part of this build's dist output, so it's out of scope
+   for this change). */
 .logo-spore {
   background: linear-gradient(to right, var(--brand-blue), var(--brand-teal));
   -webkit-background-clip: text;
@@ -161,7 +165,13 @@ section + section { border-top: 1px solid var(--border); }
   display: flex; align-items: center; gap: 0.5rem;
   flex-shrink: 0;
 }
-.nav-brand a { text-decoration: none; }
+.nav-brand a { text-decoration: none; display: inline-flex; align-items: center; }
+/* Real wordmark in the nav — sized to sit inside the 56px bar with breathing room.
+   The wordmark PNG carries the mascot orb + a faint tentacle glow, so a little
+   extra height reads well without crowding. */
+.nav-logo-img {
+  height: 30px; width: auto; display: block;
+}
 .nav-links {
   display: flex; align-items: center; gap: 1.5rem;
   margin-left: auto; font-size: 0.9rem;

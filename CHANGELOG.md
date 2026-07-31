@@ -13,6 +13,11 @@ own changelogs for CLI releases.
 
 ## [Unreleased]
 
+### Changed
+- **The site nav bar now shows the real `spore ● host` wordmark image** (across
+  the landing page and the developer/library page), replacing the CSS-text +
+  gradient-circle lockup. Sized to sit in the 56px nav.
+
 ### Fixed
 - **Site CSS changes no longer take up to 24h to reach returning visitors.** The
   deploy cached all static assets (including the hand-copied, unhashed
