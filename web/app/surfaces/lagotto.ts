@@ -166,7 +166,7 @@ export const lagottoSurface: ToolSurface = {
           <div class="lagotto-match-head">
             <span class="lagotto-match-type">${escapeHtml(m.instanceType)}</span>
             <span class="lagotto-match-kind">${spot ? "Spot" : "on-demand"}</span>
-            <span class="lagotto-match-price">$${m.price.toFixed(4)}/hr</span>
+            <span class="lagotto-match-price">${m.price != null ? `$${m.price.toFixed(4)}/hr` : "price unknown"}</span>
           </div>
           <dl class="lagotto-match-meta">
             <dt>Region</dt><dd>${escapeHtml(m.region)}</dd>

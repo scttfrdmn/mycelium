@@ -109,6 +109,53 @@ describe("truffleSurface disclosure", () => {
     d.dispose();
   });
 
+  // Every example in the hint must return results. `gpu with 80gb for training`
+  // shipped here while it silently returned CPU-only Graviton instances
+  // (truffle-ts#37/#38) — an example query is the first thing a new user runs, so
+  // a broken one is worse than none: it teaches them the tool doesn't work. It was
+  // pulled, fixed upstream in 0.5.0, and restored, so this drives each example
+  // through the real surface rather than trusting the version bump.
+  //
+  // Extracted from the hint rather than hardcoded, so adding an example to the copy
+  // without checking it fails here instead of in front of a user.
+  it("returns results for every example query in the hint", async () => {
+    const d = await truffleSurface.mount(host, ctxAt("standard"));
+    await settle();
+    const examples = [...host.querySelectorAll(".truffle-hint code")].map((c) => c.textContent!);
+    expect(examples.length).toBeGreaterThan(0);
+
+    for (const q of examples) {
+      host.querySelector<HTMLInputElement>(".truffle-q")!.value = q;
+      host.querySelector<HTMLFormElement>(".truffle-form")!.dispatchEvent(
+        new Event("submit", { cancelable: true }),
+      );
+      await settle();
+      expect(host.querySelectorAll(".truffle-row").length, `example "${q}" matched nothing`)
+        .toBeGreaterThan(0);
+    }
+    d.dispose();
+  });
+
+  it("does not answer a GPU query with CPU-only instances", async () => {
+    // The precise shape of truffle-ts#37: the query parsed, ran, and returned a
+    // ranked list of r8g/c7g boxes with no accelerator at all. It looked like a
+    // working search, which is why it survived. A count assertion alone would
+    // still pass on that output.
+    const d = await truffleSurface.mount(host, ctxAt("standard"));
+    await settle();
+    host.querySelector<HTMLInputElement>(".truffle-q")!.value = "gpu with 80gb for training";
+    host.querySelector<HTMLFormElement>(".truffle-form")!.dispatchEvent(
+      new Event("submit", { cancelable: true }),
+    );
+    await settle();
+    const rows = [...host.querySelectorAll(".truffle-row")];
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(row.textContent, `${row.textContent} has no GPU`).toMatch(/gpu/i);
+    }
+    d.dispose();
+  });
+
   it("cleans up at every level", async () => {
     for (const level of ["guided", "standard", "expert"] as const) {
       host.innerHTML = "";
