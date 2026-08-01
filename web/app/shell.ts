@@ -29,8 +29,12 @@ export class Shell {
   private render(): void {
     this.root.innerHTML = `
       <header class="portal-header">
-        <a class="portal-brand" href="/">
-          <span class="logo-spore">spore</span><span class="logo-host">host</span>
+        <a class="portal-brand" href="/" aria-label="spore.host home">
+          <!-- A 3x-DPR derivative of spore-host-logo.png, not the master: the header
+               renders it 26px tall, and shipping the 1983x793 original there would
+               cost 914 KB on every page load for 65 CSS pixels of wordmark. -->
+          <img class="portal-brand-img" src="../assets/brand/spore-host-logo-header.png"
+               alt="spore.host" width="195" height="78">
         </a>
         <div class="portal-account"></div>
       </header>
