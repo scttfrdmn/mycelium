@@ -201,15 +201,64 @@ section + section { border-top: 1px solid var(--border); }
 .hero { padding: 5rem 0 3rem; }
 .hero-inner { max-width: var(--max-width); margin: 0 auto; padding: 0 1.5rem; }
 
-/* Hero mascot — the jellyfish, shown large above the headline */
+/* ── Hero orb ─────────────────────────────────────────────────────────────
+   The live animated jellyfish, above the wordmark. The canvas and the static
+   fallback <img> are stacked in the same grid cell so the swap costs no layout
+   shift: the fallback is what a no-JS / no-WASM / reduce-motion / slow-link
+   visitor keeps, and it only fades out once Rive reports the scene is playing
+   (js adds .is-live / .is-replaced — see the orb script in index.html).
+
+   The artboard is 520×560 (taller than wide: the fringe trails well below the
+   bell), so this is sized by HEIGHT to keep the bell's apparent diameter stable
+   across breakpoints. */
+.hero-orb-stage {
+  display: grid;
+  place-items: center;
+  justify-content: center;
+  margin-bottom: 0.75rem;
+  /* Reserve the final height up front so the hero never reflows when the canvas
+     starts painting. --orb-h is shared by both stacked layers so they always
+     agree; percentage heights are avoided deliberately — a <canvas> carries
+     intrinsic width/height attributes, and under `place-items: center` the item
+     is sized to that content rather than to the grid area, so `height: 100%`
+     silently resolved to the artboard's 560px and blew out the hero. */
+  --orb-h: clamp(200px, 34vw, 320px);
+  height: var(--orb-h);
+}
+.hero-orb-stage > * { grid-area: 1 / 1; }
+#hero-orb {
+  height: var(--orb-h);
+  width: calc(var(--orb-h) * 520 / 560);   /* artboard is 520×560 */
+  max-width: 100%;
+  display: block;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+#hero-orb.is-live { opacity: 1; }
+.hero-orb-fallback {
+  /* The mark is square (1254²) and almost entirely bell, so scale it to the
+     artboard's bell rather than its full height — otherwise the static orb reads
+     bigger than the animated one and the swap visibly jumps. */
+  height: calc(var(--orb-h) * 0.82);
+  width: auto;
+  max-width: 100%;
+  display: block;
+  filter: drop-shadow(0 8px 28px rgba(51, 222, 249, 0.28));
+  transition: opacity 0.5s ease;
+}
+.hero-orb-fallback.is-replaced { opacity: 0; }
+
+/* Hero mascot — the wordmark lockup under the orb */
 .hero-mascot {
   display: flex; justify-content: center;
   margin-bottom: 1.5rem;
 }
 /* Hero wordmark — the full `spore ● host` lockup (wide image), sized by WIDTH
-   since it's ~2.5:1. Baseline presence ~640px, shown 20% smaller (×0.8 ≈ 512px). */
+   since it's ~2.5:1. Smaller now that the live orb carries the hero's visual
+   weight above it — the wordmark's job here is to spell the name, not to be the
+   focal point. */
 .hero-wordmark-img {
-  width: clamp(240px, 55vw, 512px);
+  width: clamp(200px, 42vw, 400px);
   height: auto; max-width: 100%;
   display: block;
   filter: drop-shadow(0 8px 28px rgba(51, 222, 249, 0.28));

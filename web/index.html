@@ -52,6 +52,15 @@
     <!-- ── Hero ── -->
     <div class="hero">
       <div class="hero-inner">
+        <!-- The animated orb is progressive enhancement layered over the static
+             mark: the <img> below ships in the markup and stays visible until
+             the Rive scene is actually playing, so no-JS / no-WASM / slow-link /
+             reduce-motion visitors get exactly the static hero that shipped
+             before. See the orb script near the end of this file. -->
+        <div class="hero-orb-stage">
+          <canvas id="hero-orb" width="520" height="560" aria-hidden="true"></canvas>
+          <img src="assets/brand/spore-host-mark.png" alt="" class="hero-orb-fallback" width="1254" height="1254">
+        </div>
         <div class="hero-mascot">
           <img src="assets/brand/spore-host-logo.png" alt="spore.host" class="hero-wordmark-img" width="1983" height="793">
         </div>
@@ -387,6 +396,121 @@ done</code></pre>
       });
     };
     document.head.appendChild(script);
+  })();
+
+  // ── Animated hero orb ────────────────────────────────────────────────────
+  // Progressive enhancement: the static mark in .hero-orb-stage is the baseline
+  // and stays visible until Rive reports the scene is playing, so every failure
+  // mode (no JS, no WASM, fetch error, reduce-motion, metered link) degrades to
+  // the hero that shipped before this existed.
+  //
+  // The runtime is vendored under assets/vendor/rive/ rather than pulled from a
+  // CDN — the homepage should not depend on unpkg at render time, and only
+  // css/ + assets/ are published (scripts/copy-static.mjs), so that is also the
+  // one path that ships.
+  //
+  // It is specifically the webgl2 build: both Canvas2D runtimes clip this file's
+  // animated mesh to its first row, which lops off the orb's whole tentacle
+  // fringe. webgl2 renders it correctly but draws NOTHING without a real WebGL2
+  // context, hence the capability probe below. Details in
+  // assets/vendor/rive/LICENSE-MIT.txt.
+  (function() {
+    var canvas = document.getElementById('hero-orb');
+    if (!canvas) return;
+
+    var fallback = document.querySelector('.hero-orb-fallback');
+    function bail() { canvas.remove(); }
+
+    // Never animate under an explicit OS reduce-motion preference.
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
+    if (reduce && reduce.matches) { bail(); return; }
+
+    // The runtime is ~2.5MB of WASM. Don't spend a metered visitor's data on a
+    // decorative loop.
+    var conn = navigator.connection;
+    if (conn && (conn.saveData || /^(slow-2g|2g|3g)$/.test(conn.effectiveType || ''))) {
+      bail();
+      return;
+    }
+
+    // WebGL2 must actually be available — without it this runtime silently
+    // renders an empty canvas, which would hide the orb entirely. Probe on a
+    // throwaway canvas and release the context immediately.
+    try {
+      var probe = document.createElement('canvas');
+      var gl = probe.getContext('webgl2');
+      if (!gl) { bail(); return; }
+      var lose = gl.getExtension('WEBGL_lose_context');
+      if (lose) lose.loseContext();
+    } catch (e) {
+      bail();
+      return;
+    }
+
+    var started = false;
+    function start() {
+      if (started) return;
+      started = true;
+
+      var s = document.createElement('script');
+      s.src = 'assets/vendor/rive/rive.js';
+      s.onerror = bail;
+      s.onload = function() {
+        if (typeof rive === 'undefined') { bail(); return; }
+
+        // Self-host the WASM: the runtime's default points at unpkg, and the
+        // fallback URL at jsdelivr. Both are disabled here.
+        rive.RuntimeLoader.setWasmUrl('assets/vendor/rive/rive.wasm');
+        rive.RuntimeLoader.setWasmFallbackUrl(null);
+
+        var r = new rive.Rive({
+          src: 'assets/brand/spore-orb.riv',
+          canvas: canvas,
+          artboard: 'Orb',
+          stateMachines: 'SM',
+          autoplay: true,
+          // Contain, never cover: the fringe trails far below the bell and must
+          // not be cropped at narrow widths.
+          layout: new rive.Layout({ fit: rive.Fit.Contain, alignment: rive.Alignment.Center }),
+          onLoad: function() {
+            r.resizeDrawingSurfaceToCanvas();
+            canvas.classList.add('is-live');
+            if (fallback) fallback.classList.add('is-replaced');
+          },
+          onLoadError: function() {
+            // Keep the static mark; drop the dead canvas.
+            bail();
+          }
+        });
+
+        // Pause off-screen — a looping GPU animation nobody can see is pure
+        // battery cost.
+        if ('IntersectionObserver' in window) {
+          new IntersectionObserver(function(entries) {
+            entries.forEach(function(e) { e.isIntersecting ? r.play() : r.pause(); });
+          }, { threshold: 0.05 }).observe(canvas);
+        }
+
+        var t;
+        window.addEventListener('resize', function() {
+          clearTimeout(t);
+          t = setTimeout(function() { r.resizeDrawingSurfaceToCanvas(); }, 120);
+        });
+      };
+      document.head.appendChild(s);
+    }
+
+    // Only fetch the runtime once the hero is actually in view.
+    if ('IntersectionObserver' in window) {
+      var gate = new IntersectionObserver(function(entries, obs) {
+        for (var i = 0; i < entries.length; i++) {
+          if (entries[i].isIntersecting) { obs.disconnect(); start(); return; }
+        }
+      }, { rootMargin: '200px' });
+      gate.observe(canvas);
+    } else {
+      start();
+    }
   })();
   </script>
 </body>

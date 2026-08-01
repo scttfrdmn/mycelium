@@ -13,6 +13,23 @@ own changelogs for CLI releases.
 
 ## [Unreleased]
 
+### Added
+- **The homepage hero orb is now animated.** The jellyfish mascot floats, its eyes
+  pulse, and its tentacle fringe sways strand-by-strand on an 8-second seamless
+  loop, above the static wordmark. Built as a Rive scene
+  (`web/assets/brand/spore-orb.riv`) with its editable source — full rig, art, and
+  a deterministic build script — committed under `design/orb/`.
+
+  It is layered as progressive enhancement, so the hero that shipped before is
+  still what you get whenever the animation can't or shouldn't run: no JS, no
+  WebGL2, a fetch failure, an OS "reduce motion" preference, or a metered/2G-3G
+  connection all keep the static mark, and the runtime isn't downloaded at all in
+  the last two cases. The canvas and the static mark occupy the same reserved box,
+  so the swap causes no layout shift, and the animation pauses while scrolled
+  off-screen. The Rive runtime is vendored under `web/assets/vendor/rive/` rather
+  than loaded from a CDN, so the homepage gains no third-party render-time
+  dependency.
+
 ### Changed
 - **Canonical mascot art is now the clean, transparent de-pinked mark** (replacing
   the sticker-derived knockout and the earlier pink-checkerboard icon export).
