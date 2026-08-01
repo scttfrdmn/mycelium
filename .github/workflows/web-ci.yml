@@ -1,0 +1,74 @@
+name: Web CI
+
+# PR gate for the portal (web/). Before this workflow web/ had NO pre-merge gate:
+# ci.yml covers the Lambda modules and the docs build, and deploy-site.yaml runs
+# typecheck + build only AFTER merge, on its way to publishing to S3. So a broken
+# portal merged green and the failure surfaced during the deploy — or not at all,
+# since deploy-site.yaml never ran `npm test` either (fixed there too).
+#
+# Its own file rather than a job in ci.yml because GitHub Actions has no per-job
+# `paths:` filter, and ci.yml must keep running on Go/docs PRs. Same split as
+# deploy-site.yaml.
+#
+# Lives here rather than being folded into #505 so the disclosure work wasn't held
+# up behind a new workflow (spore-host#506).
+
+on:
+  pull_request:
+    paths:
+      - 'web/**'
+      - '.github/workflows/web-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'web/**'
+      - '.github/workflows/web-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  web-tests:
+    name: Portal typecheck + test + build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      # Node 22 to match deploy-site.yaml — the gate and the deploy must build on
+      # the same runtime, or a version-specific failure escapes the gate.
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: web
+        run: npm run typecheck
+
+      # The suite that motivated this workflow. Several of these tests guard
+      # defects that are invisible on inspection and expensive in production:
+      # guided/shapes.test.ts runs against the REAL bundled truffle-ts catalog
+      # (deliberately, not a fixture — a fixture would have passed while the
+      # shipped portal quoted a fabricated $0.20/hr for a 72xB200), and
+      # guided/launch.test.ts asserts every guided launch carries a TTL and
+      # spot: false. A regression in the latter bills someone real money and no
+      # amount of clicking reveals it before the invoice.
+      #
+      # This is also the job that catches a truffle-ts version bump breaking the
+      # portal — the change most likely to break these tests, and exactly the kind
+      # that gets merged on a green tick.
+      - name: Test
+        working-directory: web
+        run: npm test
+
+      # A passing suite over a bundle that doesn't build still ships nothing. The
+      # build is cheap here and it's what deploy-site.yaml will run on main.
+      - name: Build
+        working-directory: web
+        run: npm run build

@@ -41,11 +41,20 @@ jobs:
         working-directory: web
         run: npm ci
 
-      # Typecheck before deploying — the portal's only PR gate today. A type
-      # error here means the bundle is wrong; better to fail than ship it.
+      # Typecheck before deploying. A type error here means the bundle is wrong;
+      # better to fail than ship it. web-ci.yml now gates this pre-merge too, so
+      # this is the second line of defence rather than the only one.
       - name: Typecheck portal
         working-directory: web
         run: npm run typecheck
+
+      # Test before deploying. This step was missing entirely: the portal's suite
+      # ran on developer machines and nowhere else, so a regression in the guided
+      # launch defaults (TTL present, spot: false) would deploy to spore.host
+      # unnoticed (spore-host#506).
+      - name: Test portal
+        working-directory: web
+        run: npm test
 
       # Emits web/dist: hashed portal SPA under app/ + assets/, marketing pages
       # and css/assets/cloudformation copied verbatim (scripts/copy-static.mjs).
