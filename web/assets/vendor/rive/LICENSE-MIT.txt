@@ -1,0 +1,49 @@
+@rive-app/webgl2 2.39.1 — vendored, unmodified.
+
+Source:   https://registry.npmjs.org/@rive-app/webgl2/-/webgl2-2.39.1.tgz
+Upstream: https://github.com/rive-app/rive-wasm/tree/master/js
+Files:    rive.js, rive.wasm
+
+Vendored rather than fetched from a CDN so the homepage has no third-party
+runtime dependency (the runtime's default WASM URL points at unpkg, and its
+fallback at jsdelivr).
+
+WHY webgl2 AND NOT canvas / canvas-lite
+Both Canvas2D runtimes render this file's animated mesh incorrectly: the orb's
+tentacle fringe is a 24×5 deformed mesh, and Canvas2D draws only the first row
+band, clipping everything below it (verified at 2.39.1 — the clip lands exactly
+on mesh row 1). The webgl2 runtime renders the full fringe correctly. The
+tradeoff is that webgl2 needs a real WebGL2 context and draws nothing at all
+without one, so the loader in index.html feature-detects WebGL2 first and keeps
+the static mark when it is unavailable.
+
+If a future release fixes Canvas2D mesh rendering, canvas-lite would save
+~510KB gzipped — worth re-testing on upgrade.
+
+To update: download the tarball above at the new version, copy rive.js and
+rive.wasm here verbatim, bump the version in this file, and confirm the hero
+still animates WITH ITS FRINGE INTACT (see design/orb/README.md).
+
+---
+
+The MIT License (MIT)
+
+Copyright (c) 2021 Rive
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE SOFTWARE USE OR OTHER
+DEALINGS IN THE SOFTWARE.

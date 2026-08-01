@@ -30,6 +30,10 @@ go.work
 
 # Dependency directories
 vendor/
+# ...except the site's vendored Rive runtime, which is a published site asset
+# (the homepage loads it directly, so it must not depend on a CDN) rather than a
+# restorable Go/npm dependency. See web/assets/vendor/rive/LICENSE-MIT.txt.
+!web/assets/vendor/
 
 # Build artifacts
 dist/
