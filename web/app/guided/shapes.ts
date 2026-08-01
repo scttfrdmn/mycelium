@@ -165,46 +165,29 @@ export async function resolveAllShapes(
 }
 
 /**
- * Instance types whose bundled catalog price is known-wrong, excluded from price
- * ranking until the upstream data is fixed.
- *
- * A price-ranked picker is *maximally* exposed to a fabricated low price — a
- * wrong-but-cheap entry doesn't just appear in the list, it **wins**. Both entries
- * here are filed upstream:
- *
- * - `p6e-gb200.36xlarge` — listed at **$0.2000/hr** for 72×B200 (truffle-ts#39).
- *   It wins the price sort for both `8 vcpus 128gb` and `64 vcpus`.
- * - `p5.4xlarge` — `onDemandPrice: 0`, no `estimatedPrice` flag (truffle-ts#42).
- *   Caught by `usablePrice` too; listed here so one lookup covers both defects.
- *
- * **A named quarantine, not a plausibility threshold** — and that choice was
- * forced by the data. A per-vCPU floor cannot separate these: `t4g.nano` is
- * legitimately $0.0021/vCPU while the bad B200 entry is $0.00139/vCPU, only 34%
- * apart. Any threshold that catches the fabrication also rejects real cheap
- * instances, and one that spares the cheap instances lets the fabrication through.
- * So this is deliberately a short list tied to issue numbers, which stays honest
- * as it goes stale: an entry that gets fixed upstream costs us one needlessly
- * excluded type, whereas an invented threshold would silently mis-price the whole
- * catalog.
- *
- * Delete each entry when its issue closes.
- */
-const QUARANTINED_TYPES: ReadonlySet<string> = new Set([
-  "p6e-gb200.36xlarge", // truffle-ts#39
-  "p5.4xlarge", // truffle-ts#42
-]);
-
-/**
  * A price we're willing to show, or undefined.
  *
- * Rejects zero as well as null. truffle-ts's bundled catalog currently carries
- * `p5.4xlarge` with `onDemandPrice: 0` and no `estimatedPrice` flag
- * (truffle-ts#42) — a 1×H100 machine claiming to be free. Zero is worse than
- * absent because it *sorts first*: a naive "cheapest option" picker recommends
- * the H100 box, at no charge, ahead of a $0.13 t4g. No EC2 type costs nothing per
- * hour, so a zero can only be a missing-data artifact and is treated as one.
+ * Rejects zero as well as null, and both halves still earn their keep:
  *
- * Remove this guard when truffle-ts#42 lands, not before.
+ * - **Null** is the normal case for a type with no on-demand row at all — since
+ *   truffle-ts 0.5.0, `p6e-gb200.36xlarge` and `p5e.48xlarge` carry no price
+ *   rather than a guessed one, so a price-ranked picker must skip them instead of
+ *   ranking them at 0.
+ * - **Zero** is defence in depth. truffle-ts now refuses to write a non-positive
+ *   price (truffle-ts#42), so this shouldn't fire — but a zero is the single most
+ *   damaging wrong price here, because it *sorts first*: a naive "cheapest option"
+ *   picker recommends an H100 box, at no charge, ahead of a $0.13 t4g. That's a
+ *   one-line guard against an upstream regression that no amount of clicking would
+ *   reveal, so it stays.
+ *
+ * This replaced a named quarantine of `p6e-gb200.36xlarge` (fabricated at
+ * $0.2000/hr for 72×B200) and `p5.4xlarge` (`onDemandPrice: 0`), removed once
+ * truffle-ts#39 and #42 landed in 0.5.0. Worth recording *why* that list was
+ * names rather than a plausibility threshold: no per-vCPU floor could separate
+ * those entries from real cheap instances — `t4g.nano` is legitimately
+ * $0.0021/vCPU against the bad B200's $0.00139, only 34% apart — so any threshold
+ * strict enough to catch the fabrication also rejected honest bargains. If a
+ * future bad price shows up, name it again; don't invent a threshold.
  */
 function usablePrice(r: FindResult): number | undefined {
   const p = r.instance.onDemandPrice;
@@ -225,9 +208,7 @@ function usablePrice(r: FindResult): number | undefined {
  * the top match and reports the price as unknown rather than inventing one.
  */
 function cheapest(found: FindResult[], wantsGpu: boolean): FindResult | undefined {
-  let candidates = found.filter(
-    (r) => usablePrice(r) != null && !QUARANTINED_TYPES.has(r.instance.instanceType),
-  );
+  let candidates = found.filter((r) => usablePrice(r) != null);
 
   if (!wantsGpu) {
     const cpuOnly = candidates.filter((r) => !r.instance.gpus);

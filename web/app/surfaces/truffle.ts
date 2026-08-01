@@ -28,12 +28,15 @@ export const truffleSurface: ToolSurface = {
       <div class="truffle-search">
         <h2>Find an instance type</h2>
         <!-- Examples must be queries that actually work today. "gpu with 80gb for
-             training" was here and silently returned CPU-only Graviton instances:
-             bare "gpu" parses to an unknown token and "80gb" filters system RAM,
-             not VRAM (truffle-ts#37). Name a vendor or a part until that lands. -->
-        <p class="truffle-hint">Natural language — e.g. <code>nvidia h100</code>,
-          <code>8 gpus a100</code>, <code>32 vcpus arm</code>. Offline catalog (as of
-          ${escapeHtml(CATALOG_AS_OF)}).</p>
+             training" was pulled from this list because it silently returned
+             CPU-only Graviton instances: bare "gpu" parsed to an unknown token and
+             "80gb" filtered system RAM, not VRAM. truffle-ts#37/#38 fixed both in
+             0.5.0 (bare "gpu" now sets requireGpu, and a bare memory figure beside
+             it reads as VRAM **per card**), so it's restored — it's the example
+             worth leading with, being the one a researcher would actually type. -->
+        <p class="truffle-hint">Natural language — e.g. <code>gpu with 80gb for training</code>,
+          <code>nvidia h100</code>, <code>8 gpus a100</code>, <code>32 vcpus arm</code>.
+          Offline catalog (as of ${escapeHtml(CATALOG_AS_OF)}).</p>
         <form class="truffle-form">
           <input class="truffle-q" type="search" placeholder="describe what you need…" autocomplete="off" />
           <button type="submit">Search</button>

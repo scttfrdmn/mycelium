@@ -90,17 +90,20 @@ describe("resolveShape against the real bundled catalog", () => {
     const rawFirstPrice = raw[0]!.instance.onDemandPrice;
 
     expect(rec.pricePerHour).toBeLessThanOrEqual(rawFirstPrice ?? Infinity);
-    // And it must beat every other priced, non-quarantined candidate.
-    const better = raw.filter(
-      (r) => usable(r) && r.instance.onDemandPrice! < rec.pricePerHour! && !isQuarantined(r),
-    );
+    // And it must beat every other priced candidate. This filter carried a
+    // `!isQuarantined(r)` exemption until truffle-ts 0.5.0 fixed the two
+    // fabricated prices (truffle-ts#39, #42); with the data correct, the
+    // assertion holds over the whole result set, which is the stronger claim.
+    const better = raw.filter((r) => usable(r) && r.instance.onDemandPrice! < rec.pricePerHour!);
     expect(better.map((r) => r.instance.instanceType)).toEqual([]);
   });
 
   it("does not hand a non-GPU shape a GPU instance", async () => {
-    // With the bad-price types quarantined, "8 vcpus 128gb" otherwise picks
-    // g3.4xlarge (1× M60) — charging a user who asked for memory for a
-    // decade-old accelerator they cannot use.
+    // Without the CPU-only narrowing, "8 vcpus 128gb" picks g3.4xlarge (1× M60)
+    // — charging a user who asked for memory for a decade-old accelerator they
+    // cannot use. truffle-ts 0.5.0 makes this MORE likely, not less: g3 now
+    // carries its real $1.14 rather than the old $0.80 guess, but it's still the
+    // cheapest thing matching that query.
     const recs = await resolveAllShapes();
     for (const rec of recs) {
       if (rec!.shape.wantsGpu) continue;
@@ -195,8 +198,6 @@ describe("resolveShape error and absence handling", () => {
   });
 });
 
-const QUARANTINED = new Set(["p6e-gb200.36xlarge", "p5.4xlarge"]);
-const isQuarantined = (r: FindResult) => QUARANTINED.has(r.instance.instanceType);
 const usable = (r: FindResult) =>
   typeof r.instance.onDemandPrice === "number" && r.instance.onDemandPrice > 0;
 
