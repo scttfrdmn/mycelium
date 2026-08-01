@@ -94,6 +94,7 @@ capacity](/guides/waiting-for-capacity).
 | I want to… | Go to |
 |------------|-------|
 | Find the right instance type & compare prices | [Finding the right instance](/guides/finding-instances) |
+| Launch from a browser without learning the CLI | [Portal detail levels](/guides/portal-detail-levels) |
 | Run Jupyter or RStudio in the browser | [Interactive workstation](/guides/jupyter) |
 | Train a model on a GPU | [GPU training jobs](/guides/gpu-training) |
 | Save up to 90% with Spot | [Spot instances](/guides/spot-instances) |

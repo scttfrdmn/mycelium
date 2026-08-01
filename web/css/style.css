@@ -547,6 +547,11 @@ footer {
    the width follows the intrinsic ratio. width/height stay on the <img> so the
    aspect box is reserved before the image loads (no layout shift). */
 .portal-brand-img { height: 26px; width: auto; display: block; }
+/* The disclosure control. margin-left:auto pulls it out of the header's
+   space-between centre and parks it beside the account block — the two things
+   that say "who you are" and "how much you're shown" belong together. */
+.portal-level { display: flex; align-items: center; gap: 0.4rem; margin-left: auto; margin-right: 1.25rem; font-size: 0.85rem; color: var(--text-muted); }
+.portal-level-select { font: inherit; padding: 0.25rem 0.4rem; border-radius: var(--radius); border: 1px solid var(--border-strong); background: var(--bg); color: var(--text); }
 .portal-account { display: flex; align-items: center; gap: 0.75rem; font-size: 0.9rem; color: var(--text-muted); }
 .portal-account .acct b { color: var(--text); }
 .portal-account button, .portal-gate button, .portal-banner button {
@@ -775,3 +780,63 @@ footer {
 .lagotto-match-next a { color: var(--lagotto); font-weight: 600; }
 .lagotto-log { list-style: none; margin: 1rem 0 0; padding: 0; font-family: ui-monospace, monospace; font-size: 0.8rem; color: var(--text-muted); max-height: 260px; overflow: auto; }
 .lagotto-log li { padding: 0.2rem 0; border-bottom: 1px solid var(--border); }
+
+/* ── Guided mode (app/guided/) — the "anyone could use this" end of the
+   disclosure axis. Bigger targets, fewer of them, and the cost always visible:
+   the one thing a first-time user must not be able to miss is what it costs and
+   that it stops by itself. ── */
+.guided-picker, .guided-launch { max-width: 760px; }
+.guided-hint { color: var(--text-muted); font-size: 0.95rem; max-width: 56ch; }
+.guided-cards { display: grid; gap: 0.75rem; margin: 1.25rem 0; }
+.guided-card {
+  display: grid; gap: 0.25rem; text-align: left; font: inherit; cursor: pointer;
+  padding: 0.9rem 1.1rem; border-radius: var(--radius);
+  border: 1px solid var(--border-strong); background: var(--bg-card); color: var(--text);
+}
+.guided-card:hover:not(:disabled) { border-color: var(--spawn); }
+.guided-card:disabled { cursor: default; }
+.guided-card.loading, .guided-card.unresolved { opacity: 0.7; }
+.guided-card-label { font-weight: 700; font-size: 1.05rem; }
+.guided-card-blurb { color: var(--text-muted); font-size: 0.9rem; }
+.guided-card-machine { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.3rem; }
+.guided-card-machine b { font-family: ui-monospace, monospace; color: var(--text); font-weight: 600; }
+.guided-card-cost { display: block; margin-top: 0.15rem; font-variant-numeric: tabular-nums; }
+/* An unknown or errored price is called out rather than left to blend in — a
+   missing number that looks like a normal one is the failure mode this whole
+   surface is trying to avoid. */
+.guided-card-cost.unknown, .guided-card.errored .guided-card-machine { color: var(--accent-red); }
+.guided-escape {
+  font: inherit; cursor: pointer; padding: 0.4rem 0; border: 0; background: none;
+  color: var(--text-muted); text-decoration: underline;
+}
+.guided-escape:hover { color: var(--spawn); }
+
+.guided-confirm { max-width: 620px; }
+.guided-facts { display: grid; grid-template-columns: auto 1fr; gap: 0.35rem 1rem; margin: 1rem 0; font-size: 0.9rem; }
+.guided-facts dt { color: var(--text-muted); }
+.guided-facts dd { margin: 0; }
+.guided-cost { font-size: 1.1rem; }
+.guided-cost b { font-variant-numeric: tabular-nums; }
+.guided-cost.unknown { font-size: 0.95rem; color: var(--accent-red); }
+.guided-reassure { color: var(--text-muted); font-size: 0.85rem; }
+.guided-actions { display: flex; gap: 0.75rem; align-items: center; margin-top: 1.25rem; }
+.guided-actions button { font: inherit; cursor: pointer; padding: 0.55rem 1.2rem; border-radius: var(--radius); border: 1px solid var(--border-strong); background: var(--bg); color: var(--text); }
+.guided-go { border-color: var(--spawn) !important; background: var(--spawn) !important; color: #fff !important; font-weight: 600; }
+.guided-actions button:disabled { opacity: 0.6; cursor: default; }
+.guided-msg { margin-top: 0.75rem; font-size: 0.9rem; color: var(--text-muted); min-height: 1.2em; }
+.guided-msg.ok { color: var(--spawn); }
+.guided-msg.error { color: var(--accent-red); }
+
+/* Guided instances: hide the Dashboard's own launch/sweep/queue forms — our
+   picker stands in for them — but KEEP the instance list, meters and log. A
+   beginner who can start an instance and not see or stop it is the one
+   simplification that costs real money. Done as a class on the host rather than
+   by reaching into the prebuilt component's DOM, so spawn-ts owns its markup. */
+.guided-instances .dash-section.launch,
+.guided-instances .dash-section.sweep,
+.guided-instances .dash-section.queue { display: none; }
+/* Expert-only detail on a truffle row: the fields a capacity or topology decision
+   turns on, hidden below expert because they're noise when comparing two boxes. */
+.truffle-detail { display: grid; grid-template-columns: auto 1fr; gap: 0.15rem 0.75rem; margin: 0.5rem 0 0; padding-top: 0.5rem; border-top: 1px solid var(--border); font-size: 0.8rem; }
+.truffle-detail dt { color: var(--text-muted); }
+.truffle-detail dd { margin: 0; font-family: ui-monospace, monospace; }

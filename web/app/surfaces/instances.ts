@@ -9,6 +9,8 @@ import { Dashboard, confirmDialog } from "@spore-host/spawn-ts/ui";
 // so they don't fight the portal's brand theme). Loaded with the instances chunk.
 import "@spore-host/spawn-ts/ui/style.css";
 import type { Disposable, SurfaceContext, ToolSurface } from "./types.js";
+import { atLeast } from "../disclosure.js";
+import { mountGuidedLaunch } from "../guided/launch.js";
 
 export const instancesSurface: ToolSurface = {
   id: "instances",
@@ -33,7 +35,31 @@ export const instancesSurface: ToolSurface = {
     });
     client.startMonitor();
 
+    // Guided mode replaces the Dashboard's launch form with the picker + a single
+    // confirmation, but keeps the instance list: a beginner still needs to see
+    // what's running and be able to stop it — hiding that would be the one
+    // simplification that costs real money.
+    //
+    // The Dashboard's own form is not conditionally rendered here (it lives inside
+    // the prebuilt component in spawn-ts). At `guided` we hide it via a class on
+    // the container and mount ours above; from `standard` up the Dashboard is
+    // untouched. Doing it in CSS rather than reaching into the component's DOM
+    // keeps this surface out of spawn-ts's internals.
+    const guided = !atLeast(ctx.level, "standard");
+
     const dashboard = new Dashboard(client, confirmDialog);
+    let disposeGuided: (() => void) | null = null;
+
+    if (guided) {
+      host.classList.add("guided-instances");
+      const panel = document.createElement("div");
+      host.appendChild(panel);
+      disposeGuided = mountGuidedLaunch(panel, {
+        client,
+        region: ctx.session.region,
+        onEscape: () => ctx.session.setLevel("standard"),
+      });
+    }
     host.appendChild(dashboard.el);
 
     // Tear the client's polling down if the session's creds expire.
@@ -45,6 +71,8 @@ export const instancesSurface: ToolSurface = {
       dispose() {
         offExpiry();
         client.stopMonitor();
+        disposeGuided?.();
+        host.classList.remove("guided-instances");
         dashboard.el.remove();
       },
     };

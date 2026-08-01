@@ -5,6 +5,7 @@ import { surfaces, findSurface } from "./surfaces/registry.js";
 import type { PortalConfig, SurfaceContext, Disposable } from "./surfaces/types.js";
 import type { SessionController } from "./session.js";
 import { startSignIn } from "./auth/globus-login.js";
+import { isLevel, LEVEL_INFO, LEVELS } from "./disclosure.js";
 
 export class Shell {
   private navEl!: HTMLElement;
@@ -23,6 +24,18 @@ export class Shell {
     this.render();
     window.addEventListener("hashchange", () => void this.route());
     this.session.onExpiry((state) => this.showExpiry(state));
+    // A level change re-mounts the current surface. Surfaces therefore read
+    // ctx.level once at mount instead of subscribing — one update mechanism, and
+    // it reuses route()'s existing dispose/mount path.
+    //
+    // The control is re-rendered too, not just the surface: a surface can raise the
+    // level itself (guided mode's "I know what I need"), and without this the
+    // header would still read "Guided" while the user was looking at the standard
+    // view — the control lying about the one piece of state it exists to show.
+    this.session.onLevelChange(() => {
+      this.renderLevel();
+      void this.route({ remount: true });
+    });
     void this.route();
   }
 
@@ -36,6 +49,7 @@ export class Shell {
           <img class="portal-brand-img" src="../assets/brand/spore-host-logo-header.png"
                alt="spore.host" width="195" height="78">
         </a>
+        <div class="portal-level"></div>
         <div class="portal-account"></div>
       </header>
       <div class="portal-banner" hidden></div>
@@ -47,7 +61,40 @@ export class Shell {
     this.mainEl = this.root.querySelector(".portal-main")!;
     this.bannerEl = this.root.querySelector(".portal-banner")!;
     this.renderNav();
+    this.renderLevel();
     this.renderAccount();
+  }
+
+  /**
+   * The one portal-wide disclosure control, in the header beside the account block.
+   *
+   * A single visible control is the whole state — no per-surface toggles, which
+   * would leave the user unable to say what mode they were in. The blurb is
+   * rendered as the option's title so the choice explains itself; "Guided" alone
+   * doesn't tell a first-timer what they'd get.
+   */
+  private renderLevel(): void {
+    const el = this.root.querySelector<HTMLElement>(".portal-level")!;
+    const current = this.session.level;
+    const opts = LEVELS.map(
+      (l) =>
+        `<option value="${l}"${l === current ? " selected" : ""} title="${escapeHtml(
+          LEVEL_INFO[l].blurb,
+        )}">${escapeHtml(LEVEL_INFO[l].label)}</option>`,
+    ).join("");
+    el.innerHTML = `
+      <label class="portal-level-label" for="portal-level-select">Detail</label>
+      <select class="portal-level-select" id="portal-level-select"
+              title="${escapeHtml(LEVEL_INFO[current].blurb)}">${opts}</select>`;
+    const select = el.querySelector<HTMLSelectElement>(".portal-level-select")!;
+    select.addEventListener("change", () => {
+      // Guard rather than cast: a stale bookmarked value or a hand-edited DOM
+      // must not put an unknown string into the level, where every atLeast()
+      // comparison would silently read as below-guided.
+      if (!isLevel(select.value)) return;
+      this.session.setLevel(select.value);
+      select.title = LEVEL_INFO[select.value].blurb;
+    });
   }
 
   private renderNav(): void {
@@ -89,11 +136,18 @@ export class Shell {
     return id || surfaces[0]?.id || "";
   }
 
-  private async route(): Promise<void> {
+  /**
+   * Mount the surface for the current hash.
+   *
+   * `remount` forces a fresh mount of the *same* surface — needed when something
+   * the surface read at mount time (the disclosure level) has changed. Without it
+   * the `already mounted` short-circuit below would swallow the update.
+   */
+  private async route(opts: { remount?: boolean } = {}): Promise<void> {
     const id = this.currentId();
     const surface = findSurface(id);
     // Dispose the outgoing surface first.
-    if (this.current && this.current.id !== id) {
+    if (this.current && (this.current.id !== id || opts.remount)) {
       this.current.disposable.dispose();
       this.current = null;
     }
@@ -113,6 +167,7 @@ export class Shell {
     const ctx: SurfaceContext = {
       session: this.session,
       config: this.config,
+      level: this.session.level,
       navigate: (sid) => {
         location.hash = `#/${sid}`;
       },

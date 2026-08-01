@@ -57,6 +57,10 @@ const sidebar = {
         { text: 'Overview', link: '/guides/' },
         { text: 'Which execution tool?', link: '/guides/choosing-execution' },
         { text: 'Finding the right instance', link: '/guides/finding-instances' },
+        // The browser counterpart to the page above — same catalog, same queries,
+        // three densities. Sits next to it rather than in Start Here, which is the
+        // CLI install path.
+        { text: 'Portal detail levels', link: '/guides/portal-detail-levels' },
         { text: 'Interactive workstation', link: '/guides/jupyter' },
         { text: 'GPU training jobs', link: '/guides/gpu-training' },
         { text: 'Spot instances', link: '/guides/spot-instances' },

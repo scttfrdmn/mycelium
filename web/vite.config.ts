@@ -1,4 +1,7 @@
-import { defineConfig } from "vite";
+// vitest/config re-exports Vite's own defineConfig with the `test` key typed, so
+// one config serves both the build and the test run (the convention the three
+// -ts libraries already use).
+import { defineConfig } from "vitest/config";
 import { resolve } from "node:path";
 
 // Vite builds ONLY the portal SPA (app/) — it's the sole page with a module
@@ -17,5 +20,12 @@ export default defineConfig({
     rollupOptions: {
       input: { app: resolve(__dirname, "app/index.html") },
     },
+  },
+  test: {
+    // happy-dom, not jsdom: the portal's own tests only need document/localStorage
+    // and it's what the three -ts libraries already use, so one DOM shim across
+    // the whole stack.
+    environment: "happy-dom",
+    include: ["app/**/*.test.ts"],
   },
 });
