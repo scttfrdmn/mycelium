@@ -493,7 +493,11 @@ footer {
   padding: 0 1.5rem; height: 56px;
   border-bottom: 1px solid var(--border); background: var(--bg-card);
 }
-.portal-brand { font-size: 1.3rem; text-decoration: none; }
+.portal-brand { font-size: 1.3rem; text-decoration: none; display: flex; align-items: center; }
+/* The wordmark PNG is 1983×793; height-constrained so the header stays 56px and
+   the width follows the intrinsic ratio. width/height stay on the <img> so the
+   aspect box is reserved before the image loads (no layout shift). */
+.portal-brand-img { height: 26px; width: auto; display: block; }
 .portal-account { display: flex; align-items: center; gap: 0.75rem; font-size: 0.9rem; color: var(--text-muted); }
 .portal-account .acct b { color: var(--text); }
 .portal-account button, .portal-gate button, .portal-banner button {
