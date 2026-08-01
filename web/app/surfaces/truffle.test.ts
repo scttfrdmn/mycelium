@@ -1,0 +1,124 @@
+// Per-level rendering of the truffle surface. This is the surface where the
+// disclosure axis is most visible — guided replaces the query box entirely — so it
+// carries the assertions that the level is actually honoured rather than merely
+// passed around.
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { SessionController } from "../session.js";
+import type { PortalConfig, SurfaceContext } from "./types.js";
+import type { DisclosureLevel } from "../disclosure.js";
+import { truffleSurface } from "./truffle.js";
+
+const settle = () => new Promise((r) => setTimeout(r, 0));
+
+const config = { region: "us-east-1" } as PortalConfig;
+
+function ctxAt(level: DisclosureLevel, navigate = vi.fn()): SurfaceContext {
+  const session = new SessionController("us-east-1", null);
+  session.setLevel(level);
+  return { session, config, level, navigate };
+}
+
+describe("truffleSurface disclosure", () => {
+  let host: HTMLElement;
+
+  beforeEach(() => {
+    document.body.innerHTML = "";
+    host = document.createElement("div");
+    document.body.appendChild(host);
+  });
+
+  it("shows the curated picker and NO query box at guided", async () => {
+    // A free-text query is the wrong first question: "gpu with 80gb for training"
+    // is only writable by someone who already knows what they need.
+    const d = await truffleSurface.mount(host, ctxAt("guided"));
+    await settle();
+    expect(host.querySelector(".truffle-q")).toBeNull();
+    expect(host.querySelectorAll(".guided-card").length).toBeGreaterThan(0);
+    d.dispose();
+  });
+
+  it("shows the query box and NO picker from standard up", async () => {
+    for (const level of ["standard", "expert"] as const) {
+      host.innerHTML = "";
+      const d = await truffleSurface.mount(host, ctxAt(level));
+      await settle();
+      expect(host.querySelector(".truffle-q"), level).not.toBeNull();
+      expect(host.querySelector(".guided-card"), level).toBeNull();
+      d.dispose();
+    }
+  });
+
+  it("raises the level rather than navigating on the guided escape", async () => {
+    // The user is saying "show me more", and the query box is one level up on this
+    // very surface — navigating elsewhere would answer a different question.
+    const navigate = vi.fn();
+    const ctx = ctxAt("guided", navigate);
+    const d = await truffleSurface.mount(host, ctx);
+    await settle();
+    host.querySelector<HTMLButtonElement>(".guided-escape")!.click();
+    expect(ctx.session.level).toBe("standard");
+    expect(navigate).not.toHaveBeenCalled();
+    d.dispose();
+  });
+
+  it("navigates to instances when a guided shape is chosen", async () => {
+    // This surface is auth-free by design, so there's no session to launch into —
+    // the instances surface mounts the same picker with a live client behind it.
+    const navigate = vi.fn();
+    const d = await truffleSurface.mount(host, ctxAt("guided", navigate));
+    await settle();
+    host.querySelector<HTMLButtonElement>(".guided-card")!.click();
+    expect(navigate).toHaveBeenCalledWith("instances");
+    d.dispose();
+  });
+
+  it("adds per-row detail only at expert", async () => {
+    // If expert rendered identically to standard, the third level would be a lie.
+    for (const [level, expected] of [
+      ["standard", 0],
+      ["expert", 1],
+    ] as const) {
+      host.innerHTML = "";
+      const d = await truffleSurface.mount(host, ctxAt(level));
+      await settle();
+      host.querySelector<HTMLInputElement>(".truffle-q")!.value = "nvidia h100";
+      host.querySelector<HTMLFormElement>(".truffle-form")!.dispatchEvent(
+        new Event("submit", { cancelable: true }),
+      );
+      await settle();
+      expect(host.querySelectorAll(".truffle-row").length, level).toBeGreaterThan(0);
+      expect(
+        host.querySelectorAll(".truffle-detail").length > 0,
+        `${level} expected detail: ${expected === 1}`,
+      ).toBe(expected === 1);
+      d.dispose();
+    }
+  });
+
+  it("states where an expert-level price came from", async () => {
+    // An estimate presented as a price is the same defect as a fabricated one, and
+    // expert is the level that can act on knowing which it is.
+    const d = await truffleSurface.mount(host, ctxAt("expert"));
+    await settle();
+    host.querySelector<HTMLInputElement>(".truffle-q")!.value = "nvidia h100";
+    host.querySelector<HTMLFormElement>(".truffle-form")!.dispatchEvent(
+      new Event("submit", { cancelable: true }),
+    );
+    await settle();
+    expect(host.querySelector(".truffle-detail")!.textContent).toMatch(/live AWS pull|estimate/);
+    d.dispose();
+  });
+
+  it("cleans up at every level", async () => {
+    for (const level of ["guided", "standard", "expert"] as const) {
+      host.innerHTML = "";
+      const d = await truffleSurface.mount(host, ctxAt(level));
+      await settle();
+      d.dispose();
+      // The shell disposes on every level change, so a leaked node here would
+      // stack up a duplicate surface each time the user touched the control.
+      expect(host.querySelector(".truffle-surface"), level).toBeNull();
+      expect(host.querySelector(".guided-picker"), level).toBeNull();
+    }
+  });
+});

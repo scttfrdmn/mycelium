@@ -2,12 +2,23 @@
 // up in the portal as one ToolSurface. Adding a tool later = write one
 // surfaces/<tool>.ts and append it to the registry — the shell never changes.
 import type { SessionController } from "../session.js";
+import type { DisclosureLevel } from "../disclosure.js";
 
 export interface SurfaceContext {
   /** The signed-in session (creds in memory, accountId, expiry). */
   session: SessionController;
   /** Build-time + URL-override config (region, role ARN, client id…). */
   config: PortalConfig;
+  /**
+   * How much to reveal, from "guided" out to "expert". Passed on the context that
+   * every surface already receives, so adding disclosure changed no surface
+   * signature. Compare it with `atLeast()` from ../disclosure.js rather than
+   * `===`, so a future fourth level doesn't silently drop out of every check.
+   *
+   * The shell re-mounts the current surface when this changes, so a surface reads
+   * it once at mount and need not subscribe.
+   */
+  level: DisclosureLevel;
   /** Navigate to another surface by id (updates the hash router). */
   navigate(surfaceId: string): void;
 }
