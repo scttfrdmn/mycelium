@@ -168,6 +168,29 @@ Two rules held throughout:
   button is the chart's non-visual equivalent, not a density control, and the people
   who need it are the least likely to have raised the mode.
 
+## What changing Mode does and doesn't cost you
+
+Changing Mode rebuilds the page you're on — that is how the new mode takes effect.
+Anything the page was holding in memory would go with it, so the things worth keeping
+are written into the address bar and restored on the way back:
+
+| Page | Kept across a Mode change |
+|---|---|
+| **Find instances** | Your query, re-run at the new level |
+| **Cost history** | The time window, and whether you were reading the table |
+| **Teams** | The team you had open |
+| **Watch capacity** | The instance types, price cap, zones and cadence you entered |
+
+Two things genuinely stop, because they are live rather than replayable:
+
+- **A capacity watch.** Its settings come back and you get a **Resume watching**
+  button, but it does not restart by itself. A watch polls your own AWS account on
+  a timer, and a page you didn't ask to load — a bookmark opened the next morning —
+  should not start spending on your behalf.
+- **A terminal session.** The connection is gone; reconnect from the page.
+
+Both say so before you touch the control, and the watch says so again afterwards.
+
 ## Notes
 
 - The default for a first-time visitor is **Guided**. If the default were Standard,
