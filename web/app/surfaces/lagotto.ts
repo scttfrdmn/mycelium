@@ -66,6 +66,10 @@ export const lagottoSurface: ToolSurface = {
           come and go. Describe what you want and this polls
           <b>${escapeHtml(region)}</b> until it appears — the same matching the
           <code>lagotto</code> CLI does, running in this tab against your own account.</p>
+        <p class="lagotto-hint warn">A watch lives only as long as this tab. Closing it,
+          reloading, or switching the detail level in the header stops the watch — nothing
+          keeps checking on your behalf. For a watch that outlives a browser, use the
+          <code>lagotto</code> CLI.</p>
       </div>
 
       <form class="lagotto-form">
@@ -80,7 +84,7 @@ export const lagottoSurface: ToolSurface = {
           <label for="lg-maxprice">Max $/hr</label>
           <input id="lg-maxprice" class="lagotto-maxprice" type="number" min="0" step="0.01"
                  placeholder="any" />
-          <span class="lagotto-fieldhint">blank = no cap</span>
+          <span class="lagotto-fieldhint lagotto-pricehint">blank = no cap</span>
         </div>
         <div class="lagotto-field">
           <label for="lg-azs">Only these AZs</label>
@@ -149,6 +153,23 @@ export const lagottoSurface: ToolSurface = {
       onceBtn.disabled = running;
       for (const el of [patternEl, maxPriceEl, azsEl, intervalEl, spotEl]) el.disabled = running;
     }
+
+    // What "Max $/hr" is compared against differs by an order of trustworthiness
+    // between the two modes, and the difference decides whether the cap works:
+    // a Spot watch prices live per AZ, while an on-demand watch is compared against
+    // truffle-ts's static us-east-1 table. Outside us-east-1 that makes the
+    // on-demand cap approximate — a cost guard that doesn't quite guard — and
+    // that fact previously existed only in a comment on portalCapacityFinder.
+    const priceHint = root.querySelector<HTMLElement>(".lagotto-pricehint")!;
+    const syncPriceHint = (): void => {
+      priceHint.textContent = spotEl.checked
+        ? "blank = no cap; compared against live Spot prices"
+        : `blank = no cap; compared against a static us-east-1 estimate${
+            region === "us-east-1" ? "" : ` — approximate in ${region}`
+          }`;
+    };
+    spotEl.addEventListener("change", syncPriceHint);
+    syncPriceHint();
 
     function appendLog(text: string): void {
       const li = document.createElement("li");

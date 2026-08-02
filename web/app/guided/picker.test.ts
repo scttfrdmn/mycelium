@@ -41,6 +41,42 @@ describe("mountGuidedPicker", () => {
     dispose();
   });
 
+  it("says how many machines fit, so the pick doesn't read as the only option", async () => {
+    // resolveShape computes totalMatches for exactly this purpose and the UI used to
+    // drop it. "cheapest of 194 that fit" tells the user a choice was made on their
+    // behalf; the bare recommendation reads as the only thing available.
+    const dispose = mountGuidedPicker(host, { onChoose: vi.fn(), onEscape: vi.fn() });
+    await settle();
+    expect(host.querySelector(".guided-card-alts")!.textContent).toMatch(
+      /cheapest of \d+ that fit/,
+    );
+    dispose();
+  });
+
+  it("omits the match count when there was nothing to choose between", async () => {
+    const dispose = mountGuidedPicker(host, {
+      onChoose: vi.fn(),
+      onEscape: vi.fn(),
+      shapes: [GUIDED_SHAPES[0]!],
+      finder: async () =>
+        [
+          {
+            instance: {
+              instanceType: "t4g.small",
+              vcpus: 2,
+              memoryMib: 2048,
+              onDemandPrice: 0.0168,
+            },
+            score: 1,
+            reasons: [],
+          },
+        ] as any,
+    });
+    await settle();
+    expect(host.querySelector(".guided-card-alts")).toBeNull();
+    dispose();
+  });
+
   it("reports the chosen shape and its resolved machine", async () => {
     const onChoose = vi.fn();
     const dispose = mountGuidedPicker(host, { onChoose, onEscape: vi.fn() });
