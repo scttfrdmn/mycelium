@@ -116,8 +116,12 @@ if [ "$extra" -gt 0 ]; then
   n=$(printf '%s' "$areas" | wc -w | tr -d ' ')
   if [ "$n" -gt 3 ]; then
     warn "touches $n top-level areas ($areas) — is this one topic?"
+  elif [ "$n" -gt 0 ]; then
+    ok "touches: $areas"
   else
-    ok "touches: ${areas:-nothing}"
+    # Only root-level files (CHANGELOG.md, CONTRIBUTING.md, …). Say so rather than
+    # reporting "nothing", which reads as a broken check on a real diff.
+    ok "touches: root files only"
   fi
 fi
 
