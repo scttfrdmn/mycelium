@@ -24,9 +24,11 @@ before choosing — it used to be a tooltip on each dropdown option, which Safar
 never rendered at all.
 
 Changing the mode **rebuilds the page you're on**, so anything the page was holding
-would be lost. It isn't: your truffle query, the cost window and table view, and
-the team you had open all live in the address bar (`#/truffle?q=nvidia+h100`) and
-come back at the new level. That also makes them bookmarkable and shareable.
+would be lost. Mostly it isn't — your truffle query, the cost window and table view,
+the team you had open, and a capacity watch's settings all live in the address bar
+(`#/truffle?q=nvidia+h100`) and come back at the new level, which also makes them
+bookmarkable and shareable. Two things genuinely stop, because they're live rather
+than replayable: see [what a Mode change keeps](#what-changing-mode-does-and-doesn-t-cost-you).
 
 Raising the level from inside a page — the **Show me all the options →** buttons —
 puts one dismissible line at the top of the window saying what changed and that
