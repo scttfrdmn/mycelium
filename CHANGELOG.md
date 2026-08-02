@@ -14,6 +14,28 @@ own changelogs for CLI releases.
 ## [Unreleased]
 
 ### Fixed
+- **`ssm:StartSession` is now scoped to spawn-managed instances** (#512). Both portal
+  IAM policies — the OIDC launch role in `infra/tofu/portal-oidc` and the BYOA
+  onboarding role in `deployment/cloudformation/portal-onboarding-role.yaml` — scoped
+  `ec2:TerminateInstances`/`StopInstances`/`StartInstances` to `spawn:managed=true`
+  and left `ssm:StartSession` on `instance/*` with no condition at all. A shell is at
+  least as powerful as a terminate, so this was the widest grant in the role: a portal
+  session could open a **root-capable shell on any SSM-registered instance in the
+  account** — an unrelated production box the portal never launched — while being
+  correctly denied permission to stop that same instance. The two statements sat next
+  to each other, and the destructive one's comment claimed a portal session "can't
+  touch unrelated instances".
+
+  The only thing narrowing it was `/^i-[0-9a-f]{8,}$/` on a text field in the browser,
+  which validates **syntax**, not authorization — it accepts every instance id in the
+  account, and it runs on the client, where an attacker would be.
+  - The condition key is `ssm:resourceTag/`, not `aws:ResourceTag/`: SSM evaluates the
+    target node's tags under its own service-specific key for `StartSession`.
+  - The session **documents** are a separate, deliberately unconditioned statement. A
+    document carries no `spawn:managed` tag, so folding it into the conditioned
+    statement would deny every session.
+  - **BYOA accounts must redeploy the CloudFormation template to pick this up**, and
+    the tofu side is a definition change — no workflow applies it.
 - **"Your watch was stopped" no longer appears on a page you just opened** (#513).
   The notice is hidden with the HTML `hidden` attribute, and the attribute was being
   set correctly — but the stylesheet gives that element a `display: flex`, which
@@ -41,6 +63,33 @@ own changelogs for CLI releases.
   - The other half of #513 — the guided card list below — completes it.
 
 ### Added
+- **Terminal offers a list of your machines instead of an empty id box** (#512). The
+  page asked for an instance id typed into a text field — an accurate description of
+  what SSM needs and a poor one of what anyone has. Getting an `i-0123456789abcdef0`
+  meant leaving for Instances, copying it, and coming back, so a surface that never
+  read `ctx.level` was effectively Expert-only without saying so. It now lists running
+  spawn-launched instances by name, type and spot status, from the same
+  `tag:spawn:managed=true` filter the Instances page uses — applied by AWS, not by the
+  page, so there is no client-side filtering to get wrong.
+  - Only **running** instances are offered. A stopped one fails inside SSM with a
+    message about the agent, which reads as a broken portal rather than a parked
+    machine.
+  - **Connect to an id instead →** keeps the old field, because a shell into something
+    the portal didn't launch is a legitimate thing to want. Hidden at **Guided**, where
+    an instance id isn't something the user has and offering to take one is a dead end
+    dressed as an option — with one exception: if the list **fails to load**, the
+    escape appears at Guided too, because a control you may not understand beats a page
+    with no way forward.
+  - "You have no instances" and "we couldn't ask" are reported as **different facts**.
+    Claiming the first when only the second is known sends someone hunting for machines
+    they have; a stopped-only account is told how many it has, since the fix there is
+    to start one rather than launch another.
+  - It reuses the Instances page's `EC2Provider` rather than adding a second
+    DescribeInstances client — the bundle cost is what deferred this from the original
+    disclosure pass, and it didn't materialise: the EC2 client hoisted into a shared
+    15 kB chunk, `terminal` grew 2.2 kB and `instances` **shrank** ~15 kB.
+  - The narrowing that matters is the IAM one above, not this picker. Listing makes the
+    spawn-managed set the *default* set; AWS is what makes it the *only* set.
 - **Watch capacity can be used without knowing instance-type names** (#513, part 2).
   At **Guided**, the page's fields — a glob or regular expression over instance-type
   names, a comma-separated zone list, a price cap in $/hr — are replaced by a short

@@ -14,7 +14,7 @@
 // signal that spawn-ts moved.
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SessionController } from "../session.js";
 import type { PortalConfig, SurfaceContext } from "./types.js";
 import type { DisclosureLevel } from "../disclosure.js";
@@ -44,8 +44,8 @@ function hiddenSelectors(): string[] {
 function ctxAt(level: DisclosureLevel): SurfaceContext {
   const session = new SessionController("us-east-1", null);
   session.setLevel(level);
-  // The surface throws without creds. These are never used: the EC2Provider is
-  // constructed but the test never lets a request complete.
+  // The surface throws without creds. These are the AWS docs' example key, and they
+  // never reach AWS — `fetch` is stubbed below.
   vi.spyOn(session, "getCreds").mockReturnValue({
     accessKeyId: "AKIAIOSFODNN7EXAMPLE",
     secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
@@ -56,11 +56,29 @@ function ctxAt(level: DisclosureLevel): SurfaceContext {
 
 describe("instancesSurface disclosure", () => {
   let host: HTMLElement;
+  const realFetch = globalThis.fetch;
 
   beforeEach(() => {
     document.body.innerHTML = "";
     host = document.createElement("div");
     document.body.appendChild(host);
+    // Mounting this surface constructs a real EC2Provider and calls
+    // client.startMonitor(), which issues DescribeInstances immediately. Without
+    // this stub those requests go to the actual AWS endpoint and come back 401 —
+    // the run used to finish before the response landed, so it looked clean while
+    // this suite made unauthenticated calls to AWS from CI. An empty reservation
+    // set is enough: nothing here asserts on instance data.
+    globalThis.fetch = vi.fn(
+      async () =>
+        new Response(
+          `<?xml version="1.0" encoding="UTF-8"?><DescribeInstancesResponse xmlns="http://ec2.amazonaws.com/doc/2016-11-15/"><requestId>test</requestId><reservationSet/></DescribeInstancesResponse>`,
+          { status: 200, headers: { "content-type": "text/xml" } },
+        ),
+    ) as typeof fetch;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = realFetch;
   });
 
   it("marks the host so the stylesheet can hide the Dashboard's forms at guided", async () => {

@@ -1,0 +1,267 @@
+<!doctype html>
+<!--
+  Dev-only harness for the terminal surface. Mounts the REAL surface module at each
+  disclosure level with a stub SurfaceContext, a stubbed window.fetch answering the
+  EC2 DescribeInstances (Query/XML) and SSM StartSession/TerminateSession (JSON 1.1)
+  calls, and a stub WebSocket so attachTerminal's SsmSession.open() resolves and the
+  connected state actually renders.
+
+  This exists because the unit tests cannot see the thing most likely to break here:
+  happy-dom applies no CSS, so `pick.hidden = true` "passes" there even if a
+  `display:` rule overrides the UA's `[hidden]` sheet. That is exactly the
+  specificity trap that shipped the lagotto resume notice on every mount, and this
+  surface now keeps THREE mutually-hidden controls in the DOM at once.
+
+  Open at /app/surfaces/terminal.harness.html under `npm run dev`. Not a Vite build
+  input, so it never ships to spore.host.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>terminal harness</title>
+    <link rel="stylesheet" href="../../css/style.css" />
+    <style>
+      /* Each level gets its own mount point so all three are visible at once and
+         comparable by eye — the point of the pass. */
+      .rig { border-top: 1px solid var(--border); padding: 1rem 0; }
+      .rig h1 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); }
+    </style>
+  </head>
+  <body>
+    <pre id="verdict"></pre>
+    <div class="rig"><h1>guided</h1><div id="guided" class="portal-main"></div></div>
+    <div class="rig"><h1>standard</h1><div id="standard" class="portal-main"></div></div>
+    <div class="rig"><h1>expert</h1><div id="expert" class="portal-main"></div></div>
+    <script>
+      if (location.search.includes("dark")) document.documentElement.setAttribute("data-theme", "dark");
+    </script>
+    <script type="module">
+      // ── Stubbed AWS ────────────────────────────────────────────────────────────
+      // Two instances running (one spot, one with a hostile Name tag), one stopped —
+      // so the "only running" filter and the escaping are both visible, not asserted.
+      const INSTANCES = `<?xml version="1.0" encoding="UTF-8"?>
+<DescribeInstancesResponse xmlns="http://ec2.amazonaws.com/doc/2016-11-15/">
+  <requestId>req-1</requestId>
+  <reservationSet>
+    <item>
+      <instancesSet>
+        <item>
+          <instanceId>i-00000000000000a11</instanceId>
+          <instanceType>t4g.xlarge</instanceType>
+          <instanceState><code>16</code><name>running</name></instanceState>
+          <tagSet>
+            <item><key>spawn:managed</key><value>true</value></item>
+            <item><key>Name</key><value>trial-run</value></item>
+          </tagSet>
+        </item>
+        <item>
+          <instanceId>i-00000000000000b22</instanceId>
+          <instanceType>g5.2xlarge</instanceType>
+          <instanceState><code>16</code><name>running</name></instanceState>
+          <instanceLifecycle>spot</instanceLifecycle>
+          <tagSet>
+            <item><key>spawn:managed</key><value>true</value></item>
+            <item><key>Name</key>&lt;img src=x onerror=alert(1)&gt;</item>
+          </tagSet>
+        </item>
+        <item>
+          <instanceId>i-00000000000000c33</instanceId>
+          <instanceType>m7i.large</instanceType>
+          <instanceState><code>80</code><name>stopped</name></instanceState>
+          <tagSet>
+            <item><key>spawn:managed</key><value>true</value></item>
+            <item><key>Name</key><value>parked</value></item>
+          </tagSet>
+        </item>
+      </instancesSet>
+    </item>
+  </reservationSet>
+</DescribeInstancesResponse>`;
+
+      const calls = [];
+      // ?fail — make DescribeInstances reject, to see the failed-lookup branch and
+      // (at guided) the escape hatch appearing where it is normally hidden.
+      // ?empty — no instances at all.
+      const failList = location.search.includes("fail");
+      const emptyList = location.search.includes("empty");
+
+      window.fetch = async (req) => {
+        const url = typeof req === "string" ? req : req.url;
+        const headers = typeof req === "object" && req.headers ? req.headers : new Headers();
+        const target = headers.get?.("x-amz-target") ?? "";
+        const body = typeof req === "object" && req.body ? await new Response(req.body).text() : "";
+        const action = /Action=([A-Za-z]+)/.exec(body)?.[1] ?? target.split(".").pop() ?? "?";
+        calls.push(action);
+
+        if (target.includes("StartSession")) {
+          return new Response(
+            JSON.stringify({ StreamUrl: "wss://stub.invalid/v1/data-channel/s-1", TokenValue: "tok", SessionId: "s-1" }),
+            { status: 200, headers: { "content-type": "application/x-amz-json-1.1" } },
+          );
+        }
+        if (target) return new Response("{}", { status: 200, headers: { "content-type": "application/x-amz-json-1.1" } });
+
+        if (action === "DescribeInstances") {
+          if (failList) {
+            // A real AccessDenied, so the message the surface prints is the message
+            // AWS would actually give — not a hand-written string.
+            return new Response(
+              `<Response><Errors><Error><Code>UnauthorizedOperation</Code><Message>You are not authorized to perform this operation.</Message></Error></Errors></Response>`,
+              { status: 403, headers: { "content-type": "text/xml" } },
+            );
+          }
+          const xml = emptyList
+            ? INSTANCES.replace(/<reservationSet>[\s\S]*<\/reservationSet>/, "<reservationSet/>")
+            : INSTANCES;
+          return new Response(xml, { status: 200, headers: { "content-type": "text/xml" } });
+        }
+        return new Response("", { status: 200, headers: { "content-type": "text/xml" } });
+      };
+
+      // The SSM data channel. Opens, ACKs nothing, sends nothing — enough for
+      // SsmSession.open() to resolve so the connected UI renders for real.
+      //
+      // Both details below are load-bearing rather than tidiness. A real
+      // WebSocket dispatches `onclose` as a TASK, and is a no-op once already
+      // closing; a stub that fires it synchronously and re-closes recurses forever
+      // through SsmSession.close → onclose → the surface's onClosed → teardown →
+      // dispose → SsmSession.close, because `this.ws = null` hasn't run yet. That
+      // is a defect in the stub, not in the surface — so the stub honours the
+      // contract instead of the surface working around it.
+      window.WebSocket = class StubSocket {
+        constructor(url) {
+          this.url = url;
+          this.readyState = 0; // CONNECTING
+          setTimeout(() => {
+            this.readyState = 1; // OPEN
+            this.onopen?.({});
+          }, 0);
+        }
+        send() {}
+        close() {
+          if (this.readyState > 1) return; // already CLOSING/CLOSED
+          this.readyState = 2; // CLOSING
+          setTimeout(() => {
+            this.readyState = 3; // CLOSED
+            this.onclose?.({ reason: "stub", code: 1000 });
+          }, 0);
+        }
+      };
+      window.WebSocket.CONNECTING = 0;
+      window.WebSocket.OPEN = 1;
+      window.WebSocket.CLOSING = 2;
+      window.WebSocket.CLOSED = 3;
+
+      const { terminalSurface } = await import("./terminal.ts");
+
+      function ctxAt(level) {
+        return {
+          session: {
+            region: "us-east-1",
+            accountId: "000000000000",
+            signedIn: true,
+            level,
+            getCreds: () => ({ accessKeyId: "AKIAHARNESS", secretAccessKey: "s", sessionToken: "t" }),
+            onExpiry: () => () => {},
+          },
+          config: { region: "us-east-1" },
+          level,
+          navigate: () => {},
+        };
+      }
+
+      const checks = [];
+      const assert = (name, cond, detail = "") =>
+        checks.push(`${cond ? "PASS" : "FAIL"} ${name}${detail ? " — " + detail : ""}`);
+      const settle = (ms = 120) => new Promise((r) => setTimeout(r, ms));
+
+      const mounted = {};
+      for (const level of ["guided", "standard", "expert"]) {
+        const el = document.getElementById(level);
+        mounted[level] = { el, d: await terminalSurface.mount(el, ctxAt(level)) };
+      }
+      await settle();
+
+      // The whole reason this file exists: `hidden` must WIN over the display rules
+      // for all three controls, in a real stylesheet. getComputedStyle is the only
+      // check that can see it, and happy-dom cannot do it at all.
+      const q = (level, sel) => mounted[level].el.querySelector(sel);
+      const shown = (node) => node && getComputedStyle(node).display !== "none";
+
+      for (const level of ["guided", "standard", "expert"]) {
+        assert(`${level}: picker visible`, shown(q(level, ".terminal-pick")));
+        assert(`${level}: id field NOT visible`, !shown(q(level, ".terminal-target")), getComputedStyle(q(level, ".terminal-target")).display);
+      }
+      // Only when the list LOADED: a failed lookup deliberately reveals the escape at
+      // guided (asserted in the ?fail block below), so asserting it hidden here
+      // unconditionally would be the harness contradicting itself.
+      if (!failList) {
+        assert(
+          "guided: by-id escape NOT visible",
+          !shown(q("guided", ".terminal-byid")),
+          `[hidden]=${q("guided", ".terminal-byid").hidden} display=${getComputedStyle(q("guided", ".terminal-byid")).display}`,
+        );
+      }
+      assert("standard: by-id escape visible", shown(q("standard", ".terminal-byid")));
+      assert("expert: by-id escape visible", shown(q("expert", ".terminal-byid")));
+
+      if (!failList && !emptyList) {
+        const opts = [...q("standard", ".terminal-pick").options];
+        assert("only running instances offered", opts.length === 2, opts.map((o) => o.value).join(", "));
+        assert("labels carry a recognisable name + type", /trial-run/.test(opts[0].textContent) && /t4g\.xlarge/.test(opts[0].textContent), opts[0].textContent);
+        assert("spot is labelled", opts.some((o) => /\(spot\)/.test(o.textContent)), opts[1].textContent);
+        assert("hostile Name tag did not become an element", q("standard", ".terminal-pick").querySelector("img") === null);
+        assert("Connect enabled once the list arrived", q("standard", ".terminal-open").disabled === false);
+
+        // The swap, in a real stylesheet — each control's visibility must actually
+        // flip, which is the assertion happy-dom can only fake.
+        q("standard", ".terminal-byid").click();
+        assert("after swap: field visible, picker not", shown(q("standard", ".terminal-target")) && !shown(q("standard", ".terminal-pick")));
+        assert("after swap: escape offers the way back", /pick from your instances/i.test(q("standard", ".terminal-byid").textContent));
+        q("standard", ".terminal-byid").click();
+        assert("swapped back: picker visible, field not", shown(q("standard", ".terminal-pick")) && !shown(q("standard", ".terminal-target")));
+
+        // Connect for real (stub socket) and look at the connected state.
+        q("expert", ".terminal-form").dispatchEvent(new Event("submit"));
+        await settle(200);
+        const st = q("expert", ".terminal-status");
+        assert("connected: target controls locked", q("expert", ".terminal-pick").disabled && q("expert", ".terminal-byid").disabled);
+        assert("connected: warning names the header control", /Mode/i.test(st.textContent), st.textContent);
+        assert("connected: warning is styled as a warning", st.classList.contains("warn"));
+        assert("connected: terminal panel visible", shown(q("expert", ".terminal-host")));
+        assert("connected: StartSession went to the PICKED id", calls.includes("StartSession"));
+        assert("disconnect offered", shown(q("expert", ".terminal-close")));
+        q("expert", ".terminal-close").click();
+        await settle();
+        assert("after disconnect: controls re-enabled", !q("expert", ".terminal-pick").disabled && !q("expert", ".terminal-byid").disabled);
+        assert("after disconnect: terminal panel hidden", !shown(q("expert", ".terminal-host")));
+      }
+
+      if (failList) {
+        assert("failed lookup says what failed", /couldn't list your instances/i.test(q("standard", ".terminal-status").textContent), q("standard", ".terminal-status").textContent);
+        assert("failed lookup does NOT claim there are none", !/no spawn-launched/i.test(q("standard", ".terminal-pick").textContent), q("standard", ".terminal-pick").textContent);
+        // The one case a guided user needs the id field: it's the only way in.
+        assert("guided: escape REVEALED when the list fails", shown(q("guided", ".terminal-byid")));
+        assert("Connect disabled with nothing to connect to", q("guided", ".terminal-open").disabled === true);
+      }
+
+      if (emptyList) {
+        assert("empty list says so", /no spawn-launched instances/i.test(q("standard", ".terminal-pick").textContent), q("standard", ".terminal-pick").textContent);
+        assert("empty list points at the way out", /connect to an id/i.test(q("standard", ".terminal-status").textContent), q("standard", ".terminal-status").textContent);
+        assert("Connect disabled", q("standard", ".terminal-open").disabled === true);
+      }
+
+      // ?keep — leave the surfaces mounted for eyeballing (the default run below
+      // disposes them, which empties the page).
+      if (!location.search.includes("keep")) {
+        for (const level of ["guided", "standard", "expert"]) mounted[level].d.dispose();
+        assert("dispose removes the surface", document.querySelectorAll(".terminal-surface").length === 0);
+      }
+
+      const failed = checks.filter((c) => c.startsWith("FAIL"));
+      document.getElementById("verdict").textContent =
+        checks.join("\n") + "\n\n" + (failed.length ? `${failed.length} FAILED` : "ALL PASS") + `\n(AWS calls: ${calls.join(", ")})`;
+      document.title = failed.length ? "HARNESS FAIL" : "HARNESS PASS";
+    </script>
+  </body>
+</html>
