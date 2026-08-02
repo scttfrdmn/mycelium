@@ -106,6 +106,96 @@ export const GUIDED_SHAPES: readonly GuidedShape[] = [
   },
 ] as const;
 
+/**
+ * The shapes worth *waiting* for — the capacity-watch surface's list.
+ *
+ * A separate list rather than a filter over `GUIDED_SHAPES`, and the reason is the
+ * whole point of that page: you do not wait for a `t4g.xlarge`. Offering "A small
+ * analysis" as something to watch would offer a poll that succeeds on its first
+ * check, every time, which teaches the user the page does nothing. Everything here
+ * is hardware that is genuinely and routinely unavailable — which is the only reason
+ * `lagotto` exists.
+ *
+ * Led by the H100 rather than by the cheapest, inverting `GUIDED_SHAPES`'s order.
+ * That list is read by someone choosing what to run and the cheap answer is usually
+ * right; this one is read by someone who already knows they want the scarce thing.
+ * The easier-to-find alternatives follow it, so a user looking at $55/hr and an
+ * empty log has somewhere to go.
+ *
+ * `defaultTtlHours` is carried because `GuidedShape` requires it and it's the right
+ * value for the launch that follows a match. The watch surface itself never reads it.
+ */
+export const WATCH_SHAPES: readonly GuidedShape[] = [
+  {
+    id: "watch-h100",
+    label: "A GPU for a large training run",
+    blurb: "H100-class. The hardest capacity to get, and the usual reason to watch.",
+    query: "nvidia h100",
+    defaultTtlHours: 2,
+    wantsGpu: true,
+  },
+  {
+    id: "watch-newest-gpu",
+    label: "The newest GPUs",
+    blurb: "B200-class. Newer than H100, scarcer, and considerably more expensive.",
+    query: "nvidia b200",
+    defaultTtlHours: 2,
+    wantsGpu: true,
+  },
+  {
+    id: "watch-a100",
+    label: "An older large-training GPU",
+    blurb: "A100-class. Easier to find than an H100, and under half the price.",
+    query: "nvidia a100",
+    defaultTtlHours: 2,
+    wantsGpu: true,
+  },
+  {
+    id: "watch-small-gpu",
+    label: "One GPU for inference or a notebook",
+    blurb: "L4-class. Usually available — worth watching only if a launch just failed.",
+    query: "nvidia l4",
+    defaultTtlHours: 2,
+    wantsGpu: true,
+  },
+  {
+    id: "watch-trainium",
+    label: "An AWS training chip",
+    blurb: "Trainium. Cheaper per unit of training than the equivalent GPU, when free.",
+    // "trainium", not "trn2": truffle-ts's parser doesn't read `trn2` as a family and
+    // returns 231 results spanning every family in the catalog, so price-ranking them
+    // resolves this card to a `t4g.nano`. "trainium" resolves to trn1, which is what
+    // the catalog actually carries. A query that confidently returns the wrong thing
+    // is worse than one that returns nothing.
+    query: "trainium",
+    defaultTtlHours: 2,
+    // Trainium instances carry no `gpus`, so this must be false: `cheapest()` would
+    // otherwise find no GPU-bearing candidate, fall through to the unfiltered pool,
+    // and the flag would be a no-op that misdescribes the shape.
+    wantsGpu: false,
+  },
+] as const;
+
+/**
+ * The instance-type pattern to watch for a resolved shape: the machine's whole
+ * family, as a glob.
+ *
+ * A family rather than the one cheapest type, because the user is waiting for
+ * *capacity* — `p5.48xlarge` being unavailable while `p5.4xlarge` is free is a match
+ * they want to hear about, and pinning the exact type would silently discard it.
+ * lagotto's `compilePattern` reads `p5.*` as a glob (`^p5\..*$`), and the surface
+ * pushes that form to EC2's `instance-type` filter server-side, so it's also the
+ * cheap one to poll.
+ *
+ * Falls back to the exact type when the catalog carries no family: a watch for one
+ * machine is narrower than intended but still correct, whereas a bare `.*` would
+ * quietly watch every instance type in the region.
+ */
+export function watchPattern(rec: GuidedRecommendation): string {
+  const family = rec.pick.instance.instanceFamily?.trim();
+  return family ? `${family}.*` : rec.pick.instance.instanceType;
+}
+
 /** A resolved recommendation: the shape, the machine, and what it costs. */
 export interface GuidedRecommendation {
   shape: GuidedShape;

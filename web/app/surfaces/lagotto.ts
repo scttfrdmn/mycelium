@@ -29,8 +29,10 @@ import { CapacityWatcher, type CapacityFinder, type FinderInstanceType, type Fin
 import type { MatchResult, Watch } from "@spore-host/lagotto-ts";
 import { onDemandPrice } from "@spore-host/truffle-ts";
 import type { Disposable, SurfaceContext, ToolSurface } from "./types.js";
-import { LEVEL_CONTROL_NAME } from "../disclosure.js";
+import { atLeast, LEVEL_CONTROL_NAME } from "../disclosure.js";
 import { readHashParam, writeHashParams } from "../hashstate.js";
+import { mountGuidedPicker } from "../guided/picker.js";
+import { WATCH_SHAPES, watchPattern, type GuidedRecommendation } from "../guided/shapes.js";
 
 /** Poll cadence offered in the UI. A browser tab is a short-lived watcher. */
 const INTERVALS = [
@@ -63,19 +65,32 @@ export const lagottoSurface: ToolSurface = {
     const watcher = new CapacityWatcher({ finder: portalCapacityFinder(ec2, region) });
 
     const root = document.createElement("div");
-    root.className = "lagotto-surface";
+    // The guided variant is a class on the root rather than a different template: the
+    // form still exists and is still the single source of what's being watched (see
+    // "Guided mode" below), so what differs is what's *shown*, which is CSS's job.
+    root.className = atLeast(ctx.level, "standard")
+      ? "lagotto-surface"
+      : "lagotto-surface lagotto-guided";
     root.innerHTML = `
       <div class="lagotto-head">
         <h2>Watch for capacity</h2>
-        <p class="lagotto-hint">Scarce instance types (<code>p5.*</code>, <code>trn2.*</code>)
+        <p class="lagotto-hint lagotto-hint-query">Scarce instance types (<code>p5.*</code>, <code>trn2.*</code>)
           come and go. Describe what you want and this polls
           <b>${escapeHtml(region)}</b> until it appears — the same matching the
           <code>lagotto</code> CLI does, running in this tab against your own account.</p>
+        <p class="lagotto-hint lagotto-hint-guided">The big GPUs are often all taken.
+          Pick what you're waiting for and this checks <b>${escapeHtml(region)}</b>
+          every minute until some appears, then tells you which zone to launch in.</p>
         <p class="lagotto-hint warn">A watch lives only as long as this tab. Closing it,
           reloading, or changing <b>${escapeHtml(LEVEL_CONTROL_NAME)}</b> in the header stops the watch — nothing
-          keeps checking on your behalf, though your settings are kept and you'll be
-          offered a one-click resume. For a watch that outlives a browser, use the
-          <code>lagotto</code> CLI.</p>
+          keeps checking on your behalf, though ${
+            // "your settings are kept" describes something a guided user never entered.
+            // What's kept is the same thing either way; only the name for it changes.
+            atLeast(ctx.level, "standard")
+              ? "your settings are kept"
+              : "what you picked is remembered"
+          } and you'll be offered a one-click resume. For a watch that outlives a
+          browser, use the <code>lagotto</code> CLI.</p>
       </div>
 
       <form class="lagotto-form">
@@ -117,7 +132,13 @@ export const lagottoSurface: ToolSurface = {
         </div>
       </form>
 
+      <!-- Resume BEFORE the picker, not after. At standard the picker is empty and the
+           order is unobservable; at guided the card list is ~1000px tall, so a notice
+           below it sits under the fold — telling a returning user their watch stopped
+           somewhere they will never look. Verified in a browser, not inferred: the
+           unit tests assert presence and can't see position. -->
       <div class="lagotto-resume" hidden></div>
+      <div class="lagotto-picker"></div>
       <div class="lagotto-result" aria-live="polite"></div>
       <ol class="lagotto-log" aria-live="polite"></ol>`;
     host.appendChild(root);
@@ -202,8 +223,18 @@ export const lagottoSurface: ToolSurface = {
       // Deliberately does not name a cause. The flag survives a Mode change, a
       // reload, and a re-sign-in after expiry; "when you changed Mode" would be
       // wrong in two of the three, and the actionable part is identical in all.
+      //
+      // Guided gets a different second sentence because the form it refers to isn't on
+      // screen at that level. Naming the type instead is the better answer anyway: it's
+      // the one fact the user needs to decide whether to resume, and at guided they
+      // never typed it, so "as you left them" would describe something they never did.
+      const what = patternEl.value.trim();
+      const reassure =
+        guided && what
+          ? `Still waiting for <code>${escapeHtml(what)}</code>.`
+          : "Your settings below are as you left them.";
       resume.innerHTML = `<span>Your watch was stopped — nothing has been checking since.
-        Your settings below are as you left them.</span>
+        ${reassure}</span>
         <button type="button" class="lagotto-resume-go">Resume watching</button>`;
       resume.querySelector<HTMLButtonElement>(".lagotto-resume-go")!.addEventListener("click", () => {
         resume.hidden = true;
@@ -229,11 +260,40 @@ export const lagottoSurface: ToolSurface = {
       };
     }
 
+    // ── Guided mode ───────────────────────────────────────────────────────────
+    //
+    // The form asks for a glob or a regex over instance-type names, an AZ list, and a
+    // price cap in $/hr. Every one of those is only writable by someone who already
+    // knows the answer — which makes this the surface where the guided/standard split
+    // matters most, not least: a user who *needs* this page is by definition someone
+    // whose launch just failed for capacity, and at that moment "p5.*" is exactly the
+    // string they don't have.
+    //
+    // So guided swaps the fields for the same curated cards the truffle and instances
+    // surfaces use, over WATCH_SHAPES rather than GUIDED_SHAPES — you do not wait for
+    // a t4g.xlarge, and offering one would be offering a poll that always succeeds
+    // immediately. Picking a card resolves a real instance type through the offline
+    // catalog, fills the form with its *family* glob, and starts the watch.
+    //
+    // The form is hidden rather than absent, and that is load-bearing rather than
+    // laziness: the picker writes into it, `readWatch()` reads out of it, and the
+    // hash restore + Resume path from #513 keeps working at every level without a
+    // second code path. One state, one reader.
+    const guided = !atLeast(ctx.level, "standard");
+    const picker = root.querySelector<HTMLElement>(".lagotto-picker")!;
+    let disposePicker: (() => void) | null = null;
+
     function setRunning(running: boolean): void {
-      startBtn.hidden = running;
+      // At guided the picker IS the start control, so a bare "Start watching" above
+      // no visible fields would be a button with nothing to describe what it starts.
+      startBtn.hidden = running || guided;
       stopBtn.hidden = !running;
       onceBtn.disabled = running;
       for (const el of [patternEl, maxPriceEl, azsEl, intervalEl, spotEl]) el.disabled = running;
+      // Choosing a second shape mid-watch would abandon the first without saying so.
+      // Hiding the cards while one is running makes Stop the only way forward, which
+      // is the honest shape of "one watch per tab".
+      if (guided) picker.hidden = running;
     }
 
     // What "Max $/hr" is compared against differs by an order of trustworthiness
@@ -263,6 +323,25 @@ export const lagottoSurface: ToolSurface = {
 
     function showMatch(m: MatchResult, spot: boolean): void {
       const azs = m.candidateAzs.length ? m.candidateAzs.join(", ") : "—";
+      // What to do next differs by level, because what's *available* next differs.
+      // Guided mode's Instances page offers five launch shapes, and only the H100 one
+      // overlaps this list — so telling a guided user who just waited for a B200 to
+      // "launch it from Instances" would send them to a picker that can't. Naming the
+      // control that can is the difference between an answer and a dead end.
+      //
+      // Not fixed by adding B200 cards to the launch picker: a $114/hr machine behind a
+      // beginner's single click is a deliberate omission there, not an oversight here.
+      const next = guided
+        ? `<p class="lagotto-match-next"><code>${escapeHtml(m.instanceType)}</code> is
+             free in <b>${escapeHtml(m.availabilityZone || m.region)}</b> right now.
+             To launch this exact type, switch
+             <b>${escapeHtml(LEVEL_CONTROL_NAME)}</b> to Standard and use
+             <a href="#/instances">Instances</a>. Capacity can vanish within minutes,
+             so it's worth doing now.</p>`
+        : `<p class="lagotto-match-next">Capacity is available now — launch it from
+             <a href="#/instances">Instances</a>. Availability can vanish between this
+             check and a launch; retry the next zone above on
+             <code>InsufficientInstanceCapacity</code>.</p>`;
       result.className = "lagotto-result found";
       result.innerHTML = `
         <div class="lagotto-match">
@@ -276,10 +355,7 @@ export const lagottoSurface: ToolSurface = {
             <dt>Zone</dt><dd>${escapeHtml(m.availabilityZone || "—")}</dd>
             <dt>Also offered in</dt><dd>${escapeHtml(azs)}</dd>
           </dl>
-          <p class="lagotto-match-next">Capacity is available now — launch it from
-            <a href="#/instances">Instances</a>. Availability can vanish between this
-            check and a launch; retry the next zone above on
-            <code>InsufficientInstanceCapacity</code>.</p>
+          ${next}
         </div>`;
     }
 
@@ -382,6 +458,39 @@ export const lagottoSurface: ToolSurface = {
     stopBtn.addEventListener("click", stopWatching);
     onceBtn.addEventListener("click", onOnce);
 
+    if (guided) {
+      // The initial state has to be set here too, not only in setRunning: nothing calls
+      // setRunning until a watch starts, so a bare "Start watching" would sit above no
+      // visible fields until the user clicked a card.
+      startBtn.hidden = true;
+      disposePicker = mountGuidedPicker(picker, {
+        shapes: WATCH_SHAPES,
+        heading: "What are you waiting for?",
+        hint: "Pick the closest match. We'll watch for anything in that family — a smaller one in the same family is still a machine you can use.",
+        // Not "I know what I need": the thing one level up is a pattern field, and the
+        // user who wants it wants to name types, not to be told they know things.
+        escapeLabel: "Let me name the instance types →",
+        // The cards must NOT say "about $X for 2 hours" here. That sentence describes a
+        // run, and this page starts no run — it starts a poll, which is free. What the
+        // price is for is deciding whether to want the thing at all, so it's rendered
+        // as a rate with what it would cost over a day, since capacity you're waiting
+        // for is capacity you plan to hold.
+        costLine: (rec) => watchCostLine(rec),
+        onChoose: (choice) => {
+          // Write the resolved family into the form and start. The form stays the one
+          // source of truth (see setRunning), so the hash persistence, the Resume
+          // notice and readWatch() all keep working with no guided-specific path.
+          patternEl.value = watchPattern(choice.rec);
+          maxPriceEl.value = "";
+          azsEl.value = "";
+          spotEl.checked = false;
+          syncPriceHint();
+          void startWatching();
+        },
+        onEscape: () => ctx.session.setLevel("standard"),
+      });
+    }
+
     showResumeIfInterrupted();
 
     // Federated creds are what the EC2 client signs with — a poll that outlives
@@ -401,6 +510,7 @@ export const lagottoSurface: ToolSurface = {
         // Set before the abort so startWatching's finally can tell a dispose-driven
         // abort (leave `watching=1` for the next mount) from a user Stop.
         interrupted = true;
+        disposePicker?.();
         offExpiry();
         aborter?.abort();
         form.removeEventListener("submit", onSubmit);
@@ -414,6 +524,33 @@ export const lagottoSurface: ToolSurface = {
     };
   },
 };
+
+/**
+ * The cost line on a guided watch card.
+ *
+ * The launch flow's "about $110 for 2 hours" is wrong here in a way that matters:
+ * this page starts a poll, not a run, and the poll is free. What the figure is *for*
+ * is deciding whether you want the thing at all — so it leads with the rate, and
+ * gives the per-day figure because capacity you queued for is capacity you intend to
+ * hold, and a day is the unit these machines get held for.
+ *
+ * An unknown price says so, and on this list that isn't an edge case: the p5e (H200)
+ * family carries no on-demand row at all, and the unpriced families are precisely
+ * the scarce ones this page exists for. Rendering nothing would read as free on the
+ * most expensive hardware AWS rents.
+ */
+function watchCostLine(rec: GuidedRecommendation): string {
+  if (rec.pricePerHour == null) {
+    return `<span class="guided-card-cost unknown">no listed price for this family —
+      these are usually the most expensive machines available, so check AWS pricing
+      before you launch one</span>`;
+  }
+  const est = rec.priceIsEstimate ? ", estimated" : "";
+  const perDay = rec.pricePerHour * 24;
+  return `<span class="guided-card-cost">$${rec.pricePerHour.toFixed(2)}/hr once you
+    launch it${est} — about $${Math.round(perDay).toLocaleString("en-US")} a day.
+    Watching costs nothing.</span>`;
+}
 
 // ── The CapacityFinder seam, implemented over the EC2 API ─────────────────────
 

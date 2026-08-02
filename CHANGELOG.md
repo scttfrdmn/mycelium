@@ -14,6 +14,16 @@ own changelogs for CLI releases.
 ## [Unreleased]
 
 ### Fixed
+- **"Your watch was stopped" no longer appears on a page you just opened** (#513).
+  The notice is hidden with the HTML `hidden` attribute, and the attribute was being
+  set correctly — but the stylesheet gives that element a `display: flex`, which
+  out-specifies the browser's own `[hidden] { display: none }` rule. So it showed on
+  **every** visit to **Watch capacity**, including the first, telling people a watch
+  had stopped when they had never started one. That is exactly the cry-wolf failure
+  the show-once logic was written to prevent, reintroduced a layer below it. The unit
+  tests asserted the `hidden` property, which was right; only a real browser could see
+  the rule losing. It also moved above the picker — at Guided the card list is about a
+  thousand pixels tall, so a notice below it sat under the fold.
 - **Changing Mode no longer silently loses a running capacity watch** (#513, part 1).
   A Mode change re-mounts the current page, which aborted the watch *and* cleared the
   instance types, price cap, zones and cadence describing it — with nothing on screen
@@ -28,10 +38,40 @@ own changelogs for CLI releases.
     reload, an expired session) — not after you stop one yourself — and it appears once.
     A warning that cries wolf is one you learn to ignore, which costs exactly the case
     it exists for.
-  - The remaining half of #513 (guided shape cards for this page, so it can be used
-    without knowing instance-type names) is still open.
+  - The other half of #513 — the guided card list below — completes it.
 
 ### Added
+- **Watch capacity can be used without knowing instance-type names** (#513, part 2).
+  At **Guided**, the page's fields — a glob or regular expression over instance-type
+  names, a comma-separated zone list, a price cap in $/hr — are replaced by a short
+  list of things worth waiting for: the big training GPUs, the newest ones, an older
+  cheaper one, a small one for inference, an AWS training chip. Each resolves through
+  the bundled offline catalog to a real type at a real price, so it still needs no AI,
+  no network and no credentials. This is the page where the split matters most rather
+  than least: whoever *needs* it is by definition someone whose launch just failed for
+  capacity, and at that moment `p5.*` is precisely the string they don't have.
+  - **It is not the launch list.** You don't wait for a `t4g.xlarge` — offering one
+    would offer a poll that succeeds on its first check every time, teaching the user
+    the page does nothing. The order is inverted too: the H100 leads, because whoever
+    is here already knows they want the scarce thing, and the easier alternatives
+    follow so a $55/hr quote beside an empty log has somewhere to go.
+  - **The cost line is a rate, not a total.** "About $110 for 2 hours" describes a
+    run, and this page starts a poll, which is free. It shows the hourly rate, what a
+    day of it costs, and that watching costs nothing. A family with no listed price
+    says so rather than showing nothing — the unpriced families are the scarce ones
+    this page exists for, and blank would read as free on the most expensive hardware
+    AWS rents.
+  - **Picking a card watches the whole family**, `p5.*` rather than `p5.48xlarge`. A
+    `p5.4xlarge` freeing up while the 48xlarge is still full is a match you want, and
+    pinning the exact type would silently discard it.
+  - The fields are **hidden, not removed**: the cards write into them and the watch
+    reads out of them, so the URL persistence and **Resume watching** above work
+    unchanged at every level, with one source of truth for what's being watched.
+  - On a match, Guided names the type and zone and then points at **Mode**, not at
+    Instances — Guided's Instances page offers five launch shapes and only the H100
+    one is on this list, so "launch it from Instances" would send someone who waited
+    for a B200 to a picker that can't. Adding a $114/hr machine to a beginner's
+    one-click launcher is a deliberate omission there, not an oversight here.
 - **A dead CI runner fleet now alerts instead of going unnoticed** (#520). On
   2026-08-01 the self-hosted fleet was down ~5.5h and nothing fired: a queued job
   never fails, it waits, so every open PR's checks silently degraded from "passing"

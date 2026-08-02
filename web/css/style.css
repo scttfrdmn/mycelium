@@ -820,6 +820,13 @@ footer {
    the lagotto accent: this is a notice about something that is NOT happening, and the
    accent is what this surface uses for a live watch and for a match. */
 .lagotto-resume { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin: 0 0 1rem; padding: 0.6rem 0.9rem; border: 1px solid var(--truffle); border-radius: var(--radius); background: var(--truffle-bg); color: var(--truffle); font-size: 0.9rem; }
+/* `display: flex` above out-specifies the UA's `[hidden] { display: none }`, so
+   without this the notice showed on EVERY mount — including the first — telling a
+   user who has never started a watch that theirs was stopped. Exactly the cry-wolf
+   failure the flag was designed to avoid, reintroduced one layer down. The unit tests
+   assert the `hidden` property, which was correctly set; nothing but a real browser
+   could see this, which is the argument for looking. */
+.lagotto-resume[hidden], .lagotto-picker[hidden] { display: none; }
 /* The message shrinks so the button keeps its row; it only stacks below on a
    genuinely narrow viewport, where stacking is the right answer anyway. */
 .lagotto-resume span { flex: 1 1 20ch; }
@@ -838,6 +845,21 @@ footer {
 .lagotto-match-next a { color: var(--lagotto); font-weight: 600; }
 .lagotto-log { list-style: none; margin: 1rem 0 0; padding: 0; font-family: ui-monospace, monospace; font-size: 0.8rem; color: var(--text-muted); max-height: 260px; overflow: auto; }
 .lagotto-log li { padding: 0.2rem 0; border-bottom: 1px solid var(--border); }
+/* Guided: the cards replace the fields. Only one of the two intro paragraphs is ever
+   shown, so each level gets copy written for it rather than one string hedged to fit
+   both. The form is HIDDEN, not absent — the picker writes into it and readWatch()
+   reads out of it, so the hash persistence and the Resume path work unchanged at
+   every level (see "Guided mode" in lagotto.ts). */
+.lagotto-hint-guided { display: none; }
+.lagotto-guided .lagotto-hint-query { display: none; }
+.lagotto-guided .lagotto-hint-guided { display: block; }
+.lagotto-guided .lagotto-fields, .lagotto-guided .lagotto-check, .lagotto-guided .lagotto-once { display: none; }
+/* Not `.lagotto-form { display: none }`: Stop has to stay reachable, and a display:none
+   ancestor would take it with it. The form collapses to nothing but its actions row. */
+.lagotto-guided .lagotto-form { margin: 0; }
+.lagotto-guided .lagotto-controls { margin-top: 0; }
+.lagotto-guided .guided-picker { max-width: none; }
+.lagotto-guided .guided-cards { margin-top: 1rem; }
 
 /* ── Guided mode (app/guided/) — the "anyone could use this" end of the
    disclosure axis. Bigger targets, fewer of them, and the cost always visible:

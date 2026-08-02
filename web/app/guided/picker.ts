@@ -43,6 +43,25 @@ export interface GuidedPickerOptions {
   finder?: typeof find;
   /** Shapes to offer. Defaults to the curated list; overridable for tests. */
   shapes?: readonly GuidedShape[];
+  /**
+   * Copy overrides, for a caller whose action is not "launch this".
+   *
+   * The cards, the three-state resolve (loading / no-match / lookup-failed) and the
+   * dispose safety are the parts worth sharing; the sentences around them are not
+   * universal. The capacity-watch surface asks "what are you waiting for?" and its
+   * answer is a poll, not a run — so the defaults here are the launch flow's and a
+   * second caller overrides them rather than re-implementing the list.
+   */
+  heading?: string;
+  hint?: string;
+  escapeLabel?: string;
+  /**
+   * Replaces the cost line on every card. A caller that isn't launching **must**
+   * override it: "about $0.54 for 4 hours" is a claim about a run, and on a surface
+   * that starts no run it is simply false. Owns both the priced and the
+   * unknown-price case, since a caller re-framing one must re-frame the other.
+   */
+  costLine?(rec: GuidedRecommendation): string;
 }
 
 /**
@@ -56,11 +75,15 @@ export function mountGuidedPicker(host: HTMLElement, opts: GuidedPickerOptions):
   const root = document.createElement("div");
   root.className = "guided-picker";
   root.innerHTML = `
-    <h2>What are you doing?</h2>
-    <p class="guided-hint">Pick the closest match. We'll choose a machine, show what
-      it costs per hour, and shut it down for you when the time's up.</p>
+    <h2>${escapeHtml(opts.heading ?? "What are you doing?")}</h2>
+    <p class="guided-hint">${escapeHtml(
+      opts.hint ??
+        "Pick the closest match. We'll choose a machine, show what it costs per hour, and shut it down for you when the time's up.",
+    )}</p>
     <div class="guided-cards"></div>
-    <button class="guided-escape" type="button">I know what I need →</button>`;
+    <button class="guided-escape" type="button">${escapeHtml(
+      opts.escapeLabel ?? "I know what I need →",
+    )}</button>`;
   host.appendChild(root);
 
   const cards = root.querySelector<HTMLElement>(".guided-cards")!;
@@ -96,7 +119,7 @@ export function mountGuidedPicker(host: HTMLElement, opts: GuidedPickerOptions):
         }
         card.classList.add("ready");
         card.disabled = false;
-        card.querySelector(".guided-card-machine")!.innerHTML = describe(rec);
+        card.querySelector(".guided-card-machine")!.innerHTML = describe(rec, opts.costLine);
         card.addEventListener("click", () => opts.onChoose({ shape, rec }));
       })
       .catch((err: unknown) => {
@@ -131,8 +154,15 @@ export function mountGuidedPicker(host: HTMLElement, opts: GuidedPickerOptions):
  * purpose — "cheapest of 194 that fit" tells the user a choice was made on their
  * behalf and roughly how much was on the table, where the bare recommendation reads
  * as the only thing available.
+ *
+ * `costLine` replaces the cost sentence for a caller that isn't launching. The specs
+ * and the match count are unconditional: they describe the machine, which is true
+ * whatever the caller then does with it.
  */
-function describe(rec: GuidedRecommendation): string {
+function describe(
+  rec: GuidedRecommendation,
+  costLine?: (rec: GuidedRecommendation) => string,
+): string {
   const i = rec.pick.instance;
   const gib = (i.memoryMib / 1024).toFixed(i.memoryMib % 1024 === 0 ? 0 : 1);
   const gpu = i.gpus ? ` · ${i.gpus}× ${escapeHtml(i.gpuModel ?? "GPU")}` : "";
@@ -141,6 +171,8 @@ function describe(rec: GuidedRecommendation): string {
     rec.totalMatches > 1
       ? `<span class="guided-card-alts">cheapest of ${rec.totalMatches} that fit</span>`
       : "";
+
+  if (costLine) return `<b>${specs}</b>${costLine(rec)}${of}`;
 
   if (rec.pricePerHour == null) {
     return `<b>${specs}</b><span class="guided-card-cost unknown">price unknown for this
