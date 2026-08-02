@@ -13,6 +13,36 @@ own changelogs for CLI releases.
 
 ## [Unreleased]
 
+### Fixed
+- **CI runner fleet: a host reboot no longer leaves the fleet dead** (#518). On
+  2026-08-01 the whole self-hosted fleet stayed offline for ~5.5h and every
+  `Test` / `E2E Tier 0` job across spawn, truffle, lagotto and miniwdl-spawn sat
+  queued. Three independent defects in `infra/ci-runners/`, each fixed:
+  - `boot-recreate.sh` **could not recover a `Broken` colima VM.** A vz VM whose
+    prior shutdown failed comes back with its driver running but no host agent, and
+    `colima start` — the script's only recovery — exits 1 on inspection without
+    attempting a boot. The script waited its full 3 min, tried the one thing that
+    cannot work, and gave up. It now escalates to `colima stop --force` (which
+    moves `Broken` → `Stopped`) and retries, releasing a stale lima disk lock on
+    the way.
+  - **The offline-runner prune was dead code.** It was gated on
+    `command -v gh`, and `gh` is not installed on orion — so it had silently
+    no-opped on every boot while looking like a working safety net in review.
+    Rewritten on `curl` + `jq` (both present) using the `ACCESS_TOKEN` already in
+    `.env`, so it needs no new credential; it now also refuses to delete a
+    registration that is `busy`, and reports failures instead of swallowing them.
+  - **`--replace` did not prevent the crash-loop it was added for.** All 6
+    containers still crash-looped on `Cannot configure the runner because it is
+    already configured` with `--replace` live in the image, because that flag
+    resolves the *server-side* name conflict while the check that fires is
+    *local* — `config.sh` refuses whenever `/home/runner/.runner` exists, and an
+    unclean stop skips the cleanup trap that would remove it. `entrypoint.sh` now
+    clears the stale local registration before configuring, so a plain restart is
+    survivable rather than depending on the recreate path.
+  Docs corrected accordingly: the README previously stated `--replace` fixed the
+  reboot crash-loop, which was not true. Fleet-offline alerting is tracked
+  separately in #520 — the outage was silent because queued jobs never fail.
+
 ### Changed
 - Bumped the `substrate` test dependency v0.65.0 → v0.85.0 in the
   `accountlifecycle` and `spore-bot` Lambda modules, 20 minor versions of AWS

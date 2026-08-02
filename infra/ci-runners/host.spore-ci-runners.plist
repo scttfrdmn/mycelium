@@ -10,9 +10,14 @@
     cp host.spore-ci-runners.plist ~/Library/LaunchAgents/com.spore.ci-runners.plist
     launchctl load -w ~/Library/LaunchAgents/com.spore.ci-runners.plist
 
-  It waits for colima (the docker backend) to be up, then `down --remove-orphans
-  && up -d` from the deploy dir, then prunes any leftover offline org runners.
-  Idempotent and safe to run repeatedly.
+  It waits for colima (the docker backend) to be up — escalating to
+  `colima stop --force` + `colima start` if the VM came back `Broken`, which
+  plain `colima start` cannot recover (spore-host#518) — then `down
+  --remove-orphans && up -d` from the deploy dir, then prunes any leftover
+  offline org runners. Idempotent and safe to run repeatedly.
+
+  Logs: /tmp/spore-ci-runners.{out,err}.log — read these FIRST when the fleet is
+  down after a boot; the 2026-08-01 outage was fully diagnosable from out.log.
 -->
 <plist version="1.0">
 <dict>
