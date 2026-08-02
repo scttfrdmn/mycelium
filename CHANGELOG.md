@@ -14,6 +14,46 @@ own changelogs for CLI releases.
 ## [Unreleased]
 
 ### Fixed
+- **The software catalog no longer requires an account to read** (#515). The catalog is
+  the same five environment formations for everybody — the API's handler takes no
+  arguments and reads nothing per-account — but `GET /api/strata/catalog` was routed
+  *inside* dashboard-api's authenticated switch, so browsing a static list returned
+  `401` and the portal gated the whole surface behind sign-in as a consequence. The
+  route now sits above the auth check (and above the AWS config load, which it doesn't
+  need), alongside the Slack OAuth exemptions.
+  - **`POST /api/strata/resolve` stays authenticated.** It reaches
+    `s3://strata-registry` with the Lambda's own credentials, so only the read-only
+    listing was exempted. A test asserts that, so the two don't drift together later.
+  - The existing catalog test called the handler function directly and so passed
+    whether the route was gated or not — part of why this survived. Replaced with
+    router-level tests that make the anonymous request the way a browser does.
+  - A `401` from this endpoint no longer reports "authentication failed" in the portal:
+    the endpoint doesn't authenticate, so a 401 means the deployed API is older than
+    the page, and blaming auth would send a signed-out reader to a sign-in that can't
+    help.
+- **`GET /teams/{id}` now returns the caller's role** (#514). It already resolved the
+  role to authorize the request and then discarded it, leaving clients to re-derive
+  ownership by comparing `owner_arn` against whatever identity they thought they had.
+  The portal did exactly that, and wrongly: `OwnerARN` is a **display field**, written
+  once at creation and never read for authorization, and its format depends on which
+  auth path created the team — a bare account id for portal-federated callers, a real
+  IAM ARN for CLI ones. `GET /teams` already returned `role`; the detail endpoint not
+  doing so was the gap. `OwnerARN` is now documented as display-only rather than
+  renamed, because its `dynamodbav` tag is the stored attribute name.
+  - This fixes the *browser's* half. The **underlying defect is larger and unfixed**:
+    the portal and the CLI resolve one human to two different `callerARN`s, and that
+    value is the membership row's partition key — so a CLI-created team is invisible in
+    the portal and a portal-created team is invisible to the CLI, with no workaround,
+    since `memberARNRe` rejects the bare account id that would bridge them. Tracked in
+    #531; it needs a decision on stored data before any code.
+- **`instances.test.ts` no longer calls live AWS** (#532). The suite mounted the
+  surface with a real `EC2Provider`, and mounting starts a monitor that issues
+  `DescribeInstances` immediately — so every full test run made unauthenticated calls
+  to the live endpoint, reported as `Errors 1 error` beside `198 passed`. It only
+  appeared in the *full* run (the file alone finishes before the response lands), which
+  is why an earlier `globalThis.fetch` stub looked like it worked: the AWS SDK uses its
+  own HTTP handler under Node, so the stub never intercepted anything. Now mocked at
+  the module boundary with spawn-ts's own `MockProvider`.
 - **`ssm:StartSession` is now scoped to spawn-managed instances** (#512). Both portal
   IAM policies — the OIDC launch role in `infra/tofu/portal-oidc` and the BYOA
   onboarding role in `deployment/cloudformation/portal-onboarding-role.yaml` — scoped

@@ -172,6 +172,20 @@ Two rules held throughout:
   button is the chart's non-visual equivalent, not a density control, and the people
   who need it are the least likely to have raised the mode.
 
+### Three pages need no account at all
+
+**Find instances**, **Software catalog** and **Connect account** all work signed out.
+That isn't a detail-level decision — it's the same principle one axis over: the pages
+that answer *"what is this and what would it cost me?"* are the ones a first-time
+visitor reaches first, and putting them behind the account they don't have yet inverts
+the order.
+
+The **Software catalog** was gated until recently, and for no better reason than that
+the endpoint serving it sat behind the API's authentication check. The list is the same
+five environment formations for everybody — the API's own handler takes no arguments
+and reads nothing per-account — so signing in bought nothing and cost the one visitor
+most likely to be browsing. It's now readable by anyone.
+
 ### Waiting for capacity, without knowing instance-type names
 
 **Watch capacity** is the page where the split matters most, not least. Its fields

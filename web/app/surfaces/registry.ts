@@ -67,7 +67,9 @@ export const surfaces: ToolSurface[] = [
     id: "catalog",
     label: "Software catalog",
     accent: "--strata",
-    requiresAuth: true,
+    // Static and shared, so readable without an account — see the comment on
+    // catalogSurface. The API serves GET /api/strata/catalog unauthenticated.
+    requiresAuth: false,
     load: () => import("./catalog.js").then((m) => ({ mount: m.catalogSurface.mount })),
   }),
   lazy({

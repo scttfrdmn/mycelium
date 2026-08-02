@@ -41,11 +41,16 @@ export const catalogSurface: ToolSurface = {
   id: "catalog",
   label: "Software catalog",
   accent: "--strata",
-  requiresAuth: true,
+  // The catalog is static and shared, not per-account — the API's own handler takes
+  // no arguments and returns a fixed list. It used to be gated only because the
+  // endpoint sat behind the Lambda's auth check, which made a harmless browse of five
+  // formation names require an AWS account. Now anyone can read it, signed in or not.
+  requiresAuth: false,
 
   async mount(host: HTMLElement, ctx: SurfaceContext): Promise<Disposable> {
+    // May be null: this surface mounts for signed-out visitors. The request goes out
+    // without the credentials header in that case rather than not going out at all.
     const creds = ctx.session.getCreds();
-    if (!creds) throw new Error("catalog surface mounted without a session");
 
     const root = document.createElement("div");
     root.className = "catalog-surface";
@@ -53,7 +58,7 @@ export const catalogSurface: ToolSurface = {
       <div class="catalog-head">
         <h2>Software catalog</h2>
         <p class="catalog-hint">Curated environment formations you can launch onto an
-          instance. Served by the shared dashboard-api over your federated session.</p>
+          instance. The same list for everyone — no account needed to read it.</p>
       </div>
       <div class="catalog-results" aria-live="polite"><div class="catalog-status">loading…</div></div>`;
     host.appendChild(root);
@@ -66,11 +71,20 @@ export const catalogSurface: ToolSurface = {
       try {
         const resp = await fetch(`${ctx.config.apiBase}/api/strata/catalog`, {
           method: "GET",
-          headers: { "X-AWS-Credentials": credentialsHeader(creds!) },
+          // Sent only when we have creds. The endpoint ignores them either way, but a
+          // header built from a null cred object would throw before the request left.
+          headers: creds ? { "X-AWS-Credentials": credentialsHeader(creds) } : {},
           signal: controller.signal,
         });
         if (!resp.ok) {
-          const detail = resp.status === 401 ? "authentication failed" : `HTTP ${resp.status}`;
+          // A 401 here is no longer a "you need to sign in" — this endpoint doesn't
+          // authenticate. It means the deployed API is older than this page, so say
+          // that rather than sending a signed-out reader to a sign-in screen that
+          // wouldn't help.
+          const detail =
+            resp.status === 401
+              ? "the API hasn't picked up this change yet"
+              : `HTTP ${resp.status}`;
           results.innerHTML = `<div class="catalog-status error">Couldn't load the catalog (${escapeHtml(detail)}).</div>`;
           return;
         }
@@ -86,18 +100,10 @@ export const catalogSurface: ToolSurface = {
       }
     }
 
-    // Reload if creds expire+refresh isn't wired yet — for now just surface it.
-    const offExpiry = ctx.session.onExpiry((state) => {
-      if (state === "expired") {
-        results.innerHTML = `<div class="catalog-status error">Session expired — sign in again to reload the catalog.</div>`;
-      }
-    });
-
     void load();
 
     return {
       dispose() {
-        offExpiry();
         controller.abort();
         root.remove();
       },
