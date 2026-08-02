@@ -150,13 +150,35 @@ Resources:
                   - servicequotas:GetServiceQuota
                   - servicequotas:ListServiceQuotas
                 Resource: '*'
-              - Sid: SSMSession
+              # Scoped to spawn-managed instances, matching Lifecycle above. It
+              # previously was not, which made this the widest grant in the role: a
+              # shell is at least as powerful as a terminate, so StartSession against
+              # instance/* allowed a root-capable shell on ANY SSM-registered
+              # instance in the account — including ones the portal never launched —
+              # while ec2:TerminateInstances on that same instance was denied. The
+              # only thing narrowing it was a regex on a text field in the browser,
+              # which validates syntax, not authorization.
+              #
+              # ssm:resourceTag/, not aws:ResourceTag/: SSM evaluates the target
+              # node's tags under its own service-specific condition key here.
+              - Sid: SSMSessionOnManagedInstances
                 Effect: Allow
                 Action:
                   - ssm:StartSession
-                Resource:
-                  - 'arn:aws:ec2:*:*:instance/*'
-                  - 'arn:aws:ssm:*::document/SSM-SessionManagerRunShell'
+                Resource: 'arn:aws:ec2:*:*:instance/*'
+                Condition:
+                  StringEquals:
+                    'ssm:resourceTag/spawn:managed': 'true'
+              # The session document, deliberately NOT tag-conditioned and so a
+              # separate statement: a document carries no spawn:managed tag, so
+              # folding it into the statement above would deny every session. This
+              # grants the use of a shell document; the statement above decides which
+              # targets it may be pointed at.
+              - Sid: SSMSessionDocument
+                Effect: Allow
+                Action:
+                  - ssm:StartSession
+                Resource: 'arn:aws:ssm:*::document/SSM-SessionManagerRunShell'
               - Sid: SSMSessionManage
                 Effect: Allow
                 Action:

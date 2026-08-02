@@ -159,6 +159,7 @@ isn't listed, it looks the same at every level.
 | **Cost history** | Same chart and numbers, plainer labels, and a link to Instances to go stop something | Same chart, shorter labels | + compute/storage/network breakdown, window total, peak hour, a 1-year window, and where the series came from |
 | **Teams** | **Read-only.** Your teams and their members, with no forms. | Create teams, add and remove members, delete a team | + team ids, full ARNs, created dates, and who invited whom |
 | **Watch capacity** | A short list of things worth waiting for, instead of the pattern, price cap, zone and cadence fields. Picking one watches that whole instance family. | The fields, filled in by hand | + |
+| **Terminal** | A list of your running machines to pick from | + **Connect to an id instead →**, for something spawn didn't launch | + |
 | **Connect account** | Technical detail collapsed | Collapsed | Expanded — what the IAM role can do, before the button rather than after |
 
 Two rules held throughout:
@@ -213,6 +214,47 @@ When a match comes in, Guided tells you the type and the zone and then points at
 five launch shapes and only the H100 one is on this list. Telling someone who just
 waited for a B200 to "launch it from Instances" would send them to a picker that
 can't. **Let me name the instance types →** moves up to Standard at any point.
+
+### Opening a shell without knowing an instance id
+
+**Terminal** used to ask for one thing: an instance id, typed into an empty box.
+That is a fair description of what SSM needs and a poor description of what anyone
+has. Getting an `i-0123456789abcdef0` meant going to Instances, copying it, and
+coming back — so a page that never read **Mode** at all was Expert-only without ever
+saying so.
+
+It now lists your machines and you pick one:
+
+> `trial-run — t4g.xlarge`
+> `overnight-fit — g5.2xlarge (spot)`
+
+Only **running** machines are offered. A stopped one fails inside SSM with a message
+about the agent, which reads as a broken portal rather than a parked machine.
+
+The list is the machines **spawn launched** — it comes from the same
+`spawn:managed=true` filter the Instances page uses, applied by AWS rather than by
+the page. So the default set of things you can open a shell into is the set spawn is
+responsible for. **Connect to an id instead →** takes anything you can name, because
+a shell into a machine the portal didn't launch is a legitimate thing to want; it's
+hidden at Guided, where an instance id isn't something you have and offering to take
+one is a dead end dressed as an option.
+
+One exception, and it's the case that matters: if the list **can't be loaded**, the
+id field appears at Guided too. A control you may not understand beats a page with no
+way forward. The page also distinguishes *"you have no machines"* from *"we couldn't
+ask"* — reporting the first when it only knows the second sends you hunting for
+machines you have.
+
+**This is a usability fix that also narrowed a real permission.** The old box
+validated ids with a pattern — it checked that a string *looked* like an instance id,
+which is not the same as checking you're allowed to reach it. The IAM role scoped
+stopping and terminating to `spawn:managed=true` but left `ssm:StartSession`
+unscoped, so a portal session could open a root-capable shell on any SSM-registered
+machine in the account while being correctly denied permission to *stop* that same
+machine. A shell is at least as powerful as a stop. The role now scopes
+`ssm:StartSession` the same way, in AWS, where it's enforced — the picker is the
+part you can see, not the part doing the enforcing. If you onboarded an account with
+the CloudFormation template, redeploy it to pick this up.
 
 ## What changing Mode does and doesn't cost you
 

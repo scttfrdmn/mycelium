@@ -634,7 +634,21 @@ footer {
 .terminal-hint { color: var(--text-muted); font-size: 0.9rem; max-width: 640px; }
 .terminal-form { display: flex; gap: 0.5rem; align-items: center; }
 .terminal-target { flex: 0 1 320px; font: inherit; font-family: ui-monospace, monospace; padding: 0.5rem 0.75rem; border-radius: var(--radius); border: 1px solid var(--border-strong); background: var(--bg); color: var(--text); }
-.terminal-target:focus-visible { outline: 2px solid var(--spored); outline-offset: -2px; }
+.terminal-target:focus-visible, .terminal-pick:focus-visible { outline: 2px solid var(--spored); outline-offset: -2px; }
+/* The picker, which is the primary control — a shell needs an instance id, and an
+   instance id is not something a person has. Sized like the field it replaces so
+   swapping between them doesn't reflow the row. */
+.terminal-pick { flex: 0 1 320px; font: inherit; padding: 0.5rem 0.75rem; border-radius: var(--radius); border: 1px solid var(--border-strong); background: var(--bg); color: var(--text); }
+/* Both controls live in the DOM at once (see "Choosing what to connect to" in
+   terminal.ts), so the UA's `[hidden] { display: none }` has to survive whatever
+   `display` the rules above imply — the same specificity trap that made the lagotto
+   resume notice show on every mount. Stated explicitly rather than relied on. */
+.terminal-pick[hidden], .terminal-target[hidden], .terminal-byid[hidden] { display: none; }
+/* The escape to typing an id. Styled as a quiet link rather than a button: it's the
+   fallback, and at guided it isn't shown at all. */
+.terminal-byid { align-self: flex-start; font: inherit; font-size: 0.9rem; cursor: pointer; padding: 0; border: 0; background: none; color: var(--text-muted); text-decoration: underline; }
+.terminal-byid:hover:not(:disabled) { color: var(--spored); }
+.terminal-byid:disabled { cursor: default; opacity: 0.5; text-decoration: none; }
 .terminal-form button { font: inherit; cursor: pointer; padding: 0.5rem 1rem; border-radius: var(--radius); border: 1px solid var(--border-strong); background: var(--bg); color: var(--text); }
 .terminal-open { border-color: var(--spored) !important; color: var(--spored) !important; }
 .terminal-status { color: var(--text-muted); font-size: 0.9rem; min-height: 1.2em; }

@@ -252,9 +252,39 @@ resource "aws_iam_role_policy" "ssm_session" {
     Version = "2012-10-17"
     Statement = [
       {
+        # Scoped to spawn-managed instances, matching the "Lifecycle" statement
+        # above. It previously was not, and that was the widest grant in this role:
+        # a shell is at least as powerful as a terminate, so StartSession against
+        # `instance/*` let a portal session open a root-capable shell on ANY
+        # SSM-registered instance in the account — an unrelated production box the
+        # portal never launched — while ec2:TerminateInstances on the same instance
+        # was correctly denied. The only thing narrowing it was a client-side
+        # `/^i-[0-9a-f]{8,}$/` on a text field, which is a syntax check, not authz.
+        #
+        # `ssm:resourceTag/`, not `aws:ResourceTag/`: SSM evaluates the target
+        # node's tags under its own service-specific key for StartSession.
+        Sid      = "StartSessionOnManagedInstances"
         Effect   = "Allow"
         Action   = ["ssm:StartSession"]
-        Resource = ["arn:aws:ec2:*:*:instance/*", "arn:aws:ssm:*:*:document/AWS-StartInteractiveCommand", "arn:aws:ssm:*::document/SSM-SessionManagerRunShell"]
+        Resource = "arn:aws:ec2:*:*:instance/*"
+        Condition = {
+          StringEquals = { "ssm:resourceTag/spawn:managed" = "true" }
+        }
+      },
+      {
+        # The session documents, deliberately NOT tag-conditioned and therefore a
+        # separate statement. A document is not a tagged instance, so folding it in
+        # with the condition above would deny every session — the condition would be
+        # evaluated against a resource that carries no `spawn:managed` tag at all.
+        # This grants the right to use a shell document, not the right to reach any
+        # particular target; the statement above is what decides that.
+        Sid    = "StartSessionDocuments"
+        Effect = "Allow"
+        Action = ["ssm:StartSession"]
+        Resource = [
+          "arn:aws:ssm:*:*:document/AWS-StartInteractiveCommand",
+          "arn:aws:ssm:*::document/SSM-SessionManagerRunShell",
+        ]
       },
       {
         Effect   = "Allow"
