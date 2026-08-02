@@ -14,11 +14,29 @@
 // signal that spawn-ts moved.
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SessionController } from "../session.js";
 import type { PortalConfig, SurfaceContext } from "./types.js";
 import type { DisclosureLevel } from "../disclosure.js";
-import { instancesSurface } from "./instances.js";
+
+// Swap the real EC2 provider for spawn-ts's own MockProvider. Mounting this surface
+// constructs an EC2Provider and calls client.startMonitor(), which issues
+// DescribeInstances immediately — and the AWS SDK in Node uses its own HTTP handler,
+// not globalThis.fetch, so stubbing fetch does NOT intercept it. Without this mock
+// the suite makes real unauthenticated calls to AWS, and the run reports an unhandled
+// `AuthFailure` rejection whenever it lasts long enough for the response to land.
+// (It passes in isolation either way — the run is too short. The full suite is where
+// it shows, which is why the fetch stub this replaces looked like it worked.)
+//
+// Mocked at the module boundary rather than by injection because the provider is
+// constructed inside mount() and the surface takes no provider argument. Nothing
+// here asserts on instance data, so an empty mock world is enough.
+vi.mock("@spore-host/spawn-ts", async (importActual) => {
+  const actual = await importActual<typeof import("@spore-host/spawn-ts")>();
+  return { ...actual, EC2Provider: actual.MockProvider };
+});
+
+const { instancesSurface } = await import("./instances.js");
 
 const settle = () => new Promise((r) => setTimeout(r, 50));
 
@@ -45,7 +63,7 @@ function ctxAt(level: DisclosureLevel): SurfaceContext {
   const session = new SessionController("us-east-1", null);
   session.setLevel(level);
   // The surface throws without creds. These are the AWS docs' example key, and they
-  // never reach AWS — `fetch` is stubbed below.
+  // never reach AWS — the provider is MockProvider (see vi.mock above).
   vi.spyOn(session, "getCreds").mockReturnValue({
     accessKeyId: "AKIAIOSFODNN7EXAMPLE",
     secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
@@ -56,29 +74,11 @@ function ctxAt(level: DisclosureLevel): SurfaceContext {
 
 describe("instancesSurface disclosure", () => {
   let host: HTMLElement;
-  const realFetch = globalThis.fetch;
 
   beforeEach(() => {
     document.body.innerHTML = "";
     host = document.createElement("div");
     document.body.appendChild(host);
-    // Mounting this surface constructs a real EC2Provider and calls
-    // client.startMonitor(), which issues DescribeInstances immediately. Without
-    // this stub those requests go to the actual AWS endpoint and come back 401 —
-    // the run used to finish before the response landed, so it looked clean while
-    // this suite made unauthenticated calls to AWS from CI. An empty reservation
-    // set is enough: nothing here asserts on instance data.
-    globalThis.fetch = vi.fn(
-      async () =>
-        new Response(
-          `<?xml version="1.0" encoding="UTF-8"?><DescribeInstancesResponse xmlns="http://ec2.amazonaws.com/doc/2016-11-15/"><requestId>test</requestId><reservationSet/></DescribeInstancesResponse>`,
-          { status: 200, headers: { "content-type": "text/xml" } },
-        ),
-    ) as typeof fetch;
-  });
-
-  afterEach(() => {
-    globalThis.fetch = realFetch;
   });
 
   it("marks the host so the stylesheet can hide the Dashboard's forms at guided", async () => {
