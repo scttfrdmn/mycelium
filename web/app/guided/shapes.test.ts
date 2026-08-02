@@ -13,7 +13,14 @@
 
 import { describe, expect, it } from "vitest";
 import type { FindResult } from "@spore-host/truffle-ts";
-import { GUIDED_SHAPES, resolveAllShapes, resolveShape } from "./shapes.js";
+import { compilePattern } from "@spore-host/lagotto-ts";
+import {
+  GUIDED_SHAPES,
+  WATCH_SHAPES,
+  resolveAllShapes,
+  resolveShape,
+  watchPattern,
+} from "./shapes.js";
 
 describe("GUIDED_SHAPES", () => {
   it("has unique ids", () => {
@@ -195,6 +202,80 @@ describe("resolveShape error and absence handling", () => {
     // An estimate presented as a price is the same defect as a fabricated one,
     // just smaller — so the flag has to survive to the UI.
     expect(rec.priceIsEstimate).toBe(true);
+  });
+});
+
+// The capacity-watch list is a separate list for a reason, so it gets separate
+// assertions. Its failure mode is the opposite of GUIDED_SHAPES's: there, a card that
+// resolves to something expensive is the defect; here, a card that resolves to
+// something *cheap and abundant* is, because it would offer a watch that succeeds on
+// its first check and teach the user this page does nothing.
+describe("WATCH_SHAPES", () => {
+  it("has unique ids that don't collide with the launch shapes", () => {
+    const ids = WATCH_SHAPES.map((s) => s.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    // Both lists feed `resolveShape` and both ids end up in URLs (`?shape=`), so a
+    // collision would make one list's card silently open the other's flow.
+    for (const id of ids) expect(GUIDED_SHAPES.map((s) => s.id)).not.toContain(id);
+  });
+
+  it("labels shapes in user vocabulary, not hardware vocabulary", () => {
+    for (const s of WATCH_SHAPES) {
+      expect(s.label, s.id).not.toMatch(/\b[a-z]\d[a-z]*\.\w+\b/);
+      expect(s.blurb.length, s.id).toBeGreaterThan(0);
+    }
+  });
+
+  it("resolves every shape to a real accelerator, not a cheap CPU box", async () => {
+    // The failure this catches for real: `trn2` looks like the obvious query for
+    // Trainium 2, but truffle-ts doesn't parse it as a family and returns 231 results
+    // spanning the whole catalog — so price-ranking resolves the card to a
+    // `t4g.nano` at $0.0042/hr. A card offering to watch for a t4g.nano is a card
+    // that never has anything to say, and the label would still read "An AWS
+    // training chip".
+    const recs = await resolveAllShapes(undefined, WATCH_SHAPES);
+    expect(recs).toHaveLength(WATCH_SHAPES.length);
+    recs.forEach((rec, i) => {
+      const shape = WATCH_SHAPES[i]!;
+      expect(rec, `${shape.id} resolved to nothing — "${shape.query}" matched no instance`).toBeDefined();
+      const inst = rec!.pick.instance;
+      // Every one of these is an accelerator family, so nothing here should be
+      // priced like a general-purpose box. $1/hr is well below the cheapest real
+      // candidate (inf1.xlarge at $0.228 is the floor of what these families cost)
+      // and well above every t-class/m-class type a mis-parsed query would return.
+      expect(inst.onDemandPrice ?? Infinity, `${shape.id} → ${inst.instanceType}`).toBeGreaterThan(0.2);
+      expect(inst.instanceType, shape.id).toMatch(/^[a-z0-9-]+\.[a-z0-9]+$/);
+    });
+  });
+
+  it("watches a whole family, as a glob lagotto can compile", async () => {
+    // A family and not the one cheapest type: the user is waiting for capacity, and
+    // `p5.48xlarge` being full while `p5.4xlarge` is free is a match they want. The
+    // pattern also has to survive lagotto's OWN glob→regex conversion, since that is
+    // what actually runs — asserting the string alone would not establish that.
+    const recs = await resolveAllShapes(undefined, WATCH_SHAPES);
+    for (const rec of recs) {
+      const pattern = watchPattern(rec!);
+      const type = rec!.pick.instance.instanceType;
+      expect(pattern, rec!.shape.id).toBe(`${rec!.pick.instance.instanceFamily}.*`);
+      const re = compilePattern(pattern);
+      expect(re.test(type), `${pattern} must match its own pick ${type}`).toBe(true);
+      // And must not match the rest of the catalog. `p5.*` matching `p5e.48xlarge`
+      // would widen the watch past the family the card named.
+      expect(re.test("t4g.nano"), pattern).toBe(false);
+    }
+  });
+
+  it("falls back to the exact type rather than a bare wildcard with no family", () => {
+    // `.*` here would silently watch every instance type in the region — a watch
+    // that matches instantly and reports something the user never asked about.
+    const rec = {
+      shape: WATCH_SHAPES[0]!,
+      pick: stub({ instanceType: "z9.custom", instanceFamily: "" }),
+      priceIsEstimate: false,
+      totalMatches: 1,
+    };
+    expect(watchPattern(rec)).toBe("z9.custom");
   });
 });
 

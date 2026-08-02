@@ -158,6 +158,7 @@ isn't listed, it looks the same at every level.
 | **Find instances** | The curated picker instead of the query box | Query box | + per-result hardware detail and price provenance |
 | **Cost history** | Same chart and numbers, plainer labels, and a link to Instances to go stop something | Same chart, shorter labels | + compute/storage/network breakdown, window total, peak hour, a 1-year window, and where the series came from |
 | **Teams** | **Read-only.** Your teams and their members, with no forms. | Create teams, add and remove members, delete a team | + team ids, full ARNs, created dates, and who invited whom |
+| **Watch capacity** | A short list of things worth waiting for, instead of the pattern, price cap, zone and cadence fields. Picking one watches that whole instance family. | The fields, filled in by hand | + |
 | **Connect account** | Technical detail collapsed | Collapsed | Expanded — what the IAM role can do, before the button rather than after |
 
 Two rules held throughout:
@@ -170,6 +171,49 @@ Two rules held throughout:
   button is the chart's non-visual equivalent, not a density control, and the people
   who need it are the least likely to have raised the mode.
 
+### Waiting for capacity, without knowing instance-type names
+
+**Watch capacity** is the page where the split matters most, not least. Its fields
+ask for a glob or regular expression over instance-type names, a comma-separated
+list of availability zones, and a price cap in dollars per hour — every one of them
+only writable by someone who already knows the answer. And the person who *needs*
+this page is by definition someone whose launch just failed for capacity, so `p5.*`
+is exactly the string they don't have at that moment.
+
+So Guided asks *"What are you waiting for?"* and offers a short list instead:
+
+> **A GPU for a large training run** — H100-class. The hardest capacity to get, and
+> the usual reason to watch.
+> `p5.48xlarge` — 192 vCPU · 2048 GiB · 8× H100
+> $55.04/hr once you launch it — about $1,321 a day. Watching costs nothing.
+
+Four things about that list are deliberate:
+
+- **It is not the launch list.** You don't wait for a `t4g.xlarge`. Offering "A small
+  analysis" here would offer a poll that succeeds on its first check every time,
+  which teaches you the page does nothing. Everything on this list is hardware that
+  is genuinely and routinely unavailable — the only reason the page exists.
+- **The big GPU leads.** The launch list is ordered cheapest-first because the cheap
+  answer is usually right for someone choosing what to run. This one is read by
+  someone who already knows they want the scarce thing, so it leads with that, and
+  the easier-to-find alternatives follow — somewhere to go when you're looking at
+  $55/hr and an empty log.
+- **The cost line is a rate, not a total.** "About $110 for 2 hours" describes a run,
+  and this page starts no run — it starts a poll, which is free. What the figure is
+  *for* is deciding whether you want the thing at all, so it's the hourly rate plus
+  what a day of it costs, and it says the watching itself is free. A family with no
+  listed price says so: those are the most expensive machines AWS rents, and showing
+  nothing there would read as free.
+- **It watches the whole family, not the one machine.** Picking the H100 card watches
+  `p5.*`, not `p5.48xlarge`. You're waiting for capacity, and a `p5.4xlarge` coming
+  free while the 48xlarge is still full is a match you want to hear about.
+
+When a match comes in, Guided tells you the type and the zone and then points at
+**Mode** rather than at the Instances page — because Guided's Instances page offers
+five launch shapes and only the H100 one is on this list. Telling someone who just
+waited for a B200 to "launch it from Instances" would send them to a picker that
+can't. **Let me name the instance types →** moves up to Standard at any point.
+
 ## What changing Mode does and doesn't cost you
 
 Changing Mode rebuilds the page you're on — that is how the new mode takes effect.
@@ -181,7 +225,7 @@ are written into the address bar and restored on the way back:
 | **Find instances** | Your query, re-run at the new level |
 | **Cost history** | The time window, and whether you were reading the table |
 | **Teams** | The team you had open |
-| **Watch capacity** | The instance types, price cap, zones and cadence you entered |
+| **Watch capacity** | What was being watched — the instance types, price cap, zones and cadence, whether you typed them or picked a card |
 
 Two things genuinely stop, because they are live rather than replayable:
 
