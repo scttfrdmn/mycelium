@@ -1,8 +1,10 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   atLeast,
   DEFAULT_LEVEL,
   isLevel,
+  LEVEL_CONTROL_NAME,
   LEVEL_INFO,
   LEVELS,
   loadLevel,
@@ -125,5 +127,36 @@ describe("LEVEL_INFO", () => {
     // union without an entry here is a type error, not a blank tooltip.
     const check: Record<DisclosureLevel, unknown> = LEVEL_INFO;
     expect(check).toBeTruthy();
+  });
+});
+
+describe("LEVEL_CONTROL_NAME", () => {
+  // A source scan, not a DOM assertion, because the failure this guards against is
+  // cross-file: the control was called "Detail", lagotto and terminal each told the
+  // user so in a warning about losing a running watch or SSM session, and renaming it
+  // to "Mode" left both pointing at a control that no longer existed. Every per-file
+  // test still passed. Nothing but a scan catches that.
+  const SRC = ["shell.ts", "surfaces/lagotto.ts", "surfaces/terminal.ts"];
+  const read = (f: string) => readFileSync(new URL(f, import.meta.url), "utf8");
+
+  it("is what every reference to the control interpolates", () => {
+    for (const f of SRC) {
+      const src = read(f);
+      // Skip comments: they explain the rename, so they legitimately say "Detail".
+      const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+      expect(code, `${f} interpolates the constant`).toContain("LEVEL_CONTROL_NAME");
+      // No hard-coded name in a user-visible string. `<b>Mode</b>` and "changing Mode"
+      // are exactly what drifted.
+      expect(code, `${f} has no hard-coded control name`).not.toMatch(
+        /<b>\s*(Mode|Detail)\s*<\/b>|(changing|switching|change this any time with)\s+(the\s+)?(Mode|Detail|detail level)/i,
+      );
+    }
+  });
+
+  it("names a control the user can find", () => {
+    // The name has to match the header label, or the instruction is unfollowable.
+    expect(read("shell.ts")).toContain('class="portal-level-label"');
+    expect(LEVEL_CONTROL_NAME.trim()).toBe(LEVEL_CONTROL_NAME);
+    expect(LEVEL_CONTROL_NAME.length).toBeGreaterThan(0);
   });
 });

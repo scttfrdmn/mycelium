@@ -7,6 +7,7 @@
 import { SSMClient, StartSessionCommand, TerminateSessionCommand } from "@aws-sdk/client-ssm";
 import { attachTerminal, type AttachedTerminal } from "@spore-host/spawn-ts/terminal";
 import type { Disposable, SurfaceContext, ToolSurface } from "./types.js";
+import { LEVEL_CONTROL_NAME } from "../disclosure.js";
 
 export const terminalSurface: ToolSurface = {
   id: "terminal",
@@ -100,8 +101,8 @@ export const terminalSurface: ToolSurface = {
         // click in the header drops a shell the user is typing into. Naming it is
         // the cheap half of the fix; not losing the session is issue-sized.
         status.className = "terminal-status warn";
-        status.textContent =
-          "Connected. Leaving this page, reloading, or changing the detail level in the header ends this session.";
+        // `textContent`, so the name is interpolated raw rather than escaped.
+        status.textContent = `Connected. Leaving this page, reloading, or changing ${LEVEL_CONTROL_NAME} in the header ends this session.`;
         // Un-hide BEFORE attach so xterm's fit addon measures a real size.
         termHost.hidden = false;
         attached = await attachTerminal(

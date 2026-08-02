@@ -177,3 +177,8 @@ Two rules held throughout:
 - The level is stored in `localStorage` under `spore.disclosure`. It's a
   preference, not a credential — your AWS credentials never leave the tab's memory
   (see [Security, credentials & data flow](/architecture)).
+- Two pages warn you that changing **Mode** ends something live — a capacity watch,
+  or a connected terminal. Both take the name from one constant, because when the
+  control was renamed from "Detail" those two warnings were left pointing at a
+  control that no longer existed. Being told a running session dies when you touch
+  something you can't find is worse than not being warned.

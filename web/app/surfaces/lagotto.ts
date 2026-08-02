@@ -29,6 +29,7 @@ import { CapacityWatcher, type CapacityFinder, type FinderInstanceType, type Fin
 import type { MatchResult, Watch } from "@spore-host/lagotto-ts";
 import { onDemandPrice } from "@spore-host/truffle-ts";
 import type { Disposable, SurfaceContext, ToolSurface } from "./types.js";
+import { LEVEL_CONTROL_NAME } from "../disclosure.js";
 
 /** Poll cadence offered in the UI. A browser tab is a short-lived watcher. */
 const INTERVALS = [
@@ -67,7 +68,7 @@ export const lagottoSurface: ToolSurface = {
           <b>${escapeHtml(region)}</b> until it appears — the same matching the
           <code>lagotto</code> CLI does, running in this tab against your own account.</p>
         <p class="lagotto-hint warn">A watch lives only as long as this tab. Closing it,
-          reloading, or switching the detail level in the header stops the watch — nothing
+          reloading, or changing <b>${escapeHtml(LEVEL_CONTROL_NAME)}</b> in the header stops the watch — nothing
           keeps checking on your behalf. For a watch that outlives a browser, use the
           <code>lagotto</code> CLI.</p>
       </div>
