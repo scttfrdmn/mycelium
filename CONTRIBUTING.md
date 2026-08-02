@@ -68,6 +68,38 @@ it. What is **not** fine is branching from a dirty tree or from a `HEAD` that ho
 unmerged work — the new branch silently adopts those commits, and whichever PR
 merges first ships them under its own number. The second one then merges **empty**.
 
+### What `main` enforces
+
+`main` is protected: no force pushes, no deletion, linear history required, and
+these checks must pass before a merge —
+
+| Required check | Workflow |
+|---|---|
+| `Branch hygiene` | `ci.yml` |
+| `Docs build + link check` | `ci.yml` |
+| `Go Vulnerability Check` | `security.yml` |
+| `Secret Scan (gitleaks)` | `security.yml` |
+| `Trivy Security Scan` | `security.yml` |
+| `Semgrep SAST` | `security.yml` |
+
+No review is required — the repo is effectively single-committer, so requiring one
+would only mean overriding it every time.
+
+Two deliberate omissions, both of which would otherwise deadlock every PR:
+
+- **`Lambda module tests` is not required.** It's a matrix job, so GitHub appends the
+  matrix values to the check name (`Lambda module tests (lambda/rest-api, 10)`).
+  That `10` is the coverage floor — editing any floor renames the check, and a
+  required check that never reports blocks all PRs until protection is edited to
+  match. It still runs and still reports on every PR.
+- **`web-ci.yml` and `ci-runner-drift.yml` are not required.** Both are
+  `paths:`-filtered, so they don't run on a PR that misses their directories. A
+  required check that never fires is indistinguishable from one still pending.
+
+`enforce_admins` is **off**, so an admin can still push directly or merge red. That
+is a deliberate escape hatch for an urgent fix, not an invitation — the checks exist
+because `main` deploys.
+
 That happened: #521 was cut from a tree still holding #519's commit, merged first,
 and carried it. #519 landed as an empty commit — which matched neither the
 `web/**` path filter on `deploy-site.yaml` nor `web-ci.yml`, so the PR that existed

@@ -14,6 +14,23 @@ own changelogs for CLI releases.
 ## [Unreleased]
 
 ### Added
+- **`main` is now a protected branch** (#524 follow-up). It had **no** protection at
+  all — no required checks, no restriction on direct pushes — on a branch that
+  auto-deploys to spore.host and docs.spore.host. Now: no force pushes, no deletion,
+  linear history required, and six checks required before merge (`Branch hygiene`,
+  `Docs build + link check`, `Go Vulnerability Check`, `Secret Scan (gitleaks)`,
+  `Trivy Security Scan`, `Semgrep SAST`). No review requirement — the repo is
+  effectively single-committer.
+  - `Lambda module tests` is deliberately **not** required: it's a matrix job, so its
+    check name carries the coverage floor (`lambda/rest-api, 10`). Editing a floor
+    renames the check, and a required check that never reports blocks every PR.
+  - `web-ci.yml` / `ci-runner-drift.yml` are deliberately **not** required: both are
+    `paths:`-filtered, and a check that doesn't fire is indistinguishable from one
+    still pending.
+  - `enforce_admins` is off, so an admin retains an escape hatch for an urgent fix.
+  - The required-check list and both omissions are documented in `CONTRIBUTING.md`,
+    since a protection rule whose rationale lives only in the API is one nobody can
+    safely change later.
 - **Branch hygiene is now checked, not just documented.** PR #521 was branched from
   a working tree that still held PR #519's portal commit, so #521's head carried
   both changes. #521 merged first and took the portal fix with it; #519 then merged
