@@ -5,8 +5,8 @@
 #
 # Reboot resilience (spore-host#381): on the host, recreate (not restart) the
 # fleet at boot via the launchd unit in this dir, and the entrypoint self-heals
-# (--replace re-registers; per-cycle _work/cache cleanup bounds disk). Build the
-# image from ./Dockerfile + ./entrypoint.sh in this dir (`docker build -t
+# (clears a stale local .runner; per-cycle _work/cache cleanup bounds disk). Build
+# the image from ./Dockerfile + ./entrypoint.sh in this dir (`docker build -t
 # spore-runner:latest .`).
 services:
   runner:
@@ -21,5 +21,12 @@ services:
       # FORCE_JAVASCRIPT_ACTIONS_TO_NODE24 is injected per-job via /home/runner/.env
       # by the entrypoint (covers bundled Node 20 actions like github-script in
       # codecov-action@v5). See spore-host#345.
+    volumes:
+      # Read-only heartbeat from sync-from-git.sh, surfaced to the CI drift gate
+      # (spore-host#522). A job can't read the host FS, so the drift workflow reads
+      # this to prove the host-side sync is still running; if it's missing or stale,
+      # host copies are unverified and the gate fails. `:ro` — a CI job must never
+      # be able to forge its own liveness proof.
+      - ./.sync-manifest:/host-sync/.sync-manifest:ro
     deploy:
       replicas: 6
