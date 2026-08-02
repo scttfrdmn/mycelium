@@ -43,6 +43,33 @@ own changelogs for CLI releases.
   reboot crash-loop, which was not true. Fleet-offline alerting is tracked
   separately in #520 — the outage was silent because queued jobs never fail.
 
+### Added
+- **The CI runner fleet now syncs itself from this repo** (#522). `infra/ci-runners/`
+  was versioned and reviewed but reached orion.local by hand, so it documented the
+  fleet rather than defining it — reviewing a change there proved nothing about what
+  was live. That is how #518's third defect hid: a fix present in the repo *and*
+  baked into the running image, still not working, with no way to tell the image was
+  current short of hashing it by hand. Two new pieces:
+  - `infra/ci-runners/sync-from-git.sh`, run hourly and at boot by launchd
+    (`host.spore-ci-sync.plist`): fetches `main`, copies only files whose content
+    changed, rebuilds the image when the build context changed **or** when the baked
+    `entrypoint.sh` no longer matches the repo, and recreates the fleet **only when
+    no runner is busy** — recreating mid-job kills that CI run. When busy it defers
+    to the next run instead. A no-drift run changes nothing and exits 0.
+  - A `CI runner drift` workflow that runs *on the fleet* deliberately: the only way
+    to know what a runner runs is to ask a runner, so the job hashes its own baked
+    `/home/runner/entrypoint.sh` against the repo and fails with a diff plus the
+    remediation command. It also verifies the hourly sync is still alive via a
+    `.sync-manifest` heartbeat, bind-mounted read-only so a job cannot forge its own
+    proof of freshness.
+
+  Effect: merging a runner change to `main` deploys it; `scp`-ing fixes onto the host
+  is no longer the workflow, and drift that does appear fails a check instead of
+  sitting undetected. Limits are explicit — a container can't read the host
+  filesystem, so the gate verifies the reconciler rather than hashing
+  `docker-compose.yml`/`boot-recreate.sh` directly, and a fully offline fleet leaves
+  this gate queued rather than red (that's #520).
+
 ### Changed
 - Bumped the `substrate` test dependency v0.65.0 → v0.85.0 in the
   `accountlifecycle` and `spore-bot` Lambda modules, 20 minor versions of AWS
