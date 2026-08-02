@@ -7,7 +7,8 @@
 // point, and duplicating the list is how the two views drift apart.
 
 import type { SpawnClient } from "@spore-host/spawn-ts";
-import { mountGuidedPicker, type GuidedChoice } from "./picker.js";
+import { mountGuidedPicker, type GuidedChoice, type GuidedPickerOptions } from "./picker.js";
+import { CATALOG_PRICE_REGION, costLimitFor } from "./cost.js";
 
 export interface GuidedLaunchOptions {
   client: SpawnClient;
@@ -15,6 +16,14 @@ export interface GuidedLaunchOptions {
   region: string;
   /** "I know what I need" — hand control back to the caller (raise the level). */
   onEscape(): void;
+  /**
+   * Catalog lookup and shape list, forwarded to the picker. Injected for the same
+   * reason picker.ts takes them: the unknown-price branch is unreachable through the
+   * real catalog, and it's the branch that gates the launch button on the machines
+   * that cost the most per hour — so it must be testable.
+   */
+  finder?: GuidedPickerOptions["finder"];
+  shapes?: GuidedPickerOptions["shapes"];
 }
 
 /** Render the guided launch flow into `host`. Returns a dispose fn. */
@@ -32,6 +41,8 @@ export function mountGuidedLaunch(host: HTMLElement, opts: GuidedLaunchOptions):
     disposeStep = mountGuidedPicker(root, {
       onChoose: (choice) => showConfirm(choice),
       onEscape: opts.onEscape,
+      ...(opts.finder ? { finder: opts.finder } : {}),
+      ...(opts.shapes ? { shapes: opts.shapes } : {}),
     });
   };
 
@@ -41,20 +52,40 @@ export function mountGuidedLaunch(host: HTMLElement, opts: GuidedLaunchOptions):
     const { shape, rec } = choice;
     const i = rec.pick.instance;
 
+    const limit = costLimitFor(rec.pricePerHour, shape.defaultTtlHours);
+    const priceUnknown = rec.pricePerHour == null;
+
     // The cost line is deliberately the total, and deliberately says "up to":
     // the TTL is a ceiling, not a prediction — an instance that finishes early
     // and is stopped costs less, and promising the exact figure would be wrong in
     // the user's favour right up until it wasn't.
-    const cost =
-      rec.pricePerHour == null
-        ? `<p class="guided-cost unknown">We don't have a price for
-             <code>${escapeHtml(i.instanceType)}</code> in the offline catalog, so we
-             can't tell you what this costs. Check the AWS pricing page before you
-             launch.</p>`
-        : `<p class="guided-cost">Up to <b>$${rec.estimatedTotal!.toFixed(2)}</b>
-             — $${rec.pricePerHour.toFixed(4)} per hour${
-               rec.priceIsEstimate ? " (estimated)" : ""
-             }, for at most ${shape.defaultTtlHours} hours.</p>`;
+    //
+    // "compute only" is not a hedge for its own sake. The figure is
+    // onDemandPrice × hours, which excludes the EBS volume, data transfer and
+    // anything the instance itself pulls — so "Up to $X" is a bound the number
+    // does not actually bound, and saying so is cheaper than being wrong.
+    const cost = priceUnknown
+      ? `<p class="guided-cost unknown">We don't have a price for
+           <code>${escapeHtml(i.instanceType)}</code> in the offline catalog, so we
+           can't tell you what this costs — and machines without a listed price are
+           usually the most expensive ones. Check the
+           <a href="https://aws.amazon.com/ec2/pricing/on-demand/" target="_blank"
+              rel="noopener">AWS pricing page</a> for
+           <code>${escapeHtml(i.instanceType)}</code> before you launch.</p>`
+      : `<p class="guided-cost">Up to <b>$${rec.estimatedTotal!.toFixed(2)}</b>
+           — $${rec.pricePerHour!.toFixed(4)} per hour${
+             rec.priceIsEstimate ? " (estimated)" : ""
+           }, for at most ${shape.defaultTtlHours} hours. Compute only; storage and
+           data transfer are extra.${regionCaveat(opts.region)}</p>`;
+
+    // Two limits, and they fail differently, so both are named. The TTL is enforced
+    // by the daemon on the instance; the spend cap is derived from the tags. Saying
+    // only "it shuts down after N hours" is what the previous copy did, and it
+    // promised an outcome the portal itself ships an orphan banner to catch.
+    const stops = limit
+      ? `after ${shape.defaultTtlHours} hours, or at $${limit} of spend — whichever
+         comes first`
+      : `after ${shape.defaultTtlHours} hours`;
 
     root.innerHTML = `
       <div class="guided-confirm">
@@ -65,22 +96,48 @@ export function mountGuidedLaunch(host: HTMLElement, opts: GuidedLaunchOptions):
               i.gpus ? `, ${i.gpus}× ${escapeHtml(i.gpuModel ?? "GPU")}` : ""
             }</dd>
           <dt>Region</dt><dd>${escapeHtml(opts.region)}</dd>
-          <dt>Shuts down</dt><dd>automatically after
-            ${shape.defaultTtlHours} hours, whatever happens</dd>
+          <dt>Shuts down</dt><dd>automatically ${stops}</dd>
+          <dt>Pricing</dt><dd>on-demand — not spot, so it won't be interrupted, and
+            costs roughly three times what spot would</dd>
         </dl>
         ${cost}
-        <p class="guided-reassure">The time limit is enforced on the machine itself, so
-          it applies even if you close this tab.</p>
+        <p class="guided-reassure">The time limit runs on the machine itself, so it
+          applies even if you close this tab. If that ever fails, the machine is
+          flagged in the list below so you can stop it.</p>
+        ${
+          priceUnknown
+            ? `<label class="guided-ack"><input type="checkbox" class="guided-ack-box">
+                 I understand I don't know what this will cost</label>`
+            : ""
+        }
         <div class="guided-actions">
           <button class="guided-back" type="button">← Something else</button>
-          <button class="guided-go" type="button">Start it</button>
+          <button class="guided-go" type="button"${priceUnknown ? " disabled" : ""}>Start it</button>
         </div>
+        <button class="guided-escape" type="button">Show me all the options →</button>
         <div class="guided-msg" aria-live="polite"></div>
       </div>`;
 
     const back = root.querySelector<HTMLButtonElement>(".guided-back")!;
     const go = root.querySelector<HTMLButtonElement>(".guided-go")!;
     const msg = root.querySelector<HTMLElement>(".guided-msg")!;
+
+    // The escape hatch belongs on this step too, not just the picker. This is the
+    // moment the user learns what guided mode chose for them, so it's the moment
+    // they discover it's too small — and without this the only way onward is back
+    // to the same five cards.
+    root
+      .querySelector<HTMLButtonElement>(".guided-escape")!
+      .addEventListener("click", () => opts.onEscape());
+
+    // An unknown price is the one case where "Start it" is a bet rather than a
+    // decision, and the shapes that land here are the accelerator ones — the
+    // machines that cost more per hour than the others cost per day. So the button
+    // stays disabled until the user says, in as many words, that they know.
+    const ack = root.querySelector<HTMLInputElement>(".guided-ack-box");
+    ack?.addEventListener("change", () => {
+      go.disabled = !ack.checked;
+    });
 
     back.addEventListener("click", () => showPicker());
     go.addEventListener("click", () => {
@@ -99,6 +156,14 @@ export function mountGuidedLaunch(host: HTMLElement, opts: GuidedLaunchOptions):
           // instance rather than its hardcoded default. Zero when unknown is
           // correct here: it disables the meter's math instead of inventing a rate.
           pricePerHour: rec.pricePerHour ?? 0,
+          // The second guard. TTL is enforced by spored *on the instance*, so an
+          // instance whose daemon never starts is bounded by nothing — and the
+          // Dashboard's orphan banner exists because that happens. A cost limit is
+          // derived from the tags, so it survives the daemon failing, and it also
+          // turns the Dashboard's bare cost figure into a meter against a ceiling.
+          // Omitted (not zeroed) when the price is unknown: spawn-ts reads a
+          // non-positive limit as "no limit".
+          ...(limit != null ? { costLimit: limit } : {}),
         })
         .then((inst) => {
           if (!live) return;
@@ -138,6 +203,20 @@ export function mountGuidedLaunch(host: HTMLElement, opts: GuidedLaunchOptions):
 function instanceName(shapeId: string): string {
   const stamp = new Date().toISOString().slice(5, 16).replace(/[-:T]/g, "");
   return `${shapeId}-${stamp}`;
+}
+
+/**
+ * The one clause that connects the price to the region shown above it.
+ *
+ * The confirmation renders the session's region and the catalog's price as two
+ * adjacent facts, and they're only the same fact in us-east-1. Empty string there,
+ * because a caveat that fires always is one nobody reads.
+ */
+function regionCaveat(region: string): string {
+  if (region === CATALOG_PRICE_REGION) return "";
+  return ` Priced for ${escapeHtml(CATALOG_PRICE_REGION)}; ${escapeHtml(
+    region,
+  )} may differ.`;
 }
 
 function escapeHtml(s: string): string {

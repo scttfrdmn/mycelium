@@ -115,6 +115,22 @@ export class Shell {
         this.session.accountId ?? "?",
       )}</b></span> <button class="portal-signout">sign out</button>`;
       el.querySelector(".portal-signout")!.addEventListener("click", () => {
+        // Dispose the mounted surface BEFORE clearing the session, and do it here
+        // rather than leaving it to route().
+        //
+        // route() only disposes when the route id changes, and signing out doesn't
+        // change it: location.hash = "" falls through currentId() to surfaces[0],
+        // which is `instances` — the surface most likely to be mounted. So without
+        // this, `this.current.id === id` and the dispose branch is skipped.
+        //
+        // That is not cosmetic. The instances surface holds a SpawnClient whose
+        // startMonitor() interval is still running, over an EC2Provider that
+        // captured the credential *values* — which session.clear() cannot
+        // invalidate. The result is authenticated DescribeInstances calls
+        // continuing after the user believes they signed out, until STS expiry.
+        // The same applies to a live SSM session on the terminal surface.
+        this.current?.disposable.dispose();
+        this.current = null;
         this.session.clear();
         location.hash = "";
         this.render();
@@ -195,14 +211,26 @@ export class Shell {
     });
   }
 
+  /**
+   * The expiry banner.
+   *
+   * Both strings name the instances, because expiry stops the *portal* and not the
+   * machines. The instances surface calls client.stopMonitor() when creds expire, so
+   * the list freezes and the cost meter stops advancing while the instances keep
+   * billing. "Session expired. Sign in again" is, at that moment, read as "nothing
+   * is happening" — the opposite of what's true, and expensive to believe.
+   */
   private showExpiry(state: "warning" | "expired"): void {
     this.bannerEl.hidden = false;
     if (state === "warning") {
       this.bannerEl.className = "portal-banner warn";
-      this.bannerEl.textContent = "Your session expires soon — sign in again to stay connected.";
+      this.bannerEl.textContent =
+        "Your session expires soon — sign in again to stay connected. Anything you have running keeps running.";
     } else {
       this.bannerEl.className = "portal-banner expired";
-      this.bannerEl.innerHTML = `Session expired. <button class="portal-reauth">Sign in again</button>`;
+      this.bannerEl.innerHTML = `Session expired — this page has stopped updating, but any
+        machines you started are still running and still costing money.
+        <button class="portal-reauth">Sign in again</button> to see and stop them.`;
       this.bannerEl.querySelector(".portal-reauth")!.addEventListener("click", () => {
         void startSignIn(this.config);
       });

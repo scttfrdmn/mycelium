@@ -74,6 +74,8 @@ export const terminalSurface: ToolSurface = {
       closeBtn.hidden = true;
       openBtn.disabled = false;
       target.disabled = false;
+      // Drop the connected-state styling; the caller sets the next message itself.
+      status.className = "terminal-status";
     }
 
     async function connect(instanceId: string): Promise<void> {
@@ -92,7 +94,14 @@ export const terminalSurface: ToolSurface = {
           throw new Error("StartSession returned an incomplete session");
         }
         sessionId = started.SessionId;
-        status.textContent = "";
+        // Say what ends the session, while it's live and the warning is actionable.
+        // dispose() terminates it, and dispose() runs on navigation AND on a
+        // disclosure-level change (which remounts the surface) — so an unrelated
+        // click in the header drops a shell the user is typing into. Naming it is
+        // the cheap half of the fix; not losing the session is issue-sized.
+        status.className = "terminal-status warn";
+        status.textContent =
+          "Connected. Leaving this page, reloading, or changing the detail level in the header ends this session.";
         // Un-hide BEFORE attach so xterm's fit addon measures a real size.
         termHost.hidden = false;
         attached = await attachTerminal(

@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SpawnClient } from "@spore-host/spawn-ts";
 import { mountGuidedLaunch } from "./launch.js";
 import { GUIDED_SHAPES } from "./shapes.js";
+import { costLimitFor } from "./cost.js";
 
 const settle = () => new Promise((r) => setTimeout(r, 0));
 
@@ -74,6 +75,88 @@ describe("mountGuidedLaunch", () => {
     dispose();
   });
 
+  it("does not promise the shutdown happens 'whatever happens'", async () => {
+    // The portal ships an orphan banner for precisely the case where spored fails
+    // to reap an instance, so copy claiming the shutdown is unconditional is
+    // contradicted by another component of the same page. It must say what the
+    // fallback is instead of denying the failure exists.
+    const { client } = stubClient();
+    const dispose = await pickFirst(client);
+    const text = host.querySelector(".guided-confirm")!.textContent!.replace(/\s+/g, " ");
+    expect(text).not.toContain("whatever happens");
+    expect(text.toLowerCase()).toContain("if that ever fails");
+    dispose();
+  });
+
+  it("names the spend cap alongside the time limit", async () => {
+    // Two guards that fail differently, so both are stated: the TTL runs on the
+    // instance and dies with the daemon, while the cost limit is derived from tags.
+    const { client } = stubClient();
+    const dispose = await pickFirst(client);
+    const text = host.querySelector(".guided-facts")!.textContent!.replace(/\s+/g, " ");
+    expect(text).toMatch(/\$\d+ of spend/);
+    dispose();
+  });
+
+  it("says the price excludes storage and transfer", async () => {
+    // "Up to $X" is a bound the figure doesn't actually bound — it's
+    // onDemandPrice × hours, with no EBS and no egress.
+    const { client } = stubClient();
+    const dispose = await pickFirst(client);
+    expect(host.querySelector(".guided-cost")!.textContent).toContain("Compute only");
+    dispose();
+  });
+
+  it("says spot is off and what that costs", async () => {
+    // The right default, but silent: guided mode systematically pays ~3× spot
+    // without ever mentioning that spot exists.
+    const { client } = stubClient();
+    const dispose = await pickFirst(client);
+    const text = host.querySelector(".guided-facts")!.textContent!.replace(/\s+/g, " ");
+    expect(text).toContain("not spot");
+    dispose();
+  });
+
+  it("qualifies the price when the session's region isn't the catalog's", async () => {
+    // The confirmation renders the session region and a us-east-1 catalog price as
+    // two adjacent facts. Outside us-east-1 they are not the same fact, and
+    // priceIsEstimate doesn't cover it — it flags hand-seeded entries only.
+    const { client } = stubClient();
+    const dispose = mountGuidedLaunch(host, {
+      client,
+      region: "ap-southeast-2",
+      onEscape: vi.fn(),
+    });
+    await settle();
+    host.querySelector<HTMLButtonElement>(".guided-card")!.click();
+    await settle();
+    const cost = host.querySelector(".guided-cost")!.textContent!.replace(/\s+/g, " ");
+    expect(cost).toContain("us-east-1");
+    expect(cost).toContain("ap-southeast-2");
+    dispose();
+  });
+
+  it("does not qualify the price in the catalog's own region", async () => {
+    // A caveat that fires always is one nobody reads.
+    const { client } = stubClient();
+    const dispose = await pickFirst(client); // region: us-east-1
+    expect(host.querySelector(".guided-cost")!.textContent).not.toContain("may differ");
+    dispose();
+  });
+
+  it("offers the escape hatch on the confirmation, not just the picker", async () => {
+    // This is the moment the user learns what guided mode chose, so it's the moment
+    // they discover it's too small. Without this the only way onward is back to the
+    // same five cards.
+    const onEscape = vi.fn();
+    const { client } = stubClient();
+    const dispose = await pickFirst(client, onEscape);
+    expect(host.querySelector(".guided-confirm")).toBeTruthy();
+    host.querySelector<HTMLButtonElement>(".guided-confirm .guided-escape")!.click();
+    expect(onEscape).toHaveBeenCalledTimes(1);
+    dispose();
+  });
+
   it("launches with a TTL and without spot", async () => {
     const { client, launch } = stubClient();
     const dispose = await pickFirst(client);
@@ -94,6 +177,105 @@ describe("mountGuidedLaunch", () => {
     // THIS instance instead of its hardcoded default.
     expect(input.pricePerHour).toBeGreaterThan(0);
     dispose();
+  });
+
+  it("launches with a cost limit above the expected spend", async () => {
+    // The second guard, and the reason it isn't redundant with the TTL: the TTL is
+    // enforced by spored ON the instance, so an instance whose daemon never starts
+    // is bounded by nothing — which is why the Dashboard ships an orphan banner. A
+    // cost limit is derived from the tags, so it survives the daemon failing.
+    const { client, launch } = stubClient();
+    const dispose = await pickFirst(client);
+    host.querySelector<HTMLButtonElement>(".guided-go")!.click();
+    await settle();
+
+    const input = launch.mock.calls[0]![0] as any;
+    const shape = GUIDED_SHAPES[0]!;
+    expect(input.costLimit).toBe(costLimitFor(input.pricePerHour, shape.defaultTtlHours));
+    // Above the expected spend, so it bounds a runaway instead of aborting a
+    // healthy run that merely reached its TTL.
+    expect(input.costLimit).toBeGreaterThan(input.pricePerHour * shape.defaultTtlHours);
+    dispose();
+  });
+
+  describe("when the catalog has no price", () => {
+    // The shapes that land here are the accelerator ones — types with no on-demand
+    // row are the $30-100/hr machines, so this is the branch where an accidental
+    // click is most expensive. The real catalog never produces it, so it is only
+    // ever exercised here.
+    const unpriced = [{ ...GUIDED_SHAPES[0]!, id: "unpriced", defaultTtlHours: 2 }];
+    const finder = async () => [
+      {
+        instance: {
+          instanceType: "p6e-gb200.36xlarge",
+          vcpus: 144,
+          memoryMib: 1024 * 1024,
+          gpus: 72,
+          gpuModel: "B200",
+          // No onDemandPrice at all — truffle-ts 0.5.0 carries no price rather
+          // than a guessed one for these.
+        },
+        score: 1,
+        reasons: [],
+      } as any,
+    ];
+
+    async function mountUnpriced(client: SpawnClient) {
+      const dispose = mountGuidedLaunch(host, {
+        client,
+        region: "us-east-1",
+        onEscape: vi.fn(),
+        shapes: unpriced,
+        finder,
+      });
+      await settle();
+      host.querySelector<HTMLButtonElement>(".guided-card")!.click();
+      await settle();
+      return dispose;
+    }
+
+    it("will not launch until the user acknowledges the unknown cost", async () => {
+      const { client, launch } = stubClient();
+      const dispose = await mountUnpriced(client);
+
+      const go = host.querySelector<HTMLButtonElement>(".guided-go")!;
+      expect(go.disabled).toBe(true);
+      go.click();
+      await settle();
+      expect(launch).not.toHaveBeenCalled();
+
+      host.querySelector<HTMLInputElement>(".guided-ack-box")!.click();
+      expect(go.disabled).toBe(false);
+      go.click();
+      await settle();
+      expect(launch).toHaveBeenCalledTimes(1);
+      dispose();
+    });
+
+    it("omits costLimit rather than sending zero", async () => {
+      // spawn-ts reads a non-positive costLimit as "no limit", so a 0 would look
+      // like a guard at the call site while being none — the worst pairing. The
+      // field must be absent.
+      const { client, launch } = stubClient();
+      const dispose = await mountUnpriced(client);
+      host.querySelector<HTMLInputElement>(".guided-ack-box")!.click();
+      host.querySelector<HTMLButtonElement>(".guided-go")!.click();
+      await settle();
+
+      const input = launch.mock.calls[0]![0] as any;
+      expect("costLimit" in input).toBe(false);
+      // The TTL still applies — it's the only guard left, so it must not be lost too.
+      expect(input.ttl).toBe("2h");
+      dispose();
+    });
+
+    it("says unpriced machines are usually the expensive ones", async () => {
+      const { client } = stubClient();
+      const dispose = await mountUnpriced(client);
+      const cost = host.querySelector(".guided-cost")!.textContent!.replace(/\s+/g, " ");
+      expect(cost).toContain("most expensive");
+      dispose();
+    });
   });
 
   it("names the instance distinguishably", async () => {

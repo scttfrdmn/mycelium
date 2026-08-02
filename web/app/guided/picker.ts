@@ -126,21 +126,30 @@ export function mountGuidedPicker(host: HTMLElement, opts: GuidedPickerOptions):
  *
  * An unknown price says so. Rendering "$0.00" or omitting the cost entirely would
  * both read as "free".
+ *
+ * The match count is rendered because `resolveShape` computes it for exactly this
+ * purpose — "cheapest of 194 that fit" tells the user a choice was made on their
+ * behalf and roughly how much was on the table, where the bare recommendation reads
+ * as the only thing available.
  */
 function describe(rec: GuidedRecommendation): string {
   const i = rec.pick.instance;
   const gib = (i.memoryMib / 1024).toFixed(i.memoryMib % 1024 === 0 ? 0 : 1);
   const gpu = i.gpus ? ` · ${i.gpus}× ${escapeHtml(i.gpuModel ?? "GPU")}` : "";
   const specs = `${escapeHtml(i.instanceType)} — ${i.vcpus} vCPU · ${gib} GiB${gpu}`;
+  const of =
+    rec.totalMatches > 1
+      ? `<span class="guided-card-alts">cheapest of ${rec.totalMatches} that fit</span>`
+      : "";
 
   if (rec.pricePerHour == null) {
     return `<b>${specs}</b><span class="guided-card-cost unknown">price unknown for this
-      type — check before launching</span>`;
+      type — check before launching</span>${of}`;
   }
   const est = rec.priceIsEstimate ? " (estimated)" : "";
   return `<b>${specs}</b><span class="guided-card-cost">about
     $${rec.estimatedTotal!.toFixed(2)} for ${rec.shape.defaultTtlHours} hours
-    ($${rec.pricePerHour.toFixed(4)}/hr${est})</span>`;
+    ($${rec.pricePerHour.toFixed(4)}/hr${est}, compute only)</span>${of}`;
 }
 
 function escapeHtml(s: string): string {
