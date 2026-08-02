@@ -1,0 +1,43 @@
+name: Fleet canary
+
+# A deliberately trivial job pinned to the self-hosted fleet. It exists only to
+# be dispatched by fleet-monitor.yml (spore-host#520) — if this run leaves the
+# queue, a runner picked it up, which is the one thing a monitor cannot learn by
+# asking GitHub for runner *status* (a wedged runner still reports `online`).
+#
+# Do not add steps. Every second here is a second the monitor counts as latency,
+# and the point is to prove pickup, not to test anything.
+
+on:
+  workflow_dispatch:
+    inputs:
+      marker:
+        description: 'Correlation marker set by fleet-monitor (do not run by hand)'
+        required: true
+        type: string
+
+# Surfaces the marker in the run's display title so the monitor can identify
+# exactly which run is its own — workflow_dispatch does not return a run id.
+run-name: canary ${{ inputs.marker }}
+
+permissions:
+  contents: read
+
+jobs:
+  canary:
+    name: Fleet picks up a job
+    runs-on: [self-hosted, linux, orion]
+    # If a runner takes this job and then dies mid-step, the monitor should see a
+    # failure rather than hang: cap it hard. No checkout — nothing to check out.
+    timeout-minutes: 5
+    steps:
+      - name: Report pickup
+        # The marker goes through `env`, never interpolated into the script body:
+        # `${{ inputs.marker }}` inline is shell injection (a dispatch input is
+        # attacker-controlled by anyone with write access), and semgrep's
+        # run-shell-injection rule correctly blocks it.
+        env:
+          MARKER: ${{ inputs.marker }}
+        run: |
+          echo "picked up by: ${RUNNER_NAME:-unknown} on $(hostname)"
+          echo "marker: $MARKER"

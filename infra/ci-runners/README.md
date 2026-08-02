@@ -181,6 +181,25 @@ launchctl load -w ~/Library/LaunchAgents/com.spore.ci-runners.plist
 gh api orgs/spore-host/actions/runners --jq '.total_count, (.runners[]|"\(.name) \(.status)")'
 ```
 
+## Monitoring (spore-host#520)
+
+`.github/workflows/fleet-monitor.yml` runs on **`ubuntu-latest`** every 30 min —
+never on the fleet, because a monitor pinned to what it watches can't fire when that
+thing is down, which is exactly why the 5.5h outage was silent. It dispatches
+`fleet-canary.yml` (a no-op job pinned to the fleet) and waits to see whether a
+runner actually **picks it up**; that's the real question, since a wedged runner
+still reports `online`. It also flags any run queued >20 min across the seven repos
+with fleet-pinned jobs.
+
+Failures file a `fleet-outage` issue carrying the recovery runbook, comment on that
+same issue while the outage persists rather than filing repeatedly, and close it on
+recovery. A "degraded" alert (canary picked up, but runs piling up) means something
+other than the #518 failure modes — check how many runners are listening before
+recreating anything.
+
+This is separate from the drift gate above: drift asks "is the fleet running the
+right code", monitoring asks "is the fleet running at all".
+
 ## Notes
 - **`gh` is not installed on orion.** Anything in these scripts gated on
   `command -v gh` silently no-ops there — that's how the ghost-prune went
