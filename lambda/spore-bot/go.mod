@@ -13,7 +13,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/lambda v1.88.5
 	github.com/aws/aws-sdk-go-v2/service/sts v1.41.10
 	github.com/google/uuid v1.6.0
-	github.com/scttfrdmn/substrate v0.81.0
+	github.com/scttfrdmn/substrate v0.85.0
 )
 
 require (
