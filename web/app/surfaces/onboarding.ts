@@ -5,7 +5,13 @@
 // deployment/cloudformation/portal-onboarding-role.yaml. The template's
 // phone-home custom resource auto-registers the new role with the portal on stack
 // create, so there's nothing to copy-paste back.
+//
+// Disclosure: this surface is already written in guided register — four numbered
+// steps, one CTA, and the technical detail (what the role can do, the CLI
+// equivalent, the ExternalId) behind a `<details>`. So the only level-dependent
+// thing is whether that `<details>` starts open.
 import type { Disposable, PortalConfig, SurfaceContext, ToolSurface } from "./types.js";
+import { atLeast } from "../disclosure.js";
 
 export const onboardingSurface: ToolSurface = {
   id: "connect",
@@ -62,7 +68,11 @@ export const onboardingSurface: ToolSurface = {
 
         <a class="onboard-launch" target="_blank" rel="noopener">Launch the CloudFormation stack ↗</a>
 
-        <details class="onboard-details">
+        <!-- Open at expert: an expert reading "grant spore.host permission to launch
+             EC2 in your own account" wants the IAM scope before the CTA, not after
+             clicking to find it. Below expert it stays collapsed — the whole design
+             of this surface is that you can complete it without reading this. -->
+        <details class="onboard-details"${atLeast(ctx.level, "expert") ? " open" : ""}>
           <summary>What this creates / prefer the CLI?</summary>
           <p>The stack creates an IAM role (<code>spore-portal-onboard</code>) that
             trusts the portal under a one-time ExternalId, scoped to EC2 launch +

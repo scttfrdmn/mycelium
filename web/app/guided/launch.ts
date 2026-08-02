@@ -8,6 +8,7 @@
 
 import type { SpawnClient } from "@spore-host/spawn-ts";
 import { mountGuidedPicker, type GuidedChoice, type GuidedPickerOptions } from "./picker.js";
+import { GUIDED_SHAPES, resolveShape } from "./shapes.js";
 import { CATALOG_PRICE_REGION, costLimitFor } from "./cost.js";
 
 export interface GuidedLaunchOptions {
@@ -24,6 +25,16 @@ export interface GuidedLaunchOptions {
    */
   finder?: GuidedPickerOptions["finder"];
   shapes?: GuidedPickerOptions["shapes"];
+  /**
+   * Skip the picker and open the confirmation for this shape id.
+   *
+   * The truffle surface's guided picker is auth-free and cannot launch, so it hands
+   * over to this surface — and without carrying the choice, the user who picked
+   * "A big GPU for training" arrived at an identical picker asking the same question
+   * again. Unknown ids fall back to the picker rather than erroring: this comes from
+   * the URL, so a stale bookmark is expected input, not a fault.
+   */
+  initialShapeId?: string;
 }
 
 /** Render the guided launch flow into `host`. Returns a dispose fn. */
@@ -184,7 +195,33 @@ export function mountGuidedLaunch(host: HTMLElement, opts: GuidedLaunchOptions):
     });
   };
 
-  showPicker();
+  // Jump straight to the confirmation when the caller carried a shape over. Resolved
+  // here rather than in the picker so the picker stays a pure list-and-choose: this
+  // is the same resolveShape() the cards use, on one shape.
+  const jumpTo = (shapeId: string): void => {
+    const shape = (opts.shapes ?? GUIDED_SHAPES).find((s) => s.id === shapeId);
+    if (!shape) {
+      showPicker();
+      return;
+    }
+    // Show the picker meanwhile, so a slow catalog read isn't a blank panel — and so
+    // a resolve failure leaves the user somewhere useful instead of nowhere.
+    showPicker();
+    void resolveShape(shape, opts.finder)
+      .then((rec) => {
+        if (!live) return;
+        // resolveShape returns undefined for no-match. Don't open a confirmation for
+        // a machine we couldn't find: the picker renders no-match and failure as the
+        // distinct states they are (#63's invariant), so leave the user there.
+        if (rec) showConfirm({ shape, rec });
+      })
+      .catch(() => {
+        /* the picker is already mounted and shows its own error state */
+      });
+  };
+
+  if (opts.initialShapeId) jumpTo(opts.initialShapeId);
+  else showPicker();
 
   return () => {
     live = false;

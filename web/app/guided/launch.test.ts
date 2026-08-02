@@ -353,6 +353,85 @@ describe("mountGuidedLaunch", () => {
     dispose();
   });
 
+  describe("when a shape is carried in from another surface", () => {
+    // The truffle surface's picker is auth-free and cannot launch, so it navigates to
+    // `#/instances?shape=<id>`. Without honouring that the user who chose "A big GPU
+    // for training" met an identical picker asking the same question again — the
+    // choice they'd just made, discarded.
+    it("opens the confirmation for that shape without a second click", async () => {
+      const { client } = stubClient();
+      const shape = GUIDED_SHAPES[3]!; // a GPU shape, not the default first card
+      const dispose = mountGuidedLaunch(host, {
+        client,
+        region: "us-east-1",
+        onEscape: vi.fn(),
+        initialShapeId: shape.id,
+      });
+      await settle();
+      const confirm = host.querySelector<HTMLElement>(".guided-confirm");
+      expect(confirm).toBeTruthy();
+      // The right shape, not merely some shape: carrying the wrong card over would
+      // be worse than carrying none.
+      expect(confirm!.querySelector("h2")!.textContent).toBe(shape.label);
+      dispose();
+    });
+
+    it("falls back to the picker for an unknown id", async () => {
+      // This value comes from the URL, so a stale bookmark or a hand-typed hash is
+      // expected input, not a fault. It must not error and must not blank the panel.
+      const { client } = stubClient();
+      const dispose = mountGuidedLaunch(host, {
+        client,
+        region: "us-east-1",
+        onEscape: vi.fn(),
+        initialShapeId: "no-such-shape",
+      });
+      await settle();
+      expect(host.querySelectorAll(".guided-card")).toHaveLength(GUIDED_SHAPES.length);
+      expect(host.querySelector(".guided-confirm")).toBeNull();
+      dispose();
+    });
+
+    it("leaves the user on the picker when the catalog lookup fails", async () => {
+      // A jump that can't resolve must land somewhere usable. Showing the picker
+      // meanwhile (rather than after) is what makes that true even for a slow catalog.
+      const { client } = stubClient();
+      const shape = GUIDED_SHAPES[0]!;
+      const dispose = mountGuidedLaunch(host, {
+        client,
+        region: "us-east-1",
+        onEscape: vi.fn(),
+        initialShapeId: shape.id,
+        finder: async () => {
+          throw new Error("catalog unreadable");
+        },
+      });
+      await settle();
+      expect(host.querySelector(".guided-confirm")).toBeNull();
+      expect(host.querySelector(".guided-picker")).toBeTruthy();
+      dispose();
+    });
+
+    it("opens no confirmation when the shape resolves to nothing", async () => {
+      // resolveShape returns undefined for a no-match, which is a fact about the
+      // catalog — distinct from a failure, and distinct from a machine we can price.
+      // Confirming a launch for an unresolved shape would be confirming nothing.
+      const { client } = stubClient();
+      const shape = GUIDED_SHAPES[0]!;
+      const dispose = mountGuidedLaunch(host, {
+        client,
+        region: "us-east-1",
+        onEscape: vi.fn(),
+        initialShapeId: shape.id,
+        finder: async () => [],
+      });
+      await settle();
+      expect(host.querySelector(".guided-confirm")).toBeNull();
+      expect(host.querySelector(".guided-card.unresolved")).toBeTruthy();
+      dispose();
+    });
+  });
+
   it("passes the escape hatch through", async () => {
     const onEscape = vi.fn();
     const { client } = stubClient();

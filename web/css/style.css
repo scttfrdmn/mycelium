@@ -550,8 +550,33 @@ footer {
 /* The disclosure control. margin-left:auto pulls it out of the header's
    space-between centre and parks it beside the account block — the two things
    that say "who you are" and "how much you're shown" belong together. */
-.portal-level { display: flex; align-items: center; gap: 0.4rem; margin-left: auto; margin-right: 1.25rem; font-size: 0.85rem; color: var(--text-muted); }
-.portal-level-select { font: inherit; padding: 0.25rem 0.4rem; border-radius: var(--radius); border: 1px solid var(--border-strong); background: var(--bg); color: var(--text); }
+.portal-level { display: flex; align-items: center; gap: 0.5rem; margin-left: auto; margin-right: 1.25rem; font-size: 0.85rem; color: var(--text-muted); }
+/* A segmented control, so the three levels read as the ordered scale they are —
+   `atLeast()`'s whole semantics is that ordering, and a dropdown showing one option
+   at a time hides it. */
+.portal-level-group { display: flex; border: 1px solid var(--border-strong); border-radius: var(--radius); overflow: hidden; }
+.portal-level-opt {
+  font: inherit; font-size: 0.85rem; cursor: pointer; padding: 0.25rem 0.6rem;
+  border: 0; border-left: 1px solid var(--border-strong);
+  background: var(--bg); color: var(--text-muted);
+}
+.portal-level-opt:first-child { border-left: 0; }
+.portal-level-opt:hover { background: var(--bg-subtle); color: var(--text); }
+.portal-level-opt.active { background: var(--spawn); color: #fff; font-weight: 600; }
+/* Roving tabindex means one focus stop for the group, so the ring has to be obvious
+   — it's the only indication of which option the arrow keys will move from. */
+.portal-level-opt:focus-visible { outline: 2px solid var(--spawn); outline-offset: -2px; }
+/* The blurb the old <option title> could never show. Hidden on narrow screens rather
+   than wrapping the header onto two lines; the labels still carry the ordering. */
+.portal-level-blurb { max-width: 22rem; font-size: 0.78rem; line-height: 1.2; }
+@media (max-width: 1100px) { .portal-level-blurb { display: none; } }
+@media (max-width: 720px) { .portal-level-label { display: none; } }
+/* Visually hidden, still announced. The level change rebuilds .portal-main with no
+   audible signal otherwise. */
+.portal-live {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+}
 .portal-account { display: flex; align-items: center; gap: 0.75rem; font-size: 0.9rem; color: var(--text-muted); }
 .portal-account .acct b { color: var(--text); }
 .portal-account button, .portal-gate button, .portal-banner button {
@@ -581,6 +606,10 @@ footer {
 .portal-banner.warn { background: var(--truffle-bg); color: var(--truffle); }
 .portal-banner.expired { background: #fef2f2; color: var(--accent-red); }
 [data-theme="dark"] .portal-banner.expired { background: #2a1010; }
+/* The mode-change note. Informational, so it must not borrow the expiry banner's
+   alarm colours — and it never replaces one (see Shell.showLevelNote). */
+.portal-banner.info { background: var(--bg-subtle); color: var(--text-muted); display: flex; align-items: center; gap: 0.75rem; }
+.portal-banner-x { margin-left: auto; line-height: 1; padding: 0.1rem 0.45rem !important; }
 
 /* ── truffle surface — offline instance-type catalog search ── */
 .truffle-surface { max-width: 820px; }
@@ -670,6 +699,9 @@ footer {
 .costs-tile { flex: 1 1 140px; border: 1px solid var(--border); border-radius: var(--radius); padding: 0.7rem 0.9rem; background: var(--bg-card); }
 .costs-tile-label { color: var(--text-muted); font-size: 0.8rem; }
 .costs-tile-value { color: var(--text); font-size: 1.5rem; font-weight: 600; margin-top: 0.2rem; }
+/* When a figure needs a qualifier (which sample the peak came from), it goes here
+   rather than into the value, which is too large to wrap without looking broken. */
+.costs-tile-note { color: var(--text-muted); font-size: 0.78rem; margin-top: 0.1rem; }
 .costs-status { color: var(--text-muted); }
 .costs-status.error { color: var(--accent-red); }
 .costs-body { transition: opacity 0.15s ease; }
@@ -688,6 +720,12 @@ footer {
 }
 .costs-tip-val { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
 .costs-tip-meta { color: var(--text-muted); font-size: 0.75rem; margin-top: 0.1rem; }
+.costs-tip-breakdown { color: var(--text-muted); font-size: 0.72rem; margin-top: 0.25rem; padding-top: 0.25rem; border-top: 1px solid var(--border); font-variant-numeric: tabular-nums; }
+.costs-provenance { color: var(--text-muted); font-size: 0.75rem; margin-top: 0.75rem; word-break: break-all; }
+/* Guided's "what do I do about it" line. Styled as prose with an inline button
+   rather than a CTA block: it's a pointer, not the surface's purpose. */
+.costs-act { color: var(--text-muted); font-size: 0.9rem; margin-top: 1.25rem; }
+.costs-act button { font: inherit; cursor: pointer; background: none; border: none; padding: 0; color: var(--spawn); text-decoration: underline; }
 .costs-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
 .costs-table th, .costs-table td { text-align: left; padding: 0.35rem 0.6rem; border-bottom: 1px solid var(--border); }
 .costs-table th { color: var(--text-muted); font-weight: 600; }
@@ -710,6 +748,12 @@ footer {
 .teams-role { margin-left: auto; font-size: 0.75rem; color: var(--lagotto); text-transform: uppercase; letter-spacing: 0.03em; }
 .teams-card-meta { color: var(--text-muted); font-size: 0.85rem; margin-top: 0.2rem; }
 .teams-desc { display: block; color: var(--text-muted); font-size: 0.85rem; margin-top: 0.3rem; }
+/* Expert-only identifiers. Monospace because they're things you copy into an API
+   call or a support thread, not things you read. */
+.teams-id { display: block; margin-top: 0.3rem; font-family: ui-monospace, monospace; font-size: 0.75rem; color: var(--text-muted); }
+.teams-meta { display: grid; grid-template-columns: auto 1fr; gap: 0.2rem 0.75rem; margin: 0.75rem 0 0; font-size: 0.8rem; }
+.teams-meta dt { color: var(--text-muted); }
+.teams-meta dd { margin: 0; color: var(--text); font-family: ui-monospace, monospace; word-break: break-all; }
 .teams-members { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin: 1rem 0; }
 .teams-members th, .teams-members td { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--border); }
 .teams-members th { color: var(--text-muted); font-weight: 600; }

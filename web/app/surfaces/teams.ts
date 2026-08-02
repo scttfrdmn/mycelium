@@ -6,8 +6,17 @@
 //
 // Identity note: with account-scoped auth (spawn#445), the caller's team key is
 // their verified AWS account id; teammates are added by their IAM user/role ARN.
+//
+// Disclosure: guided is READ-ONLY, not absent. Every write here needs an IAM ARN a
+// guided user cannot produce (see MEMBER_ARN_RE), and three of the actions are
+// irreversible. But membership is information about your own account, and hiding the
+// surface from the sidebar would mean a user told "check Teams" can neither find it
+// nor tell it exists. So the lists stay and the forms go, with an escape to
+// standard for the user who does need to manage one.
 import type { AwsCreds } from "@spore-host/spawn-ts/auth";
 import type { Disposable, SurfaceContext, ToolSurface } from "./types.js";
+import { atLeast } from "../disclosure.js";
+import { readHashParam, writeHashParams } from "../hashstate.js";
 
 interface Team {
   team_id: string;
@@ -57,6 +66,11 @@ export const teamsSurface: ToolSurface = {
 
     const controller = new AbortController();
     let disposed = false;
+    // `canWrite` gates the forms, not the data. The API enforces owner-only on every
+    // write regardless (403), so this is about not showing a beginner a form they
+    // can't fill in — never about security.
+    const canWrite = atLeast(ctx.level, "standard");
+    const expert = atLeast(ctx.level, "expert");
 
     // Thin fetch wrapper: attaches auth, JSON content-type on writes, and the
     // abort signal; returns parsed body + status.
@@ -96,11 +110,14 @@ export const teamsSurface: ToolSurface = {
     async function showList(): Promise<void> {
       if (disposed) return;
       root.replaceChildren();
+      writeHashParams({ team: null });
       root.append(
         el("div", "teams-head", [
           el("h2", "", ["Teams"]),
           el("p", "teams-hint", [
-            "Teams share visibility of spawn-managed instances. You own the teams you create; owners manage membership.",
+            canWrite
+              ? "Teams share visibility of spawn-managed instances. You own the teams you create; owners manage membership."
+              : "Teams share visibility of spawn-managed instances. These are the teams you're in.",
           ]),
         ]),
       );
@@ -120,10 +137,17 @@ export const teamsSurface: ToolSurface = {
       const teams: Team[] = res.data?.teams ?? [];
 
       // Create-team form (collapsible).
-      root.append(buildCreateForm(showList, api, errText));
+      if (canWrite) root.append(buildCreateForm(showList, api, errText));
 
       if (teams.length === 0) {
-        root.append(el("div", "teams-status", ["You're not in any teams yet — create one above."]));
+        root.append(
+          el("div", "teams-status", [
+            canWrite
+              ? "You're not in any teams yet — create one above."
+              : "You're not in any teams yet.",
+          ]),
+        );
+        if (!canWrite) root.append(buildEscape(ctx));
         return;
       }
 
@@ -141,15 +165,20 @@ export const teamsSurface: ToolSurface = {
           ]),
         );
         if (t.description) card.append(spanText("teams-desc", t.description));
+        if (expert) card.append(spanText("teams-id", t.team_id));
         card.addEventListener("click", () => void showDetail(t.team_id));
         list.append(card);
       }
       root.append(list);
+      if (!canWrite) root.append(buildEscape(ctx));
     }
 
     // ── Detail view ────────────────────────────────────────────────────────
     async function showDetail(teamID: string): Promise<void> {
       if (disposed) return;
+      // Recorded so a mode change — which re-mounts this surface — returns to the
+      // team the user was reading rather than dumping them back at the list.
+      writeHashParams({ team: teamID });
       root.replaceChildren();
       const back = el("button", "teams-back", ["← All teams"]);
       (back as HTMLButtonElement).type = "button";
@@ -170,6 +199,13 @@ export const teamsSurface: ToolSurface = {
 
       const team: Team = res.data.team;
       const members: Member[] = res.data.members ?? [];
+      // `owner_arn` holds a bare 12-digit account id for portal-created teams
+      // (dashboard-api's portalAccountFromARN) but a real IAM ARN for CLI-created
+      // ones (cliIamArn) — so this comparison is correct for the former and never
+      // matches the latter, and a CLI-created team shows its own owner no owner
+      // controls. Tracked in spore-host#514; the fix belongs on the API side, not
+      // here — the browser should not be parsing ARN shapes to guess which code path
+      // wrote the record.
       const iAmOwner = team.owner_arn === ctx.session.accountId;
 
       root.append(
@@ -179,37 +215,69 @@ export const teamsSurface: ToolSurface = {
         ]),
       );
 
+      // Expert: the identifiers and timestamps a support conversation or an API call
+      // needs. Deliberately below the name, not beside it — a team_id is not what
+      // anyone came here to read.
+      if (expert) {
+        const dl = el("dl", "teams-meta", []);
+        const rows: Array<[string, string]> = [
+          ["team id", team.team_id],
+          ["owner", team.owner_arn],
+          ["created", fmtDate(team.created_at)],
+        ];
+        for (const [k, v] of rows) dl.append(el("dt", "", [k]), el("dd", "", [v]));
+        root.append(dl);
+      }
+
       // Members table.
       const table = el("table", "teams-members", []);
       const thead = el("thead", "", []);
       const htr = el("tr", "", []);
-      for (const h of ["Member", "Role", "Joined", ""]) htr.append(el("th", "", [h]));
+      // `invited_by` is on every Member the API returns and was never rendered. In a
+      // shared-visibility team, "who added this person" is the audit question, and
+      // expert is the level that would act on the answer.
+      // The trailing blank column holds Remove, so it's only there when Remove can be.
+      // At guided it rendered as a fourth column of empty cells with the row rules
+      // running past "Joined" — which reads as a column that failed to load.
+      const canRemove = canWrite && iAmOwner;
+      const heads = [
+        "Member",
+        "Role",
+        "Joined",
+        ...(expert ? ["Invited by"] : []),
+        ...(canRemove ? [""] : []),
+      ];
+      for (const h of heads) htr.append(el("th", "", [h]));
       thead.append(htr);
       table.append(thead);
       const tbody = el("tbody", "", []);
       for (const m of members) {
         const tr = el("tr", "", []);
-        tr.append(
-          tdText(m.member_arn),
-          tdText(m.role),
-          tdText(fmtDate(m.joined_at)),
-        );
-        const actionTd = el("td", "teams-memb-action", []);
-        // Owner can remove non-owner members.
-        if (iAmOwner && m.role !== "owner") {
-          const rm = el("button", "teams-remove", ["Remove"]);
-          (rm as HTMLButtonElement).type = "button";
-          rm.addEventListener("click", () => void removeMember(teamID, m.member_arn));
-          actionTd.append(rm);
+        // Below expert, show the ARN's trailing user/role name with the full ARN in
+        // the title: `arn:aws:iam::123456789012:user/alice` is 45 characters of which
+        // one word identifies the person, and it wraps the table on a laptop.
+        const who = expert ? tdText(m.member_arn) : tdTitled(shortArn(m.member_arn), m.member_arn);
+        tr.append(who, tdText(m.role), tdText(fmtDate(m.joined_at)));
+        if (expert) tr.append(tdText(m.invited_by || "—"));
+        if (canRemove) {
+          const actionTd = el("td", "teams-memb-action", []);
+          // The owner's own row is not removable — the cell stays, to keep the column
+          // aligned, but empty.
+          if (m.role !== "owner") {
+            const rm = el("button", "teams-remove", ["Remove"]);
+            (rm as HTMLButtonElement).type = "button";
+            rm.addEventListener("click", () => void removeMember(teamID, m.member_arn));
+            actionTd.append(rm);
+          }
+          tr.append(actionTd);
         }
-        tr.append(actionTd);
         tbody.append(tr);
       }
       table.append(tbody);
       root.append(table);
 
       // Owner controls: add member + delete team.
-      if (iAmOwner) {
+      if (canWrite && iAmOwner) {
         root.append(buildAddMemberForm(teamID, () => void showDetail(teamID), api, errText));
         const danger = el("div", "teams-danger", []);
         const del = el("button", "teams-delete", ["Delete team"]);
@@ -218,6 +286,7 @@ export const teamsSurface: ToolSurface = {
         danger.append(del);
         root.append(danger);
       }
+      if (!canWrite) root.append(buildEscape(ctx));
     }
 
     async function removeMember(teamID: string, memberARN: string): Promise<void> {
@@ -244,7 +313,11 @@ export const teamsSurface: ToolSurface = {
       void showList();
     }
 
-    void showList();
+    // Restore the open team from the hash, so a mode change lands back where the
+    // user was rather than at the list.
+    const openTeam = readHashParam("team");
+    if (openTeam) void showDetail(openTeam);
+    else void showList();
 
     return {
       dispose() {
@@ -255,6 +328,29 @@ export const teamsSurface: ToolSurface = {
     };
   },
 };
+
+/**
+ * The way out of read-only, matching the picker's `.guided-escape` pattern.
+ *
+ * Guided mode must not be a dead end: the user who arrives here because a colleague
+ * said "add me to your team" needs a route to the form, and "go find Mode in the
+ * header" is not one — that's exactly the knowledge guided mode exists to not
+ * require. Raising the level is the same gesture truffle's picker uses.
+ */
+function buildEscape(ctx: SurfaceContext): HTMLElement {
+  const btn = el("button", "guided-escape", ["Manage teams →"]);
+  (btn as HTMLButtonElement).type = "button";
+  btn.addEventListener("click", () => ctx.session.setLevel("standard"));
+  return btn;
+}
+
+/** `arn:aws:iam::123456789012:user/alice` → `user/alice`. Unrecognised input is
+ *  returned whole rather than truncated to something that looks like an identity
+ *  but isn't. */
+function shortArn(arn: string): string {
+  const i = arn.lastIndexOf(":");
+  return i === -1 ? arn : arn.slice(i + 1) || arn;
+}
 
 // ── form builders ──────────────────────────────────────────────────────────
 type ApiFn = (p: string, i?: { method?: string; body?: unknown }) => Promise<{ ok: boolean; status: number; data: any }>;
@@ -353,6 +449,14 @@ function spanText(className: string, text: string): HTMLElement {
 
 function tdText(text: string): HTMLElement {
   return el("td", "", [text]);
+}
+
+/** A cell showing `text` with `title` on hover — for a shortened identity whose full
+ *  form must still be recoverable without changing mode. */
+function tdTitled(text: string, title: string): HTMLElement {
+  const td = el("td", "", [text]);
+  td.title = title;
+  return td;
 }
 
 function inputEl(type: string, placeholder: string, required: boolean): HTMLInputElement {
