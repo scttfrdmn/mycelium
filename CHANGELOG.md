@@ -14,6 +14,25 @@ own changelogs for CLI releases.
 ## [Unreleased]
 
 ### Fixed
+- **Clicking Disconnect no longer reports the session as having closed on its own**
+  (#530). Two writers raced and the user-initiated one lost: the Disconnect handler
+  wrote `disconnected` synchronously, then `attachTerminal`'s `onClosed` callback wrote
+  `session closed: <reason>` over it — asynchronously, because a real
+  `WebSocket.close()` dispatches `onclose` as a task rather than inline. The teardown
+  the user asked for announced itself first and the socket's notification landed second.
+  Deliberate closes now suppress the socket's message; an unexpected drop still reports
+  one, since that wording is exactly for a session that ended without being asked to.
+  Credential expiry benefits too — `sign in again` used to be replaced by
+  `session closed`, which names the symptom and drops the instruction.
+  - The flag is cleared in `connect()`, **not** in `resetUi()` as the issue suggested:
+    `resetUi()` runs synchronously right after `teardown()` on every path, i.e. before
+    the async `onClosed` it exists to suppress, so clearing it there would suppress
+    nothing. A new session and a new socket is the real boundary. There's a test for
+    the leak that would otherwise silence a real drop on a second connection.
+  - `terminal.test.ts`'s `attachTerminal` mock never fired `onClosed` at all, which is
+    why this was invisible to the suite and had to be found by driving the harness in a
+    browser. It now defers the callback the way the real socket does — synchronously
+    would run it *inside* `teardown()` and recurse.
 - **The software catalog no longer requires an account to read** (#515). The catalog is
   the same five environment formations for everybody — the API's handler takes no
   arguments and reads nothing per-account — but `GET /api/strata/catalog` was routed

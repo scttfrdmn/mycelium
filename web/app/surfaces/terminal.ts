@@ -171,9 +171,31 @@ export const terminalSurface: ToolSurface = {
       }
     }
 
+    // Set by every path that ends the session *deliberately* — the Disconnect button,
+    // credential expiry, dispose() — and read by attachTerminal's onClosed callback,
+    // which fires asynchronously because a real `WebSocket.close()` dispatches
+    // `onclose` as a task rather than inline. Without it the socket's own notification
+    // lands after the user-initiated message and overwrites it: click Disconnect, read
+    // "disconnected", then watch it become "session closed: …" a moment later
+    // (spore-host#530).
+    //
+    // `session closed: <reason>` is the wording for a session that ended on its own —
+    // the agent exited, the socket dropped, the instance went away. Using it for a
+    // disconnect the user just asked for reports a requested event as an unexpected
+    // one, and trains the reader to treat the message as noise for the next time it
+    // appears unprompted and means something.
+    //
+    // Deliberately NOT cleared in resetUi(): that runs synchronously right after
+    // teardown() on every path, i.e. before the async onclose it exists to suppress.
+    // connect() clears it, which is the real boundary — a new session, a new socket.
+    let intentionalClose = false;
+
     // Best-effort SSM cleanup: close the socket + TerminateSession (a bare
     // StartSession leaves a live session server-side until it times out).
+    // Every caller is a deliberate end, so this is where the flag is set rather than
+    // in each of the three of them.
     async function teardown(): Promise<void> {
+      intentionalClose = true;
       attached?.dispose();
       attached = null;
       const sid = sessionId;
@@ -217,6 +239,9 @@ export const terminalSurface: ToolSurface = {
       pick.disabled = true;
       byIdBtn.disabled = true;
       status.textContent = "starting SSM session…";
+      // A new session and a new socket, so the previous session's deliberate-close
+      // flag must not carry over and silence a real drop on this one.
+      intentionalClose = false;
       try {
         const ssm = new SSMClient({ region, credentials });
         const started = await ssm.send(new StartSessionCommand({ Target: id }));
@@ -238,7 +263,14 @@ export const terminalSurface: ToolSurface = {
           termHost,
           { streamUrl: started.StreamUrl, tokenValue: started.TokenValue, sessionId: started.SessionId },
           (reason) => {
-            status.textContent = `session closed${reason ? ": " + reason : ""}`;
+            // The socket closed. If we closed it, the path that did so has already
+            // said what happened in words that fit — leave its message alone and just
+            // finish the cleanup. teardown() and resetUi() are both idempotent, so
+            // running them again here is harmless and keeps the unexpected-drop path
+            // (where nothing else has run) complete.
+            if (!intentionalClose) {
+              status.textContent = `session closed${reason ? ": " + reason : ""}`;
+            }
             void teardown();
             resetUi();
           },

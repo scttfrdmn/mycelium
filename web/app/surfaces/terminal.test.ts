@@ -37,6 +37,17 @@ let listGate: Promise<void> | null = null;
 let providerOpts: Array<Record<string, unknown>> = [];
 /** StartSession targets the surface actually asked for. */
 let started: string[] = [];
+/**
+ * The reason the mocked socket reports when it closes, mirroring what the real data
+ * channel supplies. Only read by the unexpected-drop path — a deliberate close must
+ * not print it at all.
+ */
+let closeReason: string | undefined = "stub";
+/**
+ * Fires the surface's onClosed callback, so a drop the user did NOT ask for can be
+ * simulated without going through dispose().
+ */
+let dropSocket: (() => void) | null = null;
 
 vi.mock("@spore-host/spawn-ts", () => ({
   class: undefined,
@@ -54,7 +65,33 @@ vi.mock("@spore-host/spawn-ts", () => ({
 
 vi.mock("@spore-host/spawn-ts/terminal", () => ({
   // Resolves to a disposable so a "successful" connect is reachable without xterm.
-  attachTerminal: vi.fn(async () => ({ dispose: vi.fn() })),
+  //
+  // `dispose()` now fires the surface's `onClosed` callback **on a later task**,
+  // because that is what the real thing does: `WebSocket.close()` dispatches `onclose`
+  // as a task rather than inline. The mock never fired it at all, which is why
+  // spore-host#530 — the socket's own "session closed: …" landing after and
+  // overwriting the user's "disconnected" — was invisible to this suite and had to be
+  // found by driving the harness in a browser.
+  //
+  // The deferral is what makes it meaningful. Calling onClosed synchronously would run
+  // it *inside* teardown(), before the message it races with has been written, and
+  // would recurse: close → onClosed → teardown → dispose → close.
+  attachTerminal: vi.fn(
+    async (_host: unknown, _session: unknown, onClosed: (reason?: string) => void) => {
+      dropSocket = () => onClosed(closeReason);
+      let closed = false;
+      return {
+        dispose: vi.fn(() => {
+          // Idempotent, like the real socket: teardown() can run more than once per
+          // session (the onClosed path calls it again), and a second onClosed would
+          // re-enter the same race this exists to test.
+          if (closed) return;
+          closed = true;
+          setTimeout(() => onClosed(closeReason), 0);
+        }),
+      };
+    },
+  ),
 }));
 
 vi.mock("@aws-sdk/client-ssm", () => {
@@ -116,6 +153,8 @@ beforeEach(() => {
   listGate = null;
   providerOpts = [];
   started = [];
+  closeReason = "stub";
+  dropSocket = null;
 });
 
 const pick = () => host.querySelector<HTMLSelectElement>(".terminal-pick")!;
@@ -319,6 +358,98 @@ describe("terminalSurface while connected", () => {
     expect(byId().disabled).toBe(false);
     expect(openBtn().disabled).toBe(false);
     d.dispose();
+  });
+
+  describe("what the status line says when the session ends (#530)", () => {
+    /** Connect, then run out the deferred onClosed the mocked socket schedules. */
+    async function connectThen(act: () => void): Promise<void> {
+      host.querySelector<HTMLFormElement>(".terminal-form")!.dispatchEvent(new Event("submit"));
+      await settle();
+      act();
+      // Two: one for the click's own synchronous work, one for the task the socket's
+      // close is dispatched on. A single settle() would let the bug pass.
+      await settle();
+      await settle();
+    }
+
+    it("does not overwrite 'disconnected' with the socket's own message", async () => {
+      // The bug: Disconnect wrote "disconnected" synchronously, then the socket's
+      // onclose landed a task later and replaced it with "session closed: stub".
+      // `session closed: <reason>` is the wording for a session that ended on its own,
+      // so using it for a disconnect the user just clicked reports a requested event as
+      // an unexpected one.
+      const d = await terminalSurface.mount(host, ctxAt());
+      await settle();
+      await connectThen(() => host.querySelector<HTMLButtonElement>(".terminal-close")!.click());
+
+      expect(text()).toBe("disconnected");
+      expect(text()).not.toContain("session closed");
+      d.dispose();
+    });
+
+    it("still reports a drop the user did not ask for", async () => {
+      // The other direction, and the reason this isn't just "never print that message".
+      // An agent exit or a dropped socket is exactly what the wording is for, and
+      // suppressing it would leave a dead terminal with a stale "Connected." above it —
+      // a worse bug than the one being fixed.
+      const d = await terminalSurface.mount(host, ctxAt());
+      await settle();
+      await connectThen(() => dropSocket!());
+
+      expect(text()).toContain("session closed");
+      expect(text()).toContain("stub");
+      // And the surface is usable again, not stuck in the connected state.
+      expect(openBtn().disabled).toBe(false);
+      expect(host.querySelector<HTMLElement>(".terminal-close")!.hidden).toBe(true);
+      d.dispose();
+    });
+
+    it("reports a drop with no reason without a trailing colon", async () => {
+      closeReason = undefined;
+      const d = await terminalSurface.mount(host, ctxAt());
+      await settle();
+      await connectThen(() => dropSocket!());
+
+      expect(text()).toBe("session closed");
+      d.dispose();
+    });
+
+    it("keeps the expiry message rather than replacing it with the socket's", async () => {
+      // Credential expiry also tears down deliberately, and "sign in again" is the
+      // actionable half. `session closed: stub` in its place names the symptom and
+      // drops the instruction.
+      // The surface's own listener is captured as it subscribes, rather than reaching
+      // for a private emit() or adding a test-only method to SessionController.
+      const ctx = ctxAt();
+      let fireExpiry: ((s: "warning" | "expired") => void) | null = null;
+      const realOnExpiry = ctx.session.onExpiry.bind(ctx.session);
+      vi.spyOn(ctx.session, "onExpiry").mockImplementation((fn) => {
+        fireExpiry = fn;
+        return realOnExpiry(fn);
+      });
+      const d = await terminalSurface.mount(host, ctx);
+      await settle();
+      await connectThen(() => fireExpiry!("expired"));
+
+      expect(text()).toContain("sign in again");
+      expect(text()).not.toContain("session closed");
+      d.dispose();
+    });
+
+    it("does not suppress a drop on the next session after a deliberate close", async () => {
+      // The flag has to be cleared when a new session starts. If it leaked, a real drop
+      // on the second connection would be silent — the failure mode this fix could
+      // introduce, and the reason it's cleared in connect() rather than in resetUi()
+      // (which runs synchronously before the onClosed it exists to suppress).
+      const d = await terminalSurface.mount(host, ctxAt());
+      await settle();
+      await connectThen(() => host.querySelector<HTMLButtonElement>(".terminal-close")!.click());
+      expect(text()).toBe("disconnected");
+
+      await connectThen(() => dropSocket!());
+      expect(text()).toContain("session closed");
+      d.dispose();
+    });
   });
 });
 
