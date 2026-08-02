@@ -40,7 +40,19 @@ own changelogs for CLI releases.
   IAM ARN for CLI ones. `GET /teams` already returned `role`; the detail endpoint not
   doing so was the gap. `OwnerARN` is now documented as display-only rather than
   renamed, because its `dynamodbav` tag is the stored attribute name.
-  - This fixes the *browser's* half. The **underlying defect is larger and unfixed**:
+  - The portal now reads that field instead of comparing `owner_arn` against
+    `session.accountId`, so an owner who created their team with the CLI gets the owner
+    controls the API says they have. It keeps the old comparison as a **fallback for
+    when `role` is absent**, because the deployed Lambda predates the field and dropping
+    it outright would take owner controls away from every portal-created team until the
+    deploy lands. The discriminator is `role !== undefined`, not `role !== "owner"`: an
+    older API omits the field, while a newer one answering `"member"` is a real answer
+    that must be believed rather than second-guessed by an ARN comparison. The fallback
+    is itself the bug and is tracked for removal in #534.
+  - At expert, `owner_arn` is relabelled **created by**, and a **your role** row is
+    added when the API sent one. Calling a write-once display field "owner" invited
+    precisely the inference that caused this.
+  - This fixes the *symptom*. The **underlying defect is larger and unfixed**:
     the portal and the CLI resolve one human to two different `callerARN`s, and that
     value is the membership row's partition key — so a CLI-created team is invisible in
     the portal and a portal-created team is invisible to the CLI, with no workaround,

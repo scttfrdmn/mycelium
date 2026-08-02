@@ -51,12 +51,22 @@ const MEMBERS = [
   },
 ];
 
-function stubFetch(): void {
+/**
+ * Stub the API.
+ *
+ * `detail` overrides what GET /teams/{id} returns. The default omits `role`, which is
+ * what the *deployed* Lambda does — so the default path through these tests is the
+ * compatibility fallback, and the tests that care about the new field opt in.
+ */
+function stubFetch(detail: Record<string, unknown> = {}): void {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string) => {
       const path = url.replace(config.apiBase, "");
-      const body = path === "/teams" ? { teams: [TEAM] } : { team: TEAM, members: MEMBERS };
+      const body =
+        path === "/teams"
+          ? { teams: [TEAM] }
+          : { team: TEAM, members: MEMBERS, ...detail };
       return { ok: true, status: 200, json: async () => body } as never;
     }),
   );
@@ -170,6 +180,78 @@ describe("teamsSurface disclosure", () => {
     // Expert's read-only additions are still there — they're information, not authority.
     expect(host.querySelector(".teams-meta")).not.toBeNull();
     d.dispose();
+  });
+
+  describe("who the owner controls are shown to (#514)", () => {
+    // The bug: the surface decided ownership by comparing `owner_arn` against
+    // `session.accountId`. That field is a bare account id for portal-created teams and
+    // a real IAM ARN for CLI-created ones, so an owner who created their team with the
+    // CLI saw a read-only page. The API now answers the question itself with `role`.
+
+    it("believes the API's role over the stored owner_arn", async () => {
+      // The #514 case: a CLI-created team, so `owner_arn` is an IAM ARN that cannot
+      // equal an account id. The old comparison fails here; `role: "owner"` must win.
+      stubFetch({ role: "owner" });
+      const ctx = ctxAt("standard");
+      vi.spyOn(ctx.session, "accountId", "get").mockReturnValue(ACCOUNT);
+      const cliTeam = { ...TEAM, owner_arn: `arn:aws:iam::${ACCOUNT}:user/owner` };
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string) => {
+          const path = url.replace(config.apiBase, "");
+          const body =
+            path === "/teams"
+              ? { teams: [cliTeam] }
+              : { team: cliTeam, members: MEMBERS, role: "owner" };
+          return { ok: true, status: 200, json: async () => body } as never;
+        }),
+      );
+      const d = await openDetail(host, ctx);
+      expect(host.querySelector(".teams-addmember")).not.toBeNull();
+      expect(host.querySelector(".teams-danger")).not.toBeNull();
+      d.dispose();
+    });
+
+    it("believes a role of member even when owner_arn matches", async () => {
+      // The other direction, and the reason the check is `role !== undefined` rather
+      // than `role !== "owner"`: a definite "member" from the API is an answer, not a
+      // missing field, so it must not fall through to the ARN guess. Without this the
+      // fallback would silently re-grant controls the API says the caller lacks.
+      stubFetch({ role: "member" });
+      const d = await openDetail(host, ctxAt("standard"));
+      expect(host.querySelector(".teams-addmember")).toBeNull();
+      expect(host.querySelector(".teams-danger")).toBeNull();
+      d.dispose();
+    });
+
+    it("falls back to owner_arn when the API doesn't send a role", async () => {
+      // The deployed Lambda omits the field. Until it ships, dropping the comparison
+      // would take owner controls away from every portal-created team — so this asserts
+      // the change is safe to merge ahead of the deploy. Delete with the fallback.
+      stubFetch(); // no `role`
+      const d = await openDetail(host, ctxAt("standard"));
+      expect(host.querySelector(".teams-addmember")).not.toBeNull();
+      d.dispose();
+    });
+
+    it("shows your role at expert, and only when the API said so", async () => {
+      stubFetch({ role: "member" });
+      let d = await openDetail(host, ctxAt("expert"));
+      let keys = [...host.querySelectorAll(".teams-meta dt")].map((t) => t.textContent);
+      expect(keys).toContain("your role");
+      // `owner_arn` is relabelled: it is written once and never read for authorization,
+      // and calling it "owner" invited the inference that caused this bug.
+      expect(keys).toContain("created by");
+      expect(keys).not.toContain("owner");
+      d.dispose();
+
+      host.innerHTML = "";
+      stubFetch();
+      d = await openDetail(host, ctxAt("expert"));
+      keys = [...host.querySelectorAll(".teams-meta dt")].map((t) => t.textContent);
+      expect(keys, "a guess must not be printed as the answer").not.toContain("your role");
+      d.dispose();
+    });
   });
 
   it("offers a route out of read-only at guided", async () => {

@@ -157,7 +157,7 @@ isn't listed, it looks the same at every level.
 | **Instances** | The curated picker instead of the launch form. The instance list is always shown. | Full launch form | + |
 | **Find instances** | The curated picker instead of the query box | Query box | + per-result hardware detail and price provenance |
 | **Cost history** | Same chart and numbers, plainer labels, and a link to Instances to go stop something | Same chart, shorter labels | + compute/storage/network breakdown, window total, peak hour, a 1-year window, and where the series came from |
-| **Teams** | **Read-only.** Your teams and their members, with no forms. | Create teams, add and remove members, delete a team | + team ids, full ARNs, created dates, and who invited whom |
+| **Teams** | **Read-only.** Your teams and their members, with no forms. | Create teams, add and remove members, delete a team | + team ids, full ARNs, created dates, your own role, and who invited whom |
 | **Watch capacity** | A short list of things worth waiting for, instead of the pattern, price cap, zone and cadence fields. Picking one watches that whole instance family. | The fields, filled in by hand | + |
 | **Terminal** | A list of your running machines to pick from | + **Connect to an id instead →**, for something spawn didn't launch | + |
 | **Connect account** | Technical detail collapsed | Collapsed | Expanded — what the IAM role can do, before the button rather than after |
@@ -171,6 +171,21 @@ Two rules held throughout:
 - **Cost history hides nothing at any level**, including its **Table** button. That
   button is the chart's non-visual equivalent, not a density control, and the people
   who need it are the least likely to have raised the mode.
+
+### Teams: raising Mode doesn't make you an owner
+
+Standard and Expert show the create, add-member, remove and delete controls — but only
+on teams you actually own. That isn't the mode's decision: the API answers "what is
+your role in this team?" and the page shows the controls that answer allows. Every
+write is owner-gated server-side regardless, so a button the mode revealed but the API
+would refuse is a button worth not drawing.
+
+The page used to work this out for itself, by comparing the team's stored owner field
+against your account id. That field is written once when the team is created and its
+format depends on how the team was created — so **a team you made with the `spawn` CLI
+showed you, its owner, a read-only page**. Expert mode now labels that field **created
+by** rather than "owner", and adds **your role** beside it, because the two are not the
+same question.
 
 ### Three pages need no account at all
 

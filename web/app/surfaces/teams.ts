@@ -199,14 +199,24 @@ export const teamsSurface: ToolSurface = {
 
       const team: Team = res.data.team;
       const members: Member[] = res.data.members ?? [];
-      // `owner_arn` holds a bare 12-digit account id for portal-created teams
-      // (dashboard-api's portalAccountFromARN) but a real IAM ARN for CLI-created
-      // ones (cliIamArn) — so this comparison is correct for the former and never
-      // matches the latter, and a CLI-created team shows its own owner no owner
-      // controls. Tracked in spore-host#514; the fix belongs on the API side, not
-      // here — the browser should not be parsing ARN shapes to guess which code path
-      // wrote the record.
-      const iAmOwner = team.owner_arn === ctx.session.accountId;
+      // Read the API's own authorization answer rather than re-deriving it.
+      // GET /teams/{id} returns `role`, resolved from the memberships table — which is
+      // where authorization actually lives — so the browser doesn't have to infer
+      // ownership from a display field. `owner_arn` holds a bare 12-digit account id
+      // for portal-created teams (dashboard-api's portalAccountFromARN) but a real IAM
+      // ARN for CLI-created ones (cliIamArn), so comparing it against accountId was
+      // right for the former and never matched the latter: a CLI-created team showed
+      // its own owner no owner controls (spore-host#514).
+      //
+      // The comparison stays as a fallback because the deployed Lambda predates the
+      // field, and dropping it outright would take owner controls away from every
+      // portal-created team until that deploy lands. `undefined` — not `!== "owner"` —
+      // is the discriminator: an older API omits `role` entirely, while a newer one
+      // answering "member" is a real answer that must be believed. Remove the fallback
+      // once the API is deployed (spore-host#534).
+      const role: string | undefined = res.data?.role;
+      const iAmOwner =
+        role !== undefined ? role === "owner" : team.owner_arn === ctx.session.accountId;
 
       root.append(
         el("div", "teams-head", [
@@ -222,8 +232,15 @@ export const teamsSurface: ToolSurface = {
         const dl = el("dl", "teams-meta", []);
         const rows: Array<[string, string]> = [
           ["team id", team.team_id],
-          ["owner", team.owner_arn],
+          // Labelled "created by" rather than "owner": the stored field is written once
+          // at creation and never read for authorization, and its format depends on
+          // which auth path wrote it. Calling it "owner" invited exactly the inference
+          // that caused #514. `your role` below is the authoritative answer.
+          ["created by", team.owner_arn],
           ["created", fmtDate(team.created_at)],
+          // Only when the API told us. An older Lambda omits it, and printing a guess
+          // here would be the same mistake one line further down the page.
+          ...(role !== undefined ? ([["your role", role]] as Array<[string, string]>) : []),
         ];
         for (const [k, v] of rows) dl.append(el("dt", "", [k]), el("dd", "", [v]));
         root.append(dl);
