@@ -39,11 +39,55 @@ Each Go tool follows the same conventions (see the repo's `CLAUDE.md` / `Makefil
 - **Commits:** [Conventional Commits](https://www.conventionalcommits.org/)
   (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`), branch prefixes `feat/` `fix/`
   `docs/`, one PR per change, link the issue.
+- **Branching:** always cut from `origin/main` with a clean tree, and run
+  `scripts/branch-preflight.sh` before opening the PR — see
+  [Branching and merging](#branching-and-merging) below.
 - **Versioning:** [SemVer 2.0.0](https://semver.org) + a Keep-a-Changelog
   `CHANGELOG.md`; update `## [Unreleased]` in the **same PR** as any user-facing change.
 - **Docs:** the site is VitePress under `docs/`. `cd docs && npm install && npm run
   docs:dev` to preview; `npm run build` must pass. CLI references are generated —
   don't hand-edit generated pages.
+
+## Branching and merging
+
+`main` is **squash-merged and linear** — one commit per PR, no merge commits. It
+also **auto-deploys**: `web/**` publishes to spore.host and `docs/**` to
+docs.spore.host on push. So a merge is a release.
+
+Start every branch the same way:
+
+```bash
+git fetch origin main
+git status --porcelain                        # must be empty
+git checkout -b fix/123-short-name origin/main
+scripts/branch-preflight.sh                   # before you open the PR
+```
+
+Being a few commits behind `main` is fine and needs no rebase; squash-merge handles
+it. What is **not** fine is branching from a dirty tree or from a `HEAD` that holds
+unmerged work — the new branch silently adopts those commits, and whichever PR
+merges first ships them under its own number. The second one then merges **empty**.
+
+That happened: #521 was cut from a tree still holding #519's commit, merged first,
+and carried it. #519 landed as an empty commit — which matched neither the
+`web/**` path filter on `deploy-site.yaml` nor `web-ci.yml`, so the PR that existed
+to fix two user-facing strings ran no web tests and triggered no deploy. Nothing was
+red; the work simply wasn't where its PR said it was.
+
+After merging:
+
+- Check the merge commit isn't empty when it should have shipped something:
+  `git show --stat <sha>`.
+- For `web/**` or `docs/**`, confirm the deploy workflow ran —
+  `gh run list --commit <sha>`. A path-filtered workflow that never fires looks
+  exactly like one that passed.
+- **Delete your branch.** Auto-delete-on-merge is off, so they accumulate.
+
+To tell whether an old branch is safe to delete, compare its tip to the head SHA
+GitHub recorded for its merged PR (`gh pr list --state merged --json
+headRefName,headRefOid`). Don't trust `git branch --merged` — squash-merge breaks
+ancestry — and don't read `git diff main <branch>`, where a stale branch appears to
+delete every file `main` has gained since.
 
 ## Cost safety (important)
 

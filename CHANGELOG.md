@@ -13,6 +13,29 @@ own changelogs for CLI releases.
 
 ## [Unreleased]
 
+### Added
+- **Branch hygiene is now checked, not just documented.** PR #521 was branched from
+  a working tree that still held PR #519's portal commit, so #521's head carried
+  both changes. #521 merged first and took the portal fix with it; #519 then merged
+  as an **empty commit** (`131f02b`). Because `deploy-site.yaml` and `web-ci.yml`
+  are path-filtered on `web/**`, an empty commit matched neither — so the PR whose
+  entire purpose was correcting two user-facing strings ran no web tests and
+  triggered no site deploy. Nothing was red; the work simply wasn't where its PR
+  said it was, and establishing that the fix was live took a bundle-level audit of
+  what S3 was actually serving.
+  - `scripts/branch-preflight.sh` — run before opening a PR. Checks: not on `main`,
+    clean tree, based on `origin/main` history, every commit unique to this branch,
+    and (advisory) a single topic. `--fix` prints recovery commands.
+  - A `Branch hygiene` job in `ci.yml` — fails a PR with an empty diff, or one
+    carrying a commit that also belongs to another **open** PR. Comparing against
+    open PR heads rather than `main` is the load-bearing detail: when #521 was open,
+    the absorbed portal commit had not yet merged, so "is it on main?" answered no
+    for both of its commits.
+  - `CONTRIBUTING.md` gains a **Branching and merging** section; `CLAUDE.md`'s Git
+    section gains the rule and the post-merge verification steps.
+  - Repo setting: `delete_branch_on_merge` is now **on**. It was off, which is how
+    66 stale local branches accumulated before being swept.
+
 ### Fixed
 - **CI runner fleet: a host reboot no longer leaves the fleet dead** (#518). On
   2026-08-01 the whole self-hosted fleet stayed offline for ~5.5h and every
