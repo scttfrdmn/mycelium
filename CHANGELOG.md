@@ -14,8 +14,8 @@ own changelogs for CLI releases.
 ## [Unreleased]
 
 ### Changed
-- Bumped the `substrate` test dependency v0.65.0 → v0.81.0 in the
-  `accountlifecycle` and `spore-bot` Lambda modules, 16 minor versions of AWS
+- Bumped the `substrate` test dependency v0.65.0 → v0.85.0 in the
+  `accountlifecycle` and `spore-bot` Lambda modules, 20 minor versions of AWS
   emulation fidelity. Test-only; no runtime or deployed behaviour change. Both
   modules still imported substrate at its **root** package path, which moved to
   `/emulator` at v0.70.0, so the pin could not advance without that one-line
