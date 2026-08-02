@@ -201,22 +201,25 @@ export const teamsSurface: ToolSurface = {
       const members: Member[] = res.data.members ?? [];
       // Read the API's own authorization answer rather than re-deriving it.
       // GET /teams/{id} returns `role`, resolved from the memberships table — which is
-      // where authorization actually lives — so the browser doesn't have to infer
-      // ownership from a display field. `owner_arn` holds a bare 12-digit account id
-      // for portal-created teams (dashboard-api's portalAccountFromARN) but a real IAM
-      // ARN for CLI-created ones (cliIamArn), so comparing it against accountId was
-      // right for the former and never matched the latter: a CLI-created team showed
-      // its own owner no owner controls (spore-host#514).
+      // where authorization actually lives. It is present on every 200: the handler
+      // answers 403 unless resolveTeamContext finds a membership row, and every writer
+      // of that row sets the field. So a missing `role` is a broken response, and
+      // treating it as "not the owner" is the right way to fail — a read-only page is
+      // recoverable, a page offering Delete on someone else's team is not.
       //
-      // The comparison stays as a fallback because the deployed Lambda predates the
-      // field, and dropping it outright would take owner controls away from every
-      // portal-created team until that deploy lands. `undefined` — not `!== "owner"` —
-      // is the discriminator: an older API omits `role` entirely, while a newer one
-      // answering "member" is a real answer that must be believed. Remove the fallback
-      // once the API is deployed (spore-host#534).
-      const role: string | undefined = res.data?.role;
-      const iAmOwner =
-        role !== undefined ? role === "owner" : team.owner_arn === ctx.session.accountId;
+      // Nothing here consults `owner_arn`. That field is written once at creation and
+      // its format depends on which auth path wrote it — a bare 12-digit account id for
+      // portal-created teams (dashboard-api's portalAccountFromARN), a real IAM ARN for
+      // CLI-created ones (cliIamArn) — so comparing it against accountId matched the
+      // former and never the latter, and a team made with the `spawn` CLI showed its own
+      // owner a read-only page (spore-host#514). That comparison lived on here as a
+      // compatibility fallback while the API predated `role`; the Lambda is deployed
+      // (spawn 66cb620), so it is gone (spore-host#534).
+      // Typed as possibly-absent because this is parsed JSON and the type is a claim
+      // about the wire, not a guarantee — but no branch below treats absence as a
+      // supported shape.
+      const role: string | undefined = res.data.role;
+      const iAmOwner = role === "owner";
 
       root.append(
         el("div", "teams-head", [
@@ -238,9 +241,13 @@ export const teamsSurface: ToolSurface = {
           // that caused #514. `your role` below is the authoritative answer.
           ["created by", team.owner_arn],
           ["created", fmtDate(team.created_at)],
-          // Only when the API told us. An older Lambda omits it, and printing a guess
-          // here would be the same mistake one line further down the page.
-          ...(role !== undefined ? ([["your role", role]] as Array<[string, string]>) : []),
+          // Always shown, because the API always sends it. `unknown` rather than a
+          // dropped row if it somehow doesn't: this is the field that decides which
+          // controls the page offers, so an expert reader debugging a page that looks
+          // wrong should be told the answer is missing, not shown a gap they have to
+          // notice. Never a guess — printing an inference here would be the same
+          // mistake that caused #514.
+          ["your role", role ?? "unknown"],
         ];
         for (const [k, v] of rows) dl.append(el("dt", "", [k]), el("dd", "", [v]));
         root.append(dl);

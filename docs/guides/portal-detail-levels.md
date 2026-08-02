@@ -187,6 +187,11 @@ showed you, its owner, a read-only page**. Expert mode now labels that field **c
 by** rather than "owner", and adds **your role** beside it, because the two are not the
 same question.
 
+If the API ever fails to answer that question, the page shows the read-only view and
+says `unknown` for your role rather than guessing from the stored field. On a team you
+do own that's a nuisance — reload, or check that the API is reachable — but the
+alternative is offering **Delete team** to someone the API never said was an owner.
+
 ### Three pages need no account at all
 
 **Find instances**, **Software catalog** and **Connect account** all work signed out.
