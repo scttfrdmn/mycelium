@@ -24,9 +24,11 @@ before choosing — it used to be a tooltip on each dropdown option, which Safar
 never rendered at all.
 
 Changing the mode **rebuilds the page you're on**, so anything the page was holding
-would be lost. It isn't: your truffle query, the cost window and table view, and
-the team you had open all live in the address bar (`#/truffle?q=nvidia+h100`) and
-come back at the new level. That also makes them bookmarkable and shareable.
+would be lost. Mostly it isn't — your truffle query, the cost window and table view,
+the team you had open, and a capacity watch's settings all live in the address bar
+(`#/truffle?q=nvidia+h100`) and come back at the new level, which also makes them
+bookmarkable and shareable. Two things genuinely stop, because they're live rather
+than replayable: see [what a Mode change keeps](#what-changing-mode-does-and-doesn-t-cost-you).
 
 Raising the level from inside a page — the **Show me all the options →** buttons —
 puts one dismissible line at the top of the window saying what changed and that
@@ -167,6 +169,29 @@ Two rules held throughout:
 - **Cost history hides nothing at any level**, including its **Table** button. That
   button is the chart's non-visual equivalent, not a density control, and the people
   who need it are the least likely to have raised the mode.
+
+## What changing Mode does and doesn't cost you
+
+Changing Mode rebuilds the page you're on — that is how the new mode takes effect.
+Anything the page was holding in memory would go with it, so the things worth keeping
+are written into the address bar and restored on the way back:
+
+| Page | Kept across a Mode change |
+|---|---|
+| **Find instances** | Your query, re-run at the new level |
+| **Cost history** | The time window, and whether you were reading the table |
+| **Teams** | The team you had open |
+| **Watch capacity** | The instance types, price cap, zones and cadence you entered |
+
+Two things genuinely stop, because they are live rather than replayable:
+
+- **A capacity watch.** Its settings come back and you get a **Resume watching**
+  button, but it does not restart by itself. A watch polls your own AWS account on
+  a timer, and a page you didn't ask to load — a bookmark opened the next morning —
+  should not start spending on your behalf.
+- **A terminal session.** The connection is gone; reconnect from the page.
+
+Both say so before you touch the control, and the watch says so again afterwards.
 
 ## Notes
 

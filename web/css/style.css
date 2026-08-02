@@ -816,6 +816,14 @@ footer {
 .lagotto-actions button { font: inherit; cursor: pointer; padding: 0.45rem 1rem; border-radius: var(--radius); border: 1px solid var(--border-strong); background: var(--bg); color: var(--text); }
 .lagotto-start { border-color: var(--lagotto) !important; background: var(--lagotto) !important; color: #fff !important; }
 .lagotto-actions button:disabled { opacity: 0.6; cursor: default; }
+/* "Your watch was stopped — Resume". Rendered in the truffle warn colour rather than
+   the lagotto accent: this is a notice about something that is NOT happening, and the
+   accent is what this surface uses for a live watch and for a match. */
+.lagotto-resume { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin: 0 0 1rem; padding: 0.6rem 0.9rem; border: 1px solid var(--truffle); border-radius: var(--radius); background: var(--truffle-bg); color: var(--truffle); font-size: 0.9rem; }
+/* The message shrinks so the button keeps its row; it only stacks below on a
+   genuinely narrow viewport, where stacking is the right answer anyway. */
+.lagotto-resume span { flex: 1 1 20ch; }
+.lagotto-resume-go { font: inherit; cursor: pointer; margin-left: auto; flex: 0 0 auto; padding: 0.35rem 0.9rem; border-radius: var(--radius); border: 1px solid var(--lagotto); background: var(--lagotto); color: #fff; }
 .lagotto-result { color: var(--text-muted); font-size: 0.9rem; min-height: 1.2em; }
 .lagotto-result.error { color: var(--accent-red); }
 .lagotto-match { border: 1px solid var(--lagotto); border-radius: var(--radius); padding: 0.8rem 1rem; background: var(--lagotto-bg); }

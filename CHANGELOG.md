@@ -13,6 +13,24 @@ own changelogs for CLI releases.
 
 ## [Unreleased]
 
+### Fixed
+- **Changing Mode no longer silently loses a running capacity watch** (#513, part 1).
+  A Mode change re-mounts the current page, which aborted the watch *and* cleared the
+  instance types, price cap, zones and cadence describing it — with nothing on screen
+  saying either had happened. The settings now survive (in the URL, as the query on
+  **Find instances** and the window on **Cost history** already did), and the page says
+  the watch stopped and offers **Resume watching**.
+  - The poll is deliberately **not** resumed automatically. A query is replayable data;
+    a watch is a live loop polling your own AWS account every interval, and the URL
+    outlives the tab — so a page you didn't ask to load must not start spending on your
+    behalf. The parameters come back; the decision stays yours.
+  - The notice only appears when a watch was genuinely interrupted (a Mode change, a
+    reload, an expired session) — not after you stop one yourself — and it appears once.
+    A warning that cries wolf is one you learn to ignore, which costs exactly the case
+    it exists for.
+  - The remaining half of #513 (guided shape cards for this page, so it can be used
+    without knowing instance-type names) is still open.
+
 ### Added
 - **`main` is now a protected branch** (#524 follow-up). It had **no** protection at
   all — no required checks, no restriction on direct pushes — on a branch that
