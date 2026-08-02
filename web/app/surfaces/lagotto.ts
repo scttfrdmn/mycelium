@@ -30,6 +30,7 @@ import type { MatchResult, Watch } from "@spore-host/lagotto-ts";
 import { onDemandPrice } from "@spore-host/truffle-ts";
 import type { Disposable, SurfaceContext, ToolSurface } from "./types.js";
 import { LEVEL_CONTROL_NAME } from "../disclosure.js";
+import { readHashParam, writeHashParams } from "../hashstate.js";
 
 /** Poll cadence offered in the UI. A browser tab is a short-lived watcher. */
 const INTERVALS = [
@@ -37,6 +38,9 @@ const INTERVALS = [
   { label: "1m", ms: 60_000 },
   { label: "5m", ms: 300_000 },
 ] as const;
+
+/** Pre-selected cadence, and the one value `every` is omitted from the hash for. */
+const DEFAULT_INTERVAL_MS = 60_000;
 
 export const lagottoSurface: ToolSurface = {
   id: "lagotto",
@@ -69,7 +73,8 @@ export const lagottoSurface: ToolSurface = {
           <code>lagotto</code> CLI does, running in this tab against your own account.</p>
         <p class="lagotto-hint warn">A watch lives only as long as this tab. Closing it,
           reloading, or changing <b>${escapeHtml(LEVEL_CONTROL_NAME)}</b> in the header stops the watch — nothing
-          keeps checking on your behalf. For a watch that outlives a browser, use the
+          keeps checking on your behalf, though your settings are kept and you'll be
+          offered a one-click resume. For a watch that outlives a browser, use the
           <code>lagotto</code> CLI.</p>
       </div>
 
@@ -112,6 +117,7 @@ export const lagottoSurface: ToolSurface = {
         </div>
       </form>
 
+      <div class="lagotto-resume" hidden></div>
       <div class="lagotto-result" aria-live="polite"></div>
       <ol class="lagotto-log" aria-live="polite"></ol>`;
     host.appendChild(root);
@@ -125,10 +131,85 @@ export const lagottoSurface: ToolSurface = {
     const startBtn = root.querySelector<HTMLButtonElement>(".lagotto-start")!;
     const stopBtn = root.querySelector<HTMLButtonElement>(".lagotto-stop")!;
     const onceBtn = root.querySelector<HTMLButtonElement>(".lagotto-once")!;
+    const resume = root.querySelector<HTMLElement>(".lagotto-resume")!;
     const result = root.querySelector<HTMLElement>(".lagotto-result")!;
     const log = root.querySelector<HTMLElement>(".lagotto-log")!;
 
     let aborter: AbortController | null = null;
+    // True once the watch was ended by something other than the user: a re-mount
+    // (dispose) or credential expiry. Both are cases where "your watch stopped"
+    // is news, so the `watching` flag must survive into the next mount.
+    let interrupted = false;
+
+    // ── Surviving a re-mount ──────────────────────────────────────────────────
+    //
+    // Changing Mode re-mounts this surface (that IS how a level change propagates),
+    // and dispose() aborts the poll. What shipped therefore killed a running watch
+    // and handed back a blank form — the user lost both the watch and the four
+    // fields describing it, with nothing saying so. Issue #513: "either the watch
+    // should survive the remount, or the surface should say what happened — the
+    // current behaviour is the worst of both."
+    //
+    // The form is restored from the hash, following costs/truffle/teams. The poll is
+    // NOT auto-resumed, and that asymmetry is deliberate: truffle's `?q=` is
+    // replayable data, whereas a watch is a live loop billing DescribeInstanceType-
+    // Offerings against the user's account every interval. Silently restarting it on
+    // a mount the user didn't ask for — including a bookmark opened tomorrow, since
+    // the hash outlives the tab — spends their money on their behalf. So the params
+    // come back, the loop doesn't, and a Resume button says exactly what happened.
+    //
+    // Scope, stated plainly: the hash belongs to the *route*, so this covers a Mode
+    // change and a reload of #/lagotto — the reported case — and not navigating to
+    // another surface, which replaces the hash before dispose() runs. Same boundary
+    // as truffle's `?q=` and costs' `?days=`; a store that survived navigation would
+    // be a different mechanism, not a bigger version of this one.
+    const fields = { pattern: patternEl, max: maxPriceEl, azs: azsEl } as const;
+    for (const [key, el] of Object.entries(fields)) {
+      const v = readHashParam(key);
+      if (v !== null) el.value = v;
+    }
+    const urlEvery = Number(readHashParam("every"));
+    if (INTERVALS.some((i) => i.ms === urlEvery)) intervalEl.value = String(urlEvery);
+    spotEl.checked = readHashParam("spot") === "1";
+
+    /** Mirror the form into the hash. Defaults are omitted so the URL stays short. */
+    function saveForm(): void {
+      writeHashParams({
+        pattern: patternEl.value.trim() || null,
+        max: maxPriceEl.value.trim() || null,
+        azs: azsEl.value.trim() || null,
+        every: Number(intervalEl.value) === DEFAULT_INTERVAL_MS ? null : intervalEl.value,
+        spot: spotEl.checked ? "1" : null,
+      });
+    }
+
+    /**
+     * Tell the user their watch stopped, and offer one click to restart it.
+     *
+     * Only shown when a watch was actually running when the surface went away —
+     * `watching=1` is written on start and cleared on every other exit (stop, match,
+     * error, session expiry), so this can't fire for someone who merely filled the
+     * form in and navigated off.
+     */
+    function showResumeIfInterrupted(): void {
+      if (readHashParam("watching") !== "1") return;
+      // Consume the flag: the user has now been told. Leaving it set would replay
+      // "your watch stopped" on every later mount, including ones where nothing was
+      // running — and a notice that cries wolf is one the user learns to ignore.
+      writeHashParams({ watching: null });
+      resume.hidden = false;
+      resume.className = "lagotto-resume";
+      // Deliberately does not name a cause. The flag survives a Mode change, a
+      // reload, and a re-sign-in after expiry; "when you changed Mode" would be
+      // wrong in two of the three, and the actionable part is identical in all.
+      resume.innerHTML = `<span>Your watch was stopped — nothing has been checking since.
+        Your settings below are as you left them.</span>
+        <button type="button" class="lagotto-resume-go">Resume watching</button>`;
+      resume.querySelector<HTMLButtonElement>(".lagotto-resume-go")!.addEventListener("click", () => {
+        resume.hidden = true;
+        void startWatching();
+      });
+    }
 
     /** Read the form into a lagotto Watch. Throws on an invalid pattern. */
     function readWatch(): Watch {
@@ -243,6 +324,15 @@ export const lagottoSurface: ToolSurface = {
       const intervalMs = Number(intervalEl.value);
       aborter = new AbortController();
       setRunning(true);
+      // Save unconditionally here, not just on `input`: a user who accepts every
+      // default and hits Start has fired no input event, so without this the one
+      // case with a live watch to lose would be the one with nothing persisted.
+      saveForm();
+      // Recorded while the poll is live so a re-mount can tell "your watch was
+      // interrupted" from "you never started one". Cleared in the finally below,
+      // which every exit path runs through.
+      writeHashParams({ watching: "1" });
+      resume.hidden = true;
       log.replaceChildren();
       result.className = "lagotto-result";
       result.textContent = `Watching ${watch.instanceTypePattern} in ${region}…`;
@@ -264,6 +354,11 @@ export const lagottoSurface: ToolSurface = {
       } finally {
         aborter = null;
         setRunning(false);
+        // Not cleared when the watch was interrupted rather than stopped: that is
+        // precisely the case the next mount needs to know about. Clearing it here
+        // would also let this settling promise write to the hash of whatever
+        // surface replaced us, which is not ours to touch.
+        if (!interrupted) writeHashParams({ watching: null });
       }
     }
 
@@ -278,14 +373,24 @@ export const lagottoSurface: ToolSurface = {
       void startWatching();
     };
     const onOnce = () => void checkOnce();
+    // `input` on the whole form covers all four fields and the checkbox, including a
+    // paste and an autofill, which a per-element keyup would miss.
+    const onInput = () => saveForm();
     form.addEventListener("submit", onSubmit);
+    form.addEventListener("input", onInput);
+    form.addEventListener("change", onInput); // <select> and the checkbox
     stopBtn.addEventListener("click", stopWatching);
     onceBtn.addEventListener("click", onOnce);
+
+    showResumeIfInterrupted();
 
     // Federated creds are what the EC2 client signs with — a poll that outlives
     // them would just log AuthFailure every interval, so stop and say why.
     const offExpiry = ctx.session.onExpiry((state) => {
       if (state === "expired") {
+        // Interrupted, not stopped: the watch the user asked for is still wanted,
+        // so keep `watching=1` and let the mount after re-sign-in offer Resume.
+        if (aborter) interrupted = true;
         aborter?.abort();
         showError("Session expired — sign in again to keep watching.");
       }
@@ -293,9 +398,14 @@ export const lagottoSurface: ToolSurface = {
 
     return {
       dispose() {
+        // Set before the abort so startWatching's finally can tell a dispose-driven
+        // abort (leave `watching=1` for the next mount) from a user Stop.
+        interrupted = true;
         offExpiry();
         aborter?.abort();
         form.removeEventListener("submit", onSubmit);
+        form.removeEventListener("input", onInput);
+        form.removeEventListener("change", onInput);
         stopBtn.removeEventListener("click", stopWatching);
         onceBtn.removeEventListener("click", onOnce);
         ec2.destroy();
