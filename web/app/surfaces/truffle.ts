@@ -11,6 +11,7 @@ import { find, CATALOG_AS_OF, type FindResult } from "@spore-host/truffle-ts";
 import type { Disposable, SurfaceContext, ToolSurface } from "./types.js";
 import { atLeast, type DisclosureLevel } from "../disclosure.js";
 import { mountGuidedPicker } from "../guided/picker.js";
+import { readHashParam, writeHashParams } from "../hashstate.js";
 
 export const truffleSurface: ToolSurface = {
   id: "truffle",
@@ -70,9 +71,22 @@ export const truffleSurface: ToolSurface = {
 
     const onSubmit = (e: Event) => {
       e.preventDefault();
+      writeHashParams({ q: input.value.trim() || null });
       void run(input.value);
     };
     form.addEventListener("submit", onSubmit);
+
+    // Restore a query from the hash and re-run it.
+    //
+    // This is the state loss that mattered most, and it's the *common* path: type a
+    // query, get rows, want the expert detail on them, raise the mode → the shell
+    // re-mounts this surface with an empty box and the query gone. The mode change is
+    // most often triggered at exactly that moment, on exactly those results.
+    const initialQ = readHashParam("q");
+    if (initialQ) {
+      input.value = initialQ;
+      void run(initialQ);
+    }
 
     return {
       dispose() {
@@ -96,7 +110,11 @@ function mountGuided(host: HTMLElement, ctx: SurfaceContext): Disposable {
   host.appendChild(root);
 
   const dispose = mountGuidedPicker(root, {
-    onChoose: () => ctx.navigate("instances"),
+    // Carry the chosen shape across. Navigating bare discarded the GuidedChoice, so
+    // "A big GPU for training" landed the user on a fresh picker demanding the same
+    // choice they had just made (or, unsigned-in, on a sign-in gate that forgets it).
+    // The shape id in the hash survives both.
+    onChoose: (choice) => ctx.navigate(`instances?shape=${encodeURIComponent(choice.shape.id)}`),
     // The escape hatch raises the level rather than navigating: the user is saying
     // "show me more", and the query box is one level up on this very surface.
     onEscape: () => ctx.session.setLevel("standard"),

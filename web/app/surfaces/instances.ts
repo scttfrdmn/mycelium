@@ -11,6 +11,7 @@ import "@spore-host/spawn-ts/ui/style.css";
 import type { Disposable, SurfaceContext, ToolSurface } from "./types.js";
 import { atLeast } from "../disclosure.js";
 import { mountGuidedLaunch } from "../guided/launch.js";
+import { readHashParam } from "../hashstate.js";
 
 export const instancesSurface: ToolSurface = {
   id: "instances",
@@ -54,10 +55,14 @@ export const instancesSurface: ToolSurface = {
       host.classList.add("guided-instances");
       const panel = document.createElement("div");
       host.appendChild(panel);
+      // `#/instances?shape=big-gpu` — the truffle surface's picker hands the choice
+      // over rather than making the user repeat it here.
+      const shapeId = readHashParam("shape");
       disposeGuided = mountGuidedLaunch(panel, {
         client,
         region: ctx.session.region,
         onEscape: () => ctx.session.setLevel("standard"),
+        ...(shapeId ? { initialShapeId: shapeId } : {}),
       });
     }
     host.appendChild(dashboard.el);

@@ -1,11 +1,12 @@
 ---
-description: "The spore.host portal has one control that decides how much of the interface you see — Guided, Standard, or Expert. What each level shows, and why Guided works with no AI and no credentials."
+description: "The spore.host portal has one control that decides how much of the interface you see — Guided, Standard, or Expert. What each level shows on each page, and why Guided works with no AI and no credentials."
 ---
 
 # Portal detail levels
 
 The [portal](https://spore.host/app) has one control in its header, labelled
-**Detail**, with three settings. It decides how much of the interface you see.
+**Mode**, with three settings side by side. It decides how much of the interface
+you see.
 
 | Level | What you get |
 |---|---|
@@ -15,6 +16,23 @@ The [portal](https://spore.host/app) has one control in its header, labelled
 
 The setting is **remembered** and applies **across the whole portal**, not
 per-page. Changing it re-renders whatever you're looking at.
+
+It's three visible buttons rather than a dropdown, because the levels are an
+**ordered** scale and a collapsed control showing one of them hides that. The
+current level's one-line description sits beside the buttons where you can read it
+before choosing — it used to be a tooltip on each dropdown option, which Safari
+never rendered at all.
+
+Changing the mode **rebuilds the page you're on**, so anything the page was holding
+would be lost. It isn't: your truffle query, the cost window and table view, and
+the team you had open all live in the address bar (`#/truffle?q=nvidia+h100`) and
+come back at the new level. That also makes them bookmarkable and shareable.
+
+Raising the level from inside a page — the **Show me all the options →** buttons —
+puts one dismissible line at the top of the window saying what changed and that
+**Mode** in the header is where to change it back. One click otherwise silently
+rewrites a persistent, portal-wide setting, and finding the way back would need
+exactly the knowledge those buttons exist to not require.
 
 ## Guided mode
 
@@ -28,28 +46,47 @@ machine:
 The cost leads with the **total for the whole run**, not the hourly rate. "$0.1344
 per hour" is a number a first-time user cannot act on; "about $0.54" is.
 
-Picking one gets a single confirmation screen — machine, region, *"Shuts down
-automatically after 4 hours, whatever happens"*, the cost — and one **Start it**
-button. `← Something else` goes back without launching.
+Picking one gets a single confirmation screen — machine, region, when it shuts
+itself down, the cost — and one **Start it** button. `← Something else` goes back
+without launching.
 
-Every guided launch gets a **time limit** — 4 hours for CPU shapes, 2 for GPU ones
-— and none of them use spot. Both are deliberate:
+Every guided launch gets **two** limits, and they're both named on that screen
+because they fail differently:
 
-- **The time limit is not optional.** An instance nobody remembered to stop is the
-  most expensive mistake this interface makes available. The limit is enforced by
-  `spored` *on the machine*, so it holds even if you close the tab — which is
-  exactly what the confirmation screen says, because a user who closes the tab
-  must not be left guessing whether their instance now runs forever or was killed.
-- **Spot is off.** A spot instance can be reclaimed mid-run. That's a good trade
-  once you understand it and a baffling one before you do. See
-  [Spot instances](/guides/spot-instances) for when to take it.
+- **A time limit** — 4 hours for CPU shapes, 2 for GPU ones. Enforced by `spored`
+  *on the machine*, so it holds even if you close the tab. It does **not** hold if
+  the daemon never starts, which is why the instance list flags machines that
+  outlived their limit so you can stop them. The confirmation screen says this
+  rather than promising the shutdown is unconditional — the portal ships a banner
+  for exactly the case such a promise would deny.
+- **A spend cap**, set above the expected cost of the run. Derived from the
+  instance's tags rather than from anything running on it, so it survives the
+  daemon failing. It also turns the cost figure in the instance list into a meter
+  against a ceiling instead of a bare number.
+
+**Spot is off**, and the confirmation now says so along with what that costs. A
+spot instance can be reclaimed mid-run: a good trade once you understand it and a
+baffling one before you do, but paying roughly three times spot's price shouldn't be
+silent either. See [Spot instances](/guides/spot-instances) for when to take it.
+
+The cost figure is **compute only** — no EBS volume, no data transfer — and says
+so. It's priced from the catalog's `us-east-1` figures, so outside that region the
+confirmation adds that your region may differ.
+
+If a machine has **no price** in the catalog, **Start it** stays disabled until you
+tick a box saying you know you're launching something you can't be quoted for. The
+shapes that land there are the accelerator ones: types with no on-demand row are
+generally the $30–100/hr machines, so it's the one place where an accidental click
+is most expensive.
 
 Guided mode hides the launch form but **never** the instance list. Being able to
 start an instance without being able to see or stop it is the one simplification
 that would cost real money.
 
 **I know what I need →** at the bottom of the list moves you to Standard. Guided is
-a starting point, not a cage.
+a starting point, not a cage. Picking a shape on the **Find instances** page — which
+needs no sign-in and so can't launch anything — carries that choice to the
+Instances page rather than making you choose again.
 
 ### Guided mode needs nothing but the portal
 
@@ -106,6 +143,30 @@ that can act on knowing which it is. A field the catalog genuinely doesn't carry
 states something false about the hardware to the user most likely to act on it.
 
 Standard hides all of this because it's noise when you're comparing two boxes.
+
+## What changes on each page
+
+Not every page has three versions, and that's deliberate — a page with no controls,
+no writes and no jargon has nothing to hide and nothing to withhold. Where a page
+isn't listed, it looks the same at every level.
+
+| Page | Guided | Standard | Expert |
+|---|---|---|---|
+| **Instances** | The curated picker instead of the launch form. The instance list is always shown. | Full launch form | + |
+| **Find instances** | The curated picker instead of the query box | Query box | + per-result hardware detail and price provenance |
+| **Cost history** | Same chart and numbers, plainer labels, and a link to Instances to go stop something | Same chart, shorter labels | + compute/storage/network breakdown, window total, peak hour, a 1-year window, and where the series came from |
+| **Teams** | **Read-only.** Your teams and their members, with no forms. | Create teams, add and remove members, delete a team | + team ids, full ARNs, created dates, and who invited whom |
+| **Connect account** | Technical detail collapsed | Collapsed | Expanded — what the IAM role can do, before the button rather than after |
+
+Two rules held throughout:
+
+- **Nothing disappears from the sidebar.** Hiding a page at Guided would mean a user
+  told "check Teams" can neither find it nor tell it exists. Guided's promise is
+  "you can't hurt yourself here", not "fewer features" — so Teams goes read-only
+  rather than absent, with a **Manage teams →** button to move up a level.
+- **Cost history hides nothing at any level**, including its **Table** button. That
+  button is the chart's non-visual equivalent, not a density control, and the people
+  who need it are the least likely to have raised the mode.
 
 ## Notes
 
