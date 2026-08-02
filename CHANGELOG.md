@@ -61,16 +61,24 @@ own changelogs for CLI releases.
   renamed, because its `dynamodbav` tag is the stored attribute name.
   - The portal now reads that field instead of comparing `owner_arn` against
     `session.accountId`, so an owner who created their team with the CLI gets the owner
-    controls the API says they have. It keeps the old comparison as a **fallback for
-    when `role` is absent**, because the deployed Lambda predates the field and dropping
-    it outright would take owner controls away from every portal-created team until the
-    deploy lands. The discriminator is `role !== undefined`, not `role !== "owner"`: an
-    older API omits the field, while a newer one answering `"member"` is a real answer
-    that must be believed rather than second-guessed by an ARN comparison. The fallback
-    is itself the bug and is tracked for removal in #534.
-  - At expert, `owner_arn` is relabelled **created by**, and a **your role** row is
-    added when the API sent one. Calling a write-once display field "owner" invited
-    precisely the inference that caused this.
+    controls the API says they have. It shipped keeping the old comparison as a fallback
+    for when `role` was absent, because the deployed Lambda predated the field; that
+    Lambda is now deployed and **the fallback is gone** (#534) — `role === "owner"` is
+    the whole check, and nothing in the surface consults `owner_arn` for authorization
+    any more. A 200 always carries a role, since the handler answers 403 unless it
+    resolves a membership row, so a missing one is a broken response rather than an
+    older API. It **fails closed**: no owner controls, and the member list still renders,
+    because a read-only page is recoverable and a Delete button on someone else's team
+    is not. There's a test for that direction — the fixture gives `owner_arn` the
+    matching account id, so the deleted fallback would have granted the full set.
+  - At expert, `owner_arn` is relabelled **created by**, and a **your role** row shows
+    the API's answer — `unknown` if it somehow sent none, never an inference. Calling a
+    write-once display field "owner" invited precisely the inference that caused this.
+  - One existing test had to change with the fallback: "shows a non-owner no write
+    controls even at expert" expressed non-ownership by mocking a mismatching
+    `accountId`, which only worked *because* of the ARN comparison. It now states the
+    role the way the API does. Left alone it would have kept passing for a reason
+    unrelated to what it claims to check.
   - This fixes the *symptom*. The **underlying defect is larger and unfixed**:
     the portal and the CLI resolve one human to two different `callerARN`s, and that
     value is the membership row's partition key — so a CLI-created team is invisible in

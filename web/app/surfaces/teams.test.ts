@@ -54,9 +54,11 @@ const MEMBERS = [
 /**
  * Stub the API.
  *
- * `detail` overrides what GET /teams/{id} returns. The default omits `role`, which is
- * what the *deployed* Lambda does — so the default path through these tests is the
- * compatibility fallback, and the tests that care about the new field opt in.
+ * `detail` overrides what GET /teams/{id} returns. The default sends `role: "owner"`,
+ * which is what the deployed Lambda does: the handler resolves the caller's role from
+ * the memberships table and answers 403 rather than 200 without one, so a 200 always
+ * carries it. Tests wanting a different role — or a malformed response with none — say
+ * so explicitly, e.g. `stubFetch({ role: undefined })`.
  */
 function stubFetch(detail: Record<string, unknown> = {}): void {
   vi.stubGlobal(
@@ -66,7 +68,7 @@ function stubFetch(detail: Record<string, unknown> = {}): void {
       const body =
         path === "/teams"
           ? { teams: [TEAM] }
-          : { team: TEAM, members: MEMBERS, ...detail };
+          : { team: TEAM, members: MEMBERS, role: "owner", ...detail };
       return { ok: true, status: 200, json: async () => body } as never;
     }),
   );
@@ -171,9 +173,14 @@ describe("teamsSurface disclosure", () => {
     // Raising the mode cannot grant authority. The API owner-gates every write with a
     // 403 regardless, so this is about not offering a button that can only fail — and
     // the action column goes with it, since Remove was the only thing in it.
-    const ctx = ctxAt("expert");
-    vi.spyOn(ctx.session, "accountId", "get").mockReturnValue("999999999999");
-    const d = await openDetail(host, ctx);
+    //
+    // Non-ownership is stated the way the API states it, with `role`. This test used to
+    // mock a mismatching `accountId` instead, which only worked because the surface
+    // compared that against `owner_arn` — the #514 bug. A mismatching account id now
+    // proves nothing about authority, so asserting through it would leave this passing
+    // for a reason unrelated to what it claims to check.
+    stubFetch({ role: "member" });
+    const d = await openDetail(host, ctxAt("expert"));
     expect(host.querySelector(".teams-addmember")).toBeNull();
     expect(host.querySelector(".teams-danger")).toBeNull();
     expect(host.querySelector(".teams-memb-action")).toBeNull();
@@ -213,10 +220,9 @@ describe("teamsSurface disclosure", () => {
     });
 
     it("believes a role of member even when owner_arn matches", async () => {
-      // The other direction, and the reason the check is `role !== undefined` rather
-      // than `role !== "owner"`: a definite "member" from the API is an answer, not a
-      // missing field, so it must not fall through to the ARN guess. Without this the
-      // fallback would silently re-grant controls the API says the caller lacks.
+      // The other direction: a portal-created team, so `owner_arn` DOES equal the
+      // account id, and the old comparison would have granted owner controls. The API
+      // says "member", and that is the answer.
       stubFetch({ role: "member" });
       const d = await openDetail(host, ctxAt("standard"));
       expect(host.querySelector(".teams-addmember")).toBeNull();
@@ -224,32 +230,47 @@ describe("teamsSurface disclosure", () => {
       d.dispose();
     });
 
-    it("falls back to owner_arn when the API doesn't send a role", async () => {
-      // The deployed Lambda omits the field. Until it ships, dropping the comparison
-      // would take owner controls away from every portal-created team — so this asserts
-      // the change is safe to merge ahead of the deploy. Delete with the fallback.
-      stubFetch(); // no `role`
+    it("shows no owner controls when the API sends no role at all", async () => {
+      // A 200 without `role` is a broken response, not a supported shape — the handler
+      // can only answer 200 after resolving a membership row. This asserts which way it
+      // fails: closed. `owner_arn` here equals the account id, so the fallback this
+      // replaces (spore-host#534) would have granted the full set of owner controls,
+      // including irreversible Delete, on the strength of a display field.
+      stubFetch({ role: undefined });
       const d = await openDetail(host, ctxAt("standard"));
-      expect(host.querySelector(".teams-addmember")).not.toBeNull();
+      expect(host.querySelector(".teams-addmember")).toBeNull();
+      expect(host.querySelector(".teams-danger")).toBeNull();
+      expect(host.querySelector(".teams-remove")).toBeNull();
+      // Still readable, though: a member list is information about your own account, and
+      // a missing field is no reason to withhold it.
+      expect(host.querySelectorAll(".teams-members tbody tr")).toHaveLength(2);
       d.dispose();
     });
 
-    it("shows your role at expert, and only when the API said so", async () => {
+    it("shows your role at expert, never a guess", async () => {
       stubFetch({ role: "member" });
       let d = await openDetail(host, ctxAt("expert"));
       let keys = [...host.querySelectorAll(".teams-meta dt")].map((t) => t.textContent);
       expect(keys).toContain("your role");
+      expect(host.querySelector(".teams-meta")!.textContent).toContain("member");
       // `owner_arn` is relabelled: it is written once and never read for authorization,
       // and calling it "owner" invited the inference that caused this bug.
       expect(keys).toContain("created by");
       expect(keys).not.toContain("owner");
       d.dispose();
 
+      // With no role, the row says so rather than inferring one from `owner_arn` — which
+      // matches the account id in this fixture, so "owner" is exactly the wrong answer
+      // an inference would produce.
       host.innerHTML = "";
-      stubFetch();
+      stubFetch({ role: undefined });
       d = await openDetail(host, ctxAt("expert"));
-      keys = [...host.querySelectorAll(".teams-meta dt")].map((t) => t.textContent);
-      expect(keys, "a guess must not be printed as the answer").not.toContain("your role");
+      const meta = host.querySelector(".teams-meta")!;
+      keys = [...meta.querySelectorAll("dt")].map((t) => t.textContent);
+      expect(keys).toContain("your role");
+      const values = [...meta.querySelectorAll("dd")].map((v) => v.textContent);
+      expect(values, "a guess must not be printed as the answer").toContain("unknown");
+      expect(values).not.toContain("owner");
       d.dispose();
     });
   });
