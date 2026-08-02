@@ -5,7 +5,14 @@ import { surfaces, findSurface } from "./surfaces/registry.js";
 import type { PortalConfig, SurfaceContext, Disposable } from "./surfaces/types.js";
 import type { SessionController } from "./session.js";
 import { startSignIn } from "./auth/globus-login.js";
-import { DEFAULT_LEVEL, isLevel, LEVEL_INFO, LEVELS, type DisclosureLevel } from "./disclosure.js";
+import {
+  DEFAULT_LEVEL,
+  isLevel,
+  LEVEL_CONTROL_NAME,
+  LEVEL_INFO,
+  LEVELS,
+  type DisclosureLevel,
+} from "./disclosure.js";
 
 export class Shell {
   private navEl!: HTMLElement;
@@ -111,7 +118,7 @@ export class Shell {
                  tabindex="${l === current ? "0" : "-1"}">${escapeHtml(LEVEL_INFO[l].label)}</button>`,
     ).join("");
     el.innerHTML = `
-      <span class="portal-level-label" id="portal-level-label">Mode</span>
+      <span class="portal-level-label" id="portal-level-label">${escapeHtml(LEVEL_CONTROL_NAME)}</span>
       <div class="portal-level-group" role="radiogroup" aria-labelledby="portal-level-label"
            >${buttons}</div>
       <span class="portal-level-blurb">${escapeHtml(LEVEL_INFO[current].blurb)}</span>`;
@@ -345,7 +352,7 @@ export class Shell {
     this.bannerEl.className = "portal-banner info";
     this.bannerEl.innerHTML = `Showing ${escapeHtml(
       LEVEL_INFO[level].label.toLowerCase(),
-    )} controls. Change this any time with <b>Mode</b> in the header.
+    )} controls. Change this any time with <b>${escapeHtml(LEVEL_CONTROL_NAME)}</b> in the header.
       <button class="portal-banner-x" aria-label="Dismiss">×</button>`;
     this.bannerEl.querySelector(".portal-banner-x")!.addEventListener("click", () => {
       this.hideBanner();

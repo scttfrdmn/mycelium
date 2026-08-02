@@ -35,33 +35,91 @@ recreating it. Two failure modes resulted:
 2. **Reboot crash-loop.** After a host reboot, the reused containers' baked
    `.runner` config made `config.sh` refuse ("already configured") and
    `restart: always` looped them forever → all runners offline.
+3. **`Broken` colima VM after reboot** (added 2026-08-01, spore-host#518). See
+   below — this one kept the whole fleet down ~5.5h.
 
 ## The durable fix (in this dir)
 
 - **`entrypoint.sh` self-heals:** clears `_work/_temp` + `_work/_actions` and caps
   the go-build cache (wipes if >4GB) at the start of every cycle, so a reused
-  container can't grow unbounded; `--replace` re-registers cleanly so a baked
-  `.runner` no longer crash-loops.
-- **`boot-recreate.sh` + launchd:** at boot, wait for colima then `down
-  --remove-orphans && up -d` (recreate, not restart-in-place) and prune offline
-  ghost registrations.
+  container can't grow unbounded; and it **removes a stale local `.runner`**
+  before `config.sh` runs, so an unclean stop no longer crash-loops.
+- **`boot-recreate.sh` + launchd:** at boot, wait for colima (escalating to
+  `stop --force` if the VM is `Broken`) then `down --remove-orphans && up -d`
+  (recreate, not restart-in-place) and prune offline ghost registrations.
+
+## What `--replace` does NOT fix (spore-host#518)
+
+`--replace` was originally added believing it stopped the reboot crash-loop. **It
+doesn't.** On 2026-08-01 all 6 runners crash-looped on exactly
+`Cannot configure the runner because it is already configured` *with `--replace`
+present in the running image*.
+
+`--replace` resolves the **server-side** name conflict. The check that fires is
+**local**: `config.sh` refuses whenever `/home/runner/.runner` exists. On a clean
+exit the `trap cleanup EXIT` removes the registration and that file; on an unclean
+stop (host reboot, VM killed) the trap never runs, the file survives, and
+`restart: always` restarts the container into an unbreakable loop. So
+`entrypoint.sh` now explicitly removes the local registration first (`config.sh
+remove` when a token can be minted, plus `rm -f .runner .credentials*`
+unconditionally, since the local files are what block `config.sh`).
+
+## The `Broken` colima VM (spore-host#518)
+
+Distinct from the disk-full mode — **check the host disk first; if it has room,
+this is your failure.** A vz VM whose prior shutdown died (`fatal: vz:
+CanRequestStop is not supported`) comes back as lima state `Broken`, not
+`Stopped`: the driver process is running but its host agent isn't.
+
+`colima start` **cannot** recover that — it exits 1 during inspection
+(`errors inspecting instance: [vz driver is running but host agent is not]`)
+without attempting a boot. `boot-recreate.sh` used to stop there and exit 1, so
+the fleet stayed down until someone noticed. It now escalates automatically:
+
+```sh
+colima stop --force   # Broken → Stopped (also reaps the orphaned vz driver)
+colima start          # now succeeds
+```
+
+Diagnose with `colima list` (→ `Broken`) or
+`LIMA_HOME=$HOME/.colima/_lima limactl list`.
 
 ## Operations
 
-**Recover now (jobs stuck / disk full / offline ghosts):**
+**Recover now (jobs stuck / disk full / offline ghosts / after a reboot):**
 ```sh
 ssh orion.local
 export PATH=/opt/homebrew/bin:$PATH
-cd ~/spore-runner-deploy && docker compose down --remove-orphans && docker compose up -d
+bash ~/spore-runner-deploy/boot-recreate.sh   # idempotent; handles a Broken VM too
 # verify: 6 containers Up, each log shows "Listening for Jobs"
-docker compose logs --tail=40 runner | grep -c "Listening for Jobs"   # → 6
+cd ~/spore-runner-deploy && docker compose logs --tail=40 runner | grep -c "Listening for Jobs"   # → 6
 ```
+Prefer the script over a bare `docker compose up -d`: that **restarts** the stale
+pre-reboot containers, which crash-loop. Recreating is what clears them.
 
 **Rebuild the image after changing `Dockerfile`/`entrypoint.sh`:**
 ```sh
-# copy this dir's Dockerfile + entrypoint.sh to ~/spore-runner, then:
-cd ~/spore-runner && docker build -t spore-runner:latest .
-cd ~/spore-runner-deploy && docker compose down --remove-orphans && docker compose up -d
+# from a clone of this repo, with the fleet IDLE (a recreate kills running jobs):
+scp infra/ci-runners/{Dockerfile,entrypoint.sh} orion.local:~/spore-runner/
+ssh orion.local 'export PATH=/opt/homebrew/bin:$PATH
+  cd ~/spore-runner && docker build -t spore-runner:latest .
+  bash ~/spore-runner-deploy/boot-recreate.sh'
+```
+A change to `entrypoint.sh` is **baked into the image** — copying it to the host is
+not enough, and neither is a recreate. Rebuild, or the fleet keeps running the old
+entrypoint. Confirm what's actually live:
+```sh
+docker run --rm --entrypoint /bin/bash spore-runner:latest -c 'md5sum /home/runner/entrypoint.sh'
+md5 -q infra/ci-runners/entrypoint.sh   # must match
+```
+
+**Check for host drift** (this dir is the source of truth; the host copies are
+deployed by hand, so they diverge silently):
+```sh
+for f in entrypoint.sh Dockerfile; do
+  ssh orion.local "md5 -q ~/spore-runner/$f" ; md5 -q "infra/ci-runners/$f"
+done
+ssh orion.local 'md5 -q ~/spore-runner-deploy/boot-recreate.sh'; md5 -q infra/ci-runners/boot-recreate.sh
 ```
 
 **Install the boot unit (one-time):**
@@ -77,6 +135,12 @@ gh api orgs/spore-host/actions/runners --jq '.total_count, (.runners[]|"\(.name)
 ```
 
 ## Notes
+- **`gh` is not installed on orion.** Anything in these scripts gated on
+  `command -v gh` silently no-ops there — that's how the ghost-prune went
+  unnoticed as dead code for weeks (#518). Use `curl` + `jq` (both at
+  `/usr/bin/`) with the `ACCESS_TOKEN` from `.env`, which is already the token
+  `entrypoint.sh` mints registration tokens with. Run `gh`-based health checks
+  from a dev host instead.
 - Repo-scope queries (`gh api repos/spore-host/spawn/actions/runners`) show **0** —
   these are **org** runners; always query the org scope.
 - Disk lives on the colima VM volume `/dev/vdb1`; check with

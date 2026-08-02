@@ -17,6 +17,16 @@ export type DisclosureLevel = "guided" | "standard" | "expert";
 /** Ordered least- to most-revealing. Index is the comparison key. */
 export const LEVELS: readonly DisclosureLevel[] = ["guided", "standard", "expert"] as const;
 
+/**
+ * What the header control is called, wherever anything refers the user to it.
+ *
+ * One constant because the name has already drifted once: the control was labelled
+ * "Detail", two surfaces told the user so in a warning, and renaming it to "Mode" left
+ * lagotto and terminal pointing at a control that no longer existed. Someone told a
+ * running SSM session ends when they touch X needs X to be findable.
+ */
+export const LEVEL_CONTROL_NAME = "Mode";
+
 /** Human labels + one line of what each level is FOR, shown in the picker. */
 export const LEVEL_INFO: Record<DisclosureLevel, { label: string; blurb: string }> = {
   guided: {

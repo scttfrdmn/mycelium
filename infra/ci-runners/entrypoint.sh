@@ -46,9 +46,37 @@ fi
 grep -q '^FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=' /home/runner/.env 2>/dev/null \
   || echo 'FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true' >> /home/runner/.env
 
-# --replace lets a reused container (same name, leftover .runner config from the
-# prior cycle or a host reboot) re-register cleanly instead of refusing with
-# "already configured" and crash-looping under restart: always (spore-host#381).
+# Clear any stale LOCAL registration before configuring.
+#
+# `--replace` (below) resolves the *server-side* name conflict only. The check that
+# actually fires on a reused container is local: config.sh refuses outright when
+# /home/runner/.runner exists —
+#
+#   Cannot configure the runner because it is already configured.
+#   To reconfigure the runner, run 'config.cmd remove' or './config.sh remove' first.
+#
+# On a clean exit the `trap cleanup EXIT` below removes the registration, so
+# .runner is gone. On an UNCLEAN stop (host reboot, VM killed, OOM) the trap never
+# runs, .runner survives, and `restart: always` then restarts that container into an
+# unbreakable crash-loop. That is exactly what happened to all 6 runners on
+# 2026-08-01 despite --replace being present (#518) — so do the local removal
+# ourselves rather than assuming --replace covers it.
+if [ -f /home/runner/.runner ]; then
+  echo "stale .runner from an unclean stop — removing local registration first (#518)"
+  RM_TOKEN=$(curl -fsSL -X POST \
+    -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+    -H "Accept: application/vnd.github+json" \
+    "https://api.github.com/orgs/${ORG_NAME}/actions/runners/remove-token" | jq -r .token)
+  if [ -n "$RM_TOKEN" ] && [ "$RM_TOKEN" != "null" ]; then
+    ./config.sh remove --token "$RM_TOKEN" || true
+  fi
+  # config.sh remove can itself fail against a registration the server already
+  # dropped; the local files are what block config.sh, so clear them regardless.
+  rm -f /home/runner/.runner /home/runner/.credentials /home/runner/.credentials_rsaparams 2>/dev/null || true
+fi
+
+# --replace additionally lets us take over a registration the server still lists
+# under this name (e.g. the ghost from a killed container) instead of erroring.
 ./config.sh \
   --url "https://github.com/${ORG_NAME}" \
   --token "$RUNNER_TOKEN" \
