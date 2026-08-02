@@ -103,6 +103,46 @@
 - Branch naming: `feat/`, `fix/`, `refactor/` prefixes
 - PR per feature/fix; link to issue
 
+### Branching: always cut from `origin/main`, with a clean tree
+
+```bash
+git fetch origin main
+git status --porcelain              # must be empty
+git checkout -b fix/123-thing origin/main
+```
+
+**Never** `git checkout -b` from a dirty tree or from a `HEAD` carrying unmerged
+work. `main` is squash-merged and linear, so a topic branch being a few commits
+behind the tip is normal and needs no rebase — but a branch cut from *another
+branch* silently adopts that branch's commits.
+
+Run `scripts/branch-preflight.sh` before opening a PR. It checks the four things
+that actually broke: not on `main`, clean tree, based on `origin/main` history,
+and every commit unique to this branch. `--fix` prints recovery commands.
+
+**Why this is a rule and not a preference.** PR #521 (a CI-runner fix) was branched
+from a tree still holding PR #519's portal commit, so #521's head contained both.
+#521 merged first and carried the portal fix; #519 then merged as an **empty
+commit** (`131f02b`). Because `deploy-site.yaml` and `web-ci.yml` are path-filtered
+on `web/**`, an empty commit matched neither — so the PR whose whole purpose was
+fixing two user-facing strings produced no Web CI run and no site deploy, and
+confirming the fix was live took a bundle-level audit of what S3 was serving.
+
+Corollaries:
+- One topic per PR. A diff spanning `web/` + `infra/` + `lambda/` is usually the
+  dirty-tree symptom, not a design.
+- After a merge, verify the merge commit is **non-empty** when it should have
+  shipped something: `git show --stat <sha>`. An empty diff means another PR
+  already carried your work.
+- For a `web/**` or `docs/**` change, confirm the deploy workflow actually ran —
+  a path-filtered workflow that never triggers looks identical to a passing one.
+- Branches are **not** auto-deleted on merge (`delete_branch_on_merge` is off).
+  Delete yours after merge, or they accumulate — 66 had to be swept once already.
+  The safe test for "is this branch merged?" is **not** `git branch --merged`
+  (squash-merge defeats ancestry) and **not** `git diff main <branch>` (a stale
+  branch reports main's newer files as deletions). Compare the branch tip to the
+  `headRefOid` GitHub recorded for its merged PR.
+
 ## Pre-commit Checks
 - Run before every commit: `gofmt`, `go vet`, `staticcheck`
 - Smoke tests: `go test -short ./...`

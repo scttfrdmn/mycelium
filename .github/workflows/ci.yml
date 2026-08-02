@@ -16,6 +16,84 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  # Catches a PR that carries another in-flight PR's commits, which is how #519
+  # ended up merging as an empty commit: #521 was branched from a tree still
+  # holding #519's work, merged first, and took the portal fix with it. #519 then
+  # had nothing to apply — and an empty commit matches no path filter, so the PR
+  # that existed to fix two user-facing strings triggered neither web-ci.yml nor
+  # deploy-site.yaml. Nothing was red. The work just wasn't where its PR said.
+  #
+  # Unconditional (no paths: filter) so it can be a required check without
+  # deadlocking PRs that don't touch the filtered directories.
+  branch-hygiene:
+    name: Branch hygiene
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    # Job-scoped rather than widening the workflow's `contents: read`: this is the
+    # only job that needs to enumerate other open PRs.
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # Full history: the merge-base and the per-commit reachability checks
+          # below are meaningless against a depth-1 clone.
+          fetch-depth: 0
+
+      - name: PR is non-empty and self-contained
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          base="$(git merge-base "$BASE_SHA" "$HEAD_SHA")"
+          echo "merge-base: $base"
+
+          # 1. An empty PR means someone else already merged this work, so the
+          #    deploy this PR implies will never fire. This is the state #519 was
+          #    in by the time it merged — though not when it was opened, which is
+          #    why check 2 below is the one that would actually have caught it.
+          if [ -z "$(git diff --name-only "$base" "$HEAD_SHA")" ]; then
+            echo "::error::This PR has an empty diff against its merge-base."
+            echo "Another PR has probably already carried these commits. Nothing"
+            echo "would deploy: an empty merge commit matches no path filter."
+            exit 1
+          fi
+          echo "PR diff is non-empty"
+
+          # 2. No commit here may also belong to another OPEN PR.
+          #
+          # Testing against origin/main is not enough and it is worth being precise
+          # about why: when #521 was open, the portal commit it had absorbed had not
+          # yet merged, so "is it on main?" answered no for both of its commits. The
+          # detectable signal at that moment was that #519 was open with the same
+          # commit in its head. That is what this checks.
+          bad=0
+          others="$(gh pr list --state open --json number,headRefOid \
+                      --jq ".[] | select(.number != $PR) | \"\(.number) \(.headRefOid)\"")"
+          while read -r c; do
+            [ -z "$c" ] && continue
+            while read -r n oid; do
+              [ -z "${oid:-}" ] && continue
+              # Fetch the other PR's head so reachability is answerable locally.
+              git fetch --quiet origin "pull/$n/head" 2>/dev/null || continue
+              if git merge-base --is-ancestor "$c" FETCH_HEAD 2>/dev/null; then
+                echo "::error::Commit ${c:0:7} ($(git log -1 --format=%s "$c")) is also in open PR #$n."
+                echo "This branch was cut from unmerged work. Whichever PR merges first"
+                echo "ships both changes; the other merges empty and deploys nothing."
+                bad=1
+              fi
+            done <<< "$others"
+          done < <(git rev-list "$base..$HEAD_SHA")
+          [ "$bad" -eq 0 ] || {
+            echo "Branch from origin/main with a clean tree — see CONTRIBUTING.md."
+            exit 1
+          }
+          echo "no commits shared with another open PR"
+
   lambda-tests:
     name: Lambda module tests
     runs-on: ubuntu-latest
