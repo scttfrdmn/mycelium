@@ -32,6 +32,12 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Report pickup
+        # The marker goes through `env`, never interpolated into the script body:
+        # `${{ inputs.marker }}` inline is shell injection (a dispatch input is
+        # attacker-controlled by anyone with write access), and semgrep's
+        # run-shell-injection rule correctly blocks it.
+        env:
+          MARKER: ${{ inputs.marker }}
         run: |
           echo "picked up by: ${RUNNER_NAME:-unknown} on $(hostname)"
-          echo "marker: ${{ inputs.marker }}"
+          echo "marker: $MARKER"
