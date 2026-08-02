@@ -14,6 +14,26 @@ own changelogs for CLI releases.
 ## [Unreleased]
 
 ### Added
+- **A dead CI runner fleet now alerts instead of going unnoticed** (#520). On
+  2026-08-01 the self-hosted fleet was down ~5.5h and nothing fired: a queued job
+  never fails, it waits, so every open PR's checks silently degraded from "passing"
+  to "unknown" — indistinguishable from "still running". Two new workflows:
+  `fleet-monitor.yml` runs on `ubuntu-latest` every 30 min (a monitor pinned to the
+  fleet it watches cannot fire when that fleet is down — that is precisely why the
+  outage was silent) and dispatches `fleet-canary.yml`, a no-op job pinned to the
+  fleet, then waits to see whether a runner actually *picks it up*. Pickup is the
+  real question: a registered-but-wedged runner still reports `online`, and #518's
+  crash-looping containers flapped between polls. It separately flags any run queued
+  for more than 20 min across the seven repos with fleet-pinned jobs, which catches
+  causes the canary doesn't anticipate.
+
+  Alerts land as a GitHub issue labelled `fleet-outage`, carrying the recovery
+  runbook and the two known causes from #518. Noise is bounded: a sustained outage
+  comments on one issue rather than filing every 30 minutes, and recovery closes it
+  automatically. The alert distinguishes "fleet is dead" from "fleet is alive but
+  runs are piling up", since those need different first moves. No new secret is
+  required — this deliberately avoids the `admin:org` runner-status endpoint, which
+  would answer the weaker question (registered) rather than the real one.
 - **`main` is now a protected branch** (#524 follow-up). It had **no** protection at
   all — no required checks, no restriction on direct pushes — on a branch that
   auto-deploys to spore.host and docs.spore.host. Now: no force pushes, no deletion,
