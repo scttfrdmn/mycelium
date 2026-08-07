@@ -13,6 +13,17 @@ own changelogs for CLI releases.
 
 ## [Unreleased]
 
+### Removed
+- **The self-hosted `orion` CI runner fleet and everything that operated it**
+  (`infra/ci-runners/`, `.github/workflows/{ci-runner-drift,fleet-canary,fleet-monitor}.yml`).
+  All 15 jobs across the 9 repos that pinned to `[self-hosted, orion]` now run
+  on `ubuntu-latest` — orion (colima/Docker on orion.local) is decommissioned
+  org-wide in favor of GitHub-hosted runners, trading the fleet's disk-fill /
+  reboot-crash-loop / Broken-VM failure modes (#381, #518) for GitHub-hosted's
+  own occasional outages and slower minutes — the tradeoff the fleet originally
+  existed to avoid, now accepted deliberately. Also dropped `/infra/ci-runners`
+  from `.github/dependabot.yml`'s docker directories (nothing left to scan).
+
 ### Fixed
 - **Clicking Disconnect no longer reports the session as having closed on its own**
   (#530). Two writers raced and the user-initiated one lost: the Disconnect handler
